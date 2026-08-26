@@ -26,16 +26,29 @@ export class CanvasAdapter {
     if (!context) { new Notice("Open a Canvas before collecting Canvas items."); return []; }
     const document = await this.read(context.file);
     const selectedIds = this.runtimeSelectionIds(context.view);
+    return this.collectIds(document, context.file.path, selectedIds);
+  }
+
+  async collectNode(node: unknown): Promise<PaletteItem[]> {
+    const context = this.activeContext();
+    if (!context) { new Notice("Open a Canvas before collecting Canvas items."); return []; }
+    const document = await this.read(context.file);
+    const id = this.runtimeNodeId(node);
+    if (!id) { new Notice("Unable to identify the selected Canvas item."); return []; }
+    return this.collectIds(document, context.file.path, [id]);
+  }
+
+  private async collectIds(document: CanvasDocument, canvasPath: string, selectedIds: string[]): Promise<PaletteItem[]> {
     if (selectedIds.length === 0) { new Notice("Select one or more Canvas items first."); return []; }
     const selectedNodes = document.nodes.filter((node) => selectedIds.includes(node.id));
     const collectAsGroup = selectedNodes.length > 1 || selectedNodes.some((node) => node.type === "group");
     if (collectAsGroup) {
       const nodes = this.expandGroupNodes(document.nodes, selectedIds);
-      const item = this.groupItem(nodes, document.edges, context.file.path, selectedIds[0]);
+      const item = this.groupItem(nodes, document.edges, canvasPath, selectedIds[0]);
       return item ? [item] : [];
     }
     const node = selectedNodes[0];
-    return node ? [await this.itemFromNode(node, context.file.path)] : [];
+    return node ? [await this.itemFromNode(node, canvasPath)] : [];
   }
 
   async restoreItem(item: PaletteItem, screenX: number, screenY: number): Promise<boolean> {
@@ -123,6 +136,16 @@ export class CanvasAdapter {
       const nodeData = node?.data as Record<string, unknown> | undefined;
       return typeof row.id === "string" ? row.id : typeof data?.id === "string" ? data.id : typeof node?.id === "string" ? node.id : typeof nodeData?.id === "string" ? nodeData.id : "";
     }).filter(Boolean);
+  }
+
+  private runtimeNodeId(value: unknown): string | null {
+    const row = value as Record<string, unknown> | null;
+    if (!row) return null;
+    const data = row.data as Record<string, unknown> | undefined;
+    const node = row.node as Record<string, unknown> | undefined;
+    const nodeData = node?.data as Record<string, unknown> | undefined;
+    const id = typeof row.id === "string" ? row.id : typeof data?.id === "string" ? data.id : typeof node?.id === "string" ? node.id : typeof nodeData?.id === "string" ? nodeData.id : null;
+    return id;
   }
 
   private expandGroupNodes(nodes: CanvasNodeSnapshot[], selectedIds: string[]): CanvasNodeSnapshot[] {

@@ -13,6 +13,7 @@
 - Enable and disable without console errors.
 - Open a Canvas; verify the hover trigger mounts, Mini Palette opens, moves, resizes, and closes without affecting Canvas editing.
 - Collect a Canvas text node, MD node, image node, and Group; inspect, import, drag each to another Canvas, and confirm file references and Group edges/layout.
+- Right-click each Canvas Node type and verify the Canvas Palette menu has both Mini Palette and direct Side Palette Workspace destinations, with no equivalent File Explorer collection action.
 - Export a nested Collection to Canvas and verify the tree edge directions.
 - Create workspaces, collections, and memos; test reorder/move to collection and representative Workspace switching.
 - Verify Light, Dark, Follow Obsidian, Obsidian accent, and custom accent without layout changes.

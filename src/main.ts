@@ -1,4 +1,4 @@
-import { Menu, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import { EventRef, Menu, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { CanvasAdapter } from "./canvas/canvas-adapter";
 import { TextScrapHighlights } from "./canvas/text-scrap-highlights";
 import { createId } from "./core/ids";
@@ -28,12 +28,6 @@ export default class CanvasPalettePlugin extends Plugin {
     this.addCommand({ id: "open-side-palette", name: "Open Side Palette", callback: () => void this.activateSidePalette() });
     this.addCommand({ id: "open-mini-palette", name: "Open Mini Palette on Canvas", callback: () => this.miniPalette.open() });
     this.addCommand({ id: "collect-canvas-selection", name: "Collect selected Canvas items", callback: () => void this.collectCanvasSelection() });
-    this.addCommand({ id: "collect-active-file", name: "Collect active file", checkCallback: (checking) => {
-      const file = this.app.workspace.getActiveFile();
-      if (!file) return false;
-      if (!checking) void this.collectFile(file);
-      return true;
-    }});
     this.addCommand({ id: "collect-selected-text", name: "Collect selected text as card", editorCheckCallback: (checking, editor, view) => {
       const selection = editor.getSelection();
       if (!selection) return false;
@@ -44,9 +38,12 @@ export default class CanvasPalettePlugin extends Plugin {
       const workspace = this.store.createWorkspace(`Workspace ${Object.keys(this.store.data.workspaces).length + 1}`);
       this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed(); new Notice(`Created ${workspace.name}`);
     }});
-    this.registerEvent(this.app.workspace.on("file-menu", (menu: Menu, file) => {
-      if (!(file instanceof TFile)) return;
-      menu.addItem((item) => item.setTitle("Collect in Canvas Palette").setIcon("library-big").onClick(() => void this.collectFile(file)));
+    const workspaceEvents = this.app.workspace as unknown as { on: (name: string, callback: (...args: unknown[]) => unknown) => EventRef };
+    this.registerEvent(workspaceEvents.on("canvas:node-menu", (...args: unknown[]) => {
+      const menu = args[0] as Menu | undefined;
+      const node = args[1];
+      if (!menu || typeof menu.addItem !== "function") return;
+      this.addCanvasNodeCollectionMenu(menu, node);
     }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
       if (this.canvas.activeContext()) this.miniPalette.mount();
@@ -97,15 +94,6 @@ export default class CanvasPalettePlugin extends Plugin {
     new Notice("Text collected in Mini Palette");
   }
 
-  async collectFile(file: TFile): Promise<void> {
-    const imageExtensions = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"]);
-    const type = imageExtensions.has(file.extension.toLowerCase()) ? "image" : "markdown";
-    const now = Date.now();
-    const content = type === "markdown" ? await this.app.vault.cachedRead(file) : undefined;
-    this.store.addPending({ id: createId(type), type, displayTitle: file.basename, tags: [], label: "", caption: "", createdAt: now, modifiedAt: now, origin: { filePath: file.path }, content });
-    new Notice(`${file.name} collected in Mini Palette`);
-  }
-
   async collectCanvasSelection(): Promise<void> {
     const items = await this.canvas.collectSelection();
     if (items.length === 0) return;
@@ -113,6 +101,38 @@ export default class CanvasPalettePlugin extends Plugin {
     this.store.data.uiState.miniPalette.tab = "collect";
     this.miniPalette.open();
     new Notice(`${items.length} Canvas item${items.length === 1 ? "" : "s"} collected.`);
+  }
+
+  private addCanvasNodeCollectionMenu(menu: Menu, node: unknown): void {
+    menu.addSeparator();
+    menu.addItem((item) => item.setTitle("Canvas Palette").setIcon("library-big").setIsLabel(true));
+    menu.addItem((item) => item.setTitle("Collect to Mini Palette").setIcon("inbox").onClick(() => void this.collectCanvasNodeToMini(node)));
+    const currentWorkspace = this.activeWorkspace();
+    if (currentWorkspace) menu.addItem((item) => item.setTitle(`Save directly to Side Palette — ${currentWorkspace.name}`).setIcon("panel-right").onClick(() => void this.collectCanvasNodeToWorkspace(node, currentWorkspace.id)));
+    for (const workspace of Object.values(this.store.data.workspaces)) {
+      if (workspace.id === currentWorkspace?.id) continue;
+      menu.addItem((item) => item.setTitle(`Save directly to Side Palette — ${workspace.name}`).setIcon("panel-right").onClick(() => void this.collectCanvasNodeToWorkspace(node, workspace.id)));
+    }
+  }
+
+  private async collectCanvasNodeToMini(node: unknown): Promise<void> {
+    const items = await this.canvas.collectNode(node);
+    if (items.length === 0) return;
+    for (const item of items) this.store.addPending(item);
+    this.store.data.uiState.miniPalette.tab = "collect";
+    this.miniPalette.open();
+    new Notice(`${items.length} Canvas item${items.length === 1 ? "" : "s"} added to Mini Palette.`);
+  }
+
+  private async collectCanvasNodeToWorkspace(node: unknown, workspaceId: string): Promise<void> {
+    const items = await this.canvas.collectNode(node);
+    if (items.length === 0) return;
+    for (const item of items) this.store.addToWorkspace(workspaceId, item);
+    this.store.data.uiState.activeWorkspaceId = workspaceId;
+    this.store.data.uiState.selectedItemId = items[0].id;
+    this.store.changed();
+    await this.openSidePalette();
+    new Notice(`${items.length} Canvas item${items.length === 1 ? "" : "s"} saved to Side Palette.`);
   }
 
   async openOriginal(item: PaletteItem): Promise<void> {

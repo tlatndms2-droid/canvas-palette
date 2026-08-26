@@ -59,6 +59,17 @@ export class PaletteStore {
     this.changed();
   }
 
+  addToWorkspace(workspaceId: string, item: PaletteItem): void {
+    const workspace = this.data.workspaces[workspaceId];
+    if (!workspace) return;
+    item.origin.workspaceId = workspaceId;
+    this.data.items[item.id] = item;
+    if (!workspace.looseItemIds.includes(item.id)) workspace.looseItemIds.push(item.id);
+    if (item.origin.canvasPath && !workspace.canvasPaths.includes(item.origin.canvasPath)) workspace.canvasPaths.push(item.origin.canvasPath);
+    if (item.origin.canvasPath && !workspace.representativeCanvasPath) workspace.representativeCanvasPath = item.origin.canvasPath;
+    this.changed();
+  }
+
   importPending(workspaceId: string, itemIds: string[]): void {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace) return;

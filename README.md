@@ -2,14 +2,14 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.1.1**
+Current version: **0.1.2**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
 - Schema-versioned persistent model for items, workspaces, collections, pending imports, and UI state.
-- Canvas adapter for selected Canvas Card/MD/Image/Group collection and Canvas JSON restoration.
+- Canvas-only context menu for selected Card/MD/Image/Group: collect to Mini Palette or save directly to a chosen Side Palette Workspace.
 - Floating Mini Palette mounted over the active Canvas, with a hover trigger, drag movement, resize, pin/close controls, and direct Canvas drag-and-drop.
 - Separate Collect review and Storage management experiences; Collect uses an attached Inspector drawer that does not resize its parent.
 - PDF-aligned docked three-pane Storage layout with independent left/right toggle and divider resize.
@@ -31,7 +31,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 
 1. Enable Canvas Palette in Obsidian.
 2. Open the Side Palette from the ribbon or command palette.
-3. On a Canvas, select nodes and use **Collect selected Canvas items**. The selected Card, MD, Image, or Group enters Mini Palette Collect.
+3. Right-click a Canvas Card, MD, Image, or Group. Under **Canvas Palette**, choose **Collect to Mini Palette** for review or **Save directly to Side Palette** for a Workspace.
 4. Hover the Mini Palette trigger at the upper-right of the Canvas, review items in the Inspector, and import them into a Workspace.
 5. Open Side Palette to organize Collections or Mini Palette Storage to search across Workspaces.
 6. Drag an item from either palette directly into a Canvas. Cards create text nodes, files retain their source reference, and Groups restore their subgraph.
@@ -59,6 +59,7 @@ Copy `main.js`, `manifest.json`, and `styles.css` into:
 ## Validation notes
 
 - Canvas integration is implemented through Canvas document JSON plus guarded runtime selection access. It must be exercised against the user's installed Obsidian Canvas version before depending on it for production canvases.
+- Collection entry points deliberately exist only in the Canvas Node context menu; File Explorer and active-file collection shortcuts are not provided.
 - Text scraps preserve source origin/range and are highlighted in the editor; clicking the highlight selects the linked Palette Card and opens Side Palette.
 - `More`, exact copy semantics, final filter-combination rules, and final pane min/max values remain deliberately undecided.
 

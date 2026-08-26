@@ -2,10 +2,10 @@
 
 ## Current state
 
-- Version: `0.1.1`
+- Version: `0.1.2`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.1`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Latest release: `0.1.2`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
 
 ## Implemented
 
@@ -14,6 +14,7 @@
 - Floating Canvas-hosted Mini Palette with hover trigger, window move/resize, Collect Inspector, Storage filters/sort/view modes, docked panes, previews, and Canvas drag/drop.
 - Side Palette divider resize, Card/List Viewport, nested Outliner, Tag/Label indexes, item move/reorder foundations, and Canvas export.
 - Preview service for Markdown, images, and subgraph visualizations.
+- Canvas Node context-menu integration: `Collect to Mini Palette` or `Save directly to Side Palette — <Workspace>`. Vault File Explorer and active-file collection actions were removed because collection is Canvas-native.
 
 ## Architecture
 
