@@ -2,15 +2,15 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.1.14**
+Current version: **0.1.15**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
 - Schema-versioned persistent model for items, workspaces, collections, pending imports, and UI state.
-- Canvas-only context menus for selected Card/MD/Image/Group nodes and selected text: collect to Mini Palette or save directly to a chosen Side Palette Workspace.
-- Canvas node context menus can edit Palette Tags, Label, and Caption before collection. Metadata uses a responsive reference-card layout with a title/Label header, preserved native content area, Tag-chip/date footer, and external Caption. Typography, spacing, chips, and chrome scale with the resized Canvas node; empty metadata produces no overlay.
+- The native selected-node Canvas toolbar provides metadata editing, Mini Palette collection, and direct Side Palette storage for Card/MD/Image/Group nodes. Selected Canvas text keeps the same collection routes in its editor context menu.
+- The selected-node Canvas toolbar can create Palette Tags, Label, and Caption before collection. Existing Label, Tag, and Caption values can then be edited in place by double-clicking their visible overlay; Enter or focus loss saves, Escape cancels, and the automatic date remains read-only. The overlay preserves the native Canvas card and scales with the resized node.
 - Floating Mini Palette mounted over the active Canvas, with a hover trigger, drag movement, resize, pin/close controls, and direct Canvas drag-and-drop.
 - Separate Collect review and Storage management experiences; Collect uses an attached Inspector drawer that does not resize its parent.
 - PDF-aligned docked three-pane Storage layout with independent left/right toggle and divider resize.
@@ -37,8 +37,8 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 
 1. Enable Canvas Palette in Obsidian.
 2. Open the Side Palette from the ribbon or command palette.
-3. Right-click a Canvas Card, MD, Image, or Group. Under **Canvas Palette**, choose **Collect to Mini Palette** for review or **Save directly to Side Palette** for a Workspace.
-   Choose **Edit Palette Metadata** first if you want to attach Tags, a Label, or a Caption before collection; those values are inherited by the collected Item.
+3. Select a Canvas Card, MD, Image, or Group. In the native node toolbar, choose **Collect to Mini Palette** for review or **Save directly to Side Palette** for a Workspace.
+   Choose **Edit Palette Metadata** first if you want to attach Tags, a Label, or a Caption before collection. Afterward, double-click the visible Label, Tag, or Caption to edit it directly on the card. Those values are inherited by the collected Item.
 4. Hover the Mini Palette trigger at the upper-right of the Canvas, review items in the Inspector, and import them into a Workspace.
 5. Open Side Palette to organize Collections or Mini Palette Storage to search across Workspaces.
 6. Drag an item from either palette directly into a Canvas. Cards create text nodes, Markdown and images remain source-linked file nodes, and Groups restore their subgraph.

@@ -5,6 +5,7 @@ import type { CanvasAdapter, CanvasRuntimeNodeLike } from "./canvas-adapter";
 export class CanvasMetadataController {
   private timer: number | null = null;
   private readonly nodesByElement = new WeakMap<Element, CanvasRuntimeNodeLike>();
+  private readonly activeEditors = new WeakSet<HTMLElement>();
   private readonly resizeObserver = new ResizeObserver((entries) => {
     for (const entry of entries) {
       const node = this.nodesByElement.get(entry.target);
@@ -23,7 +24,7 @@ export class CanvasMetadataController {
     for (const context of this.adapter.openContexts()) {
       const nodes = context.runtime.nodes;
       if (!(nodes instanceof Map)) continue;
-      for (const [nodeId, node] of nodes) this.decorate(node, this.plugin.store.getCanvasNodeMetadata(context.file.path, nodeId));
+      for (const [nodeId, node] of nodes) this.decorate(node, context.file.path, nodeId, this.plugin.store.getCanvasNodeMetadata(context.file.path, nodeId));
     }
   }
 
@@ -37,9 +38,11 @@ export class CanvasMetadataController {
     }
   }
 
-  private decorate(node: CanvasRuntimeNodeLike, metadata: PaletteMetadata | undefined): void {
+  private decorate(node: CanvasRuntimeNodeLike, canvasPath: string, nodeId: string, metadata: PaletteMetadata | undefined): void {
     const nodeEl = node.nodeEl;
     if (!(nodeEl instanceof HTMLElement)) return;
+    const activeEditor = nodeEl.querySelector<HTMLElement>(":scope > .cp-canvas-metadata .cp-canvas-metadata__editor");
+    if (activeEditor && this.activeEditors.has(activeEditor)) return;
     this.remove(node);
     if (!metadata || (metadata.tags.length === 0 && !metadata.label && !metadata.caption)) return;
     const data = node.getData?.();
@@ -50,15 +53,89 @@ export class CanvasMetadataController {
       const header = layer.createDiv({ cls: "cp-canvas-metadata__header" });
       const label = header.createDiv({ cls: "cp-canvas-metadata__label", text: metadata.label });
       if (metadata.labelColor) label.style.setProperty("--cp-label-color", metadata.labelColor);
+      this.makeInlineEditable(label, "Edit label", metadata.label, (value) => {
+        this.saveMetadata(canvasPath, nodeId, { label: value });
+      });
     }
     const footer = layer.createDiv({ cls: "cp-canvas-metadata__footer" });
     const tags = footer.createDiv({ cls: "cp-canvas-metadata__tags" });
-    for (const tag of metadata.tags) tags.createSpan({ cls: "cp-canvas-metadata__tag", text: `#${tag}` });
+    for (const [index, tag] of metadata.tags.entries()) {
+      const tagEl = tags.createSpan({ cls: "cp-canvas-metadata__tag", text: `#${tag}` });
+      this.makeInlineEditable(tagEl, "Edit tag", tag, (value) => {
+        const current = this.plugin.store.getCanvasNodeMetadata(canvasPath, nodeId);
+        if (!current) return;
+        const nextTags = [...current.tags];
+        const normalized = value.trim().replace(/^#/, "");
+        if (normalized) nextTags[index] = normalized;
+        else nextTags.splice(index, 1);
+        this.saveMetadata(canvasPath, nodeId, { tags: [...new Set(nextTags)] });
+      });
+    }
     footer.createDiv({ cls: "cp-canvas-metadata__date", text: new Date(metadata.modifiedAt).toLocaleDateString() });
-    if (metadata.caption) layer.createDiv({ cls: "cp-canvas-metadata__caption", text: metadata.caption });
+    if (metadata.caption) {
+      const caption = layer.createDiv({ cls: "cp-canvas-metadata__caption", text: metadata.caption });
+      this.makeInlineEditable(caption, "Edit caption", metadata.caption, (value) => {
+        this.saveMetadata(canvasPath, nodeId, { caption: value });
+      });
+    }
     this.nodesByElement.set(nodeEl, node);
     this.resizeObserver.observe(nodeEl);
     this.updateScale(node);
+  }
+
+  private makeInlineEditable(element: HTMLElement, label: string, value: string, onCommit: (value: string) => void): void {
+    element.setAttribute("title", `${label} (double-click)`);
+    element.addEventListener("pointerdown", (event) => event.stopPropagation());
+    element.addEventListener("click", (event) => event.stopPropagation());
+    element.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (element.closest(".cp-canvas-metadata")?.querySelector(".cp-canvas-metadata__editor")) return;
+
+      const editor = document.createElement("input");
+      editor.type = "text";
+      editor.className = `cp-canvas-metadata__editor ${element.className}`;
+      this.activeEditors.add(editor);
+      editor.value = value;
+      editor.setAttribute("aria-label", label);
+      editor.setAttribute("title", "Enter or focus out to save; Escape to cancel");
+      if (element.style.getPropertyValue("--cp-label-color")) {
+        editor.style.setProperty("--cp-label-color", element.style.getPropertyValue("--cp-label-color"));
+      }
+      element.replaceWith(editor);
+
+      let finished = false;
+      const finish = (save: boolean): void => {
+        if (finished) return;
+        finished = true;
+        editor.classList.remove("cp-canvas-metadata__editor");
+        editor.disabled = true;
+        if (save) onCommit(editor.value.trim());
+        else this.refreshSoon();
+      };
+      editor.addEventListener("pointerdown", (inputEvent) => inputEvent.stopPropagation());
+      editor.addEventListener("click", (inputEvent) => inputEvent.stopPropagation());
+      editor.addEventListener("dblclick", (inputEvent) => inputEvent.stopPropagation());
+      editor.addEventListener("keydown", (inputEvent) => {
+        inputEvent.stopPropagation();
+        if (inputEvent.isComposing) return;
+        if (inputEvent.key === "Enter") { inputEvent.preventDefault(); finish(true); editor.blur(); }
+        else if (inputEvent.key === "Escape") { inputEvent.preventDefault(); finish(false); }
+      });
+      editor.addEventListener("blur", () => finish(true));
+      window.requestAnimationFrame(() => { editor.focus(); editor.select(); });
+    });
+  }
+
+  private saveMetadata(canvasPath: string, nodeId: string, changes: Partial<Pick<PaletteMetadata, "tags" | "label" | "caption">>): void {
+    const current = this.plugin.store.getCanvasNodeMetadata(canvasPath, nodeId);
+    if (!current) { this.refreshSoon(); return; }
+    this.plugin.store.setCanvasNodeMetadata(canvasPath, nodeId, {
+      tags: changes.tags ?? current.tags,
+      label: changes.label ?? current.label,
+      labelColor: (changes.label ?? current.label) ? current.labelColor : "",
+      caption: changes.caption ?? current.caption
+    });
   }
 
   private remove(node: CanvasRuntimeNodeLike): void {
