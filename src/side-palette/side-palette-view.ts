@@ -1,6 +1,6 @@
 import { ItemView, Menu, WorkspaceLeaf } from "obsidian";
 import type CanvasPalettePlugin from "../main";
-import type { Collection, PaletteItem } from "../core/types";
+import type { Collection, PaletteItem, SideLayoutState } from "../core/types";
 import { ConfirmDeleteModal, ItemEditorModal, TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, workspaceSelect } from "../ui/render";
@@ -24,9 +24,7 @@ export class SidePaletteView extends ItemView {
     if (this.plugin.store.data.settings.accentMode === "custom") root.style.setProperty("--cp-accent", this.plugin.store.data.settings.accentColor);
     const workspace = this.plugin.activeWorkspace();
     if (!workspace) return;
-    root.style.setProperty("--cp-side-left", `${Math.round(workspace.sideLayout.viewportRatio * 100)}%`);
-    root.style.setProperty("--cp-side-top", `${Math.round(workspace.sideLayout.topRatio * 100)}%`);
-    root.style.setProperty("--cp-side-index", `${Math.round(workspace.sideLayout.indexRatio * 100)}%`);
+    this.applyLayoutVariables(root, workspace.sideLayout);
     const header = root.createDiv({ cls: "cp-side__header" });
     header.createDiv({ cls: "cp-brand", text: "Canvas Palette" });
     const exportButton = header.createEl("button", { text: "Export" }); exportButton.addEventListener("click", () => void this.plugin.exportActiveWorkspace());
@@ -39,15 +37,24 @@ export class SidePaletteView extends ItemView {
     const top = root.createDiv({ cls: "cp-side__top" });
     const viewport = top.createDiv({ cls: "cp-panel cp-viewport" }); this.renderViewport(viewport, workspace.id);
     const vDivider = top.createDiv({ cls: "cp-divider cp-divider--vertical" });
-    makeHorizontalDivider(vDivider, (x) => { const rect = top.getBoundingClientRect(); workspace.sideLayout.viewportRatio = Math.max(0.28, Math.min(0.72, (x - rect.left) / rect.width)); this.plugin.store.changed(); });
+    makeHorizontalDivider(vDivider, (x) => {
+      workspace.sideLayout.viewportRatio = this.horizontalRatio(top, vDivider, x, 160, 180);
+      this.applyLayoutVariables(root, workspace.sideLayout);
+    }, () => this.plugin.store.changed());
     const outliner = top.createDiv({ cls: "cp-panel cp-outliner" }); this.renderOutliner(outliner, workspace.id);
     const hDivider = root.createDiv({ cls: "cp-divider cp-divider--horizontal" });
-    makeVerticalDivider(hDivider, (y) => { const rect = root.getBoundingClientRect(); workspace.sideLayout.topRatio = Math.max(0.45, Math.min(0.82, (y - rect.top) / rect.height)); this.plugin.store.changed(); });
     const indexes = root.createDiv({ cls: "cp-side__indexes" });
-    const tags = indexes.createDiv({ cls: "cp-panel" }); this.renderIndex(tags, "Tag index", this.items(workspace.id).flatMap((item) => item.tags), "#");
+    makeVerticalDivider(hDivider, (y) => {
+      workspace.sideLayout.topRatio = this.verticalRatio(top, indexes, hDivider, y);
+      this.applyLayoutVariables(root, workspace.sideLayout);
+    }, () => this.plugin.store.changed());
+    const tags = indexes.createDiv({ cls: "cp-panel cp-tag-index" }); this.renderIndex(tags, "Tag index", this.items(workspace.id).flatMap((item) => item.tags), "#");
     const iDivider = indexes.createDiv({ cls: "cp-divider cp-divider--vertical" });
-    makeHorizontalDivider(iDivider, (x) => { const rect = indexes.getBoundingClientRect(); workspace.sideLayout.indexRatio = Math.max(0.25, Math.min(0.75, (x - rect.left) / rect.width)); this.plugin.store.changed(); });
-    const labels = indexes.createDiv({ cls: "cp-panel" }); this.renderIndex(labels, "Label index", this.items(workspace.id).map((item) => item.label).filter(Boolean), "");
+    makeHorizontalDivider(iDivider, (x) => {
+      workspace.sideLayout.indexRatio = this.horizontalRatio(indexes, iDivider, x, 130, 130);
+      this.applyLayoutVariables(root, workspace.sideLayout);
+    }, () => this.plugin.store.changed());
+    const labels = indexes.createDiv({ cls: "cp-panel cp-label-index" }); this.renderIndex(labels, "Label index", this.items(workspace.id).map((item) => item.label).filter(Boolean), "");
   }
 
   private renderViewport(parent: HTMLElement, workspaceId: string): void {
@@ -115,6 +122,33 @@ export class SidePaletteView extends ItemView {
   }
 
   private items(workspaceId: string): PaletteItem[] { return this.plugin.store.itemsForWorkspace(workspaceId); }
+  private applyLayoutVariables(root: HTMLElement, layout: SideLayoutState): void {
+    root.style.setProperty("--cp-side-upper-left", `${layout.viewportRatio}fr`);
+    root.style.setProperty("--cp-side-upper-right", `${1 - layout.viewportRatio}fr`);
+    root.style.setProperty("--cp-side-upper", `${layout.topRatio}fr`);
+    root.style.setProperty("--cp-side-lower", `${1 - layout.topRatio}fr`);
+    root.style.setProperty("--cp-side-lower-left", `${layout.indexRatio}fr`);
+    root.style.setProperty("--cp-side-lower-right", `${1 - layout.indexRatio}fr`);
+  }
+  private horizontalRatio(container: HTMLElement, divider: HTMLElement, clientX: number, leftMinimum: number, rightMinimum: number): number {
+    const rect = container.getBoundingClientRect();
+    const dividerWidth = divider.getBoundingClientRect().width;
+    const available = Math.max(1, rect.width - dividerWidth);
+    const minLeft = Math.min(leftMinimum, available * 0.4);
+    const minRight = Math.min(rightMinimum, available * 0.4);
+    const left = this.clamp(clientX - rect.left - dividerWidth / 2, minLeft, available - minRight);
+    return left / available;
+  }
+  private verticalRatio(upper: HTMLElement, lower: HTMLElement, divider: HTMLElement, clientY: number): number {
+    const upperRect = upper.getBoundingClientRect();
+    const available = Math.max(1, upperRect.height + lower.getBoundingClientRect().height);
+    const dividerHeight = divider.getBoundingClientRect().height;
+    const minUpper = Math.min(230, available * 0.65);
+    const minLower = Math.min(110, available * 0.3);
+    const upperHeight = this.clamp(clientY - upperRect.top - dividerHeight / 2, minUpper, available - minLower);
+    return upperHeight / available;
+  }
+  private clamp(value: number, minimum: number, maximum: number): number { return Math.max(minimum, Math.min(maximum, value)); }
   private setSideView(viewMode: "grid" | "list"): void { const workspace = this.plugin.activeWorkspace(); if (!workspace) return; workspace.sideLayout.viewMode = viewMode; this.plugin.store.changed(); }
   private promptCollection(workspaceId: string, parentId: string | null): void { new TextPromptModal(this.app, "New collection", "", (value) => this.plugin.store.createCollection(workspaceId, value, parentId), "Collection name").open(); }
   private itemMenu(event: MouseEvent, item: PaletteItem): void {

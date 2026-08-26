@@ -26,3 +26,13 @@
 .cp-quick-editor-header.is-dragging{cursor:grabbing}.cp-quick-editor-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:var(--font-semibold)}.cp-quick-editor-actions{display:flex;gap:2px}.cp-quick-editor-actions button{cursor:pointer}
 .cp-quick-editor-body{position:relative;flex:1 1 auto;min-height:0}.cp-native-editor-host,.cp-native-editor-host>.workspace-split{box-sizing:border-box;width:100%;height:100%;min-height:0}.cp-native-editor-host .workspace-tabs,.cp-native-editor-host .workspace-leaf,.cp-native-editor-host .workspace-leaf-content,.cp-native-editor-host .view-content{height:100%;min-height:0}.cp-native-editor-host .workspace-tab-header-container,.cp-native-editor-host .view-header{display:none}
 .cp-quick-editor-status{flex:0 0 auto;padding:4px 12px;overflow:hidden;border-top:1px solid var(--background-modifier-border);background:var(--background-secondary);color:var(--text-muted);font-size:var(--font-ui-smaller);text-overflow:ellipsis;white-space:nowrap}
+
+/* Side Palette split panes: three independent persisted splitters. */
+.workspace-leaf-content .view-content.cp-side{grid-template-rows:auto auto auto minmax(230px,var(--cp-side-upper)) 8px minmax(110px,var(--cp-side-lower));width:100%;min-width:0;overflow:hidden}
+.cp-side__top{grid-template-columns:minmax(min(160px,40%),var(--cp-side-upper-left)) 8px minmax(min(180px,40%),var(--cp-side-upper-right));min-width:0;min-height:0;overflow:hidden}
+.cp-side__indexes{grid-template-columns:minmax(min(130px,40%),var(--cp-side-lower-left)) 8px minmax(min(130px,40%),var(--cp-side-lower-right));min-width:0;min-height:0;overflow:hidden}
+.cp-side .cp-panel{min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain}
+.cp-side>.cp-divider--horizontal{width:100%;height:8px;touch-action:none}
+.cp-side__top>.cp-divider--vertical,.cp-side__indexes>.cp-divider--vertical{width:8px;height:100%;touch-action:none}
+.cp-side>.cp-divider--horizontal::after{top:3px}.cp-side__top>.cp-divider--vertical::after,.cp-side__indexes>.cp-divider--vertical::after{left:3px}
+.cp-is-resizing,.cp-is-resizing *{user-select:none!important}.cp-is-resizing--column,.cp-is-resizing--column *{cursor:col-resize!important}.cp-is-resizing--row,.cp-is-resizing--row *{cursor:row-resize!important}
