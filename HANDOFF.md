@@ -5,7 +5,7 @@
 - Version: `0.1.1`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Release target: `0.1.1`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Latest release: `0.1.1`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
 
 ## Implemented
 
