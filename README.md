@@ -2,20 +2,22 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.1.2**
+Current version: **0.1.3**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
 - Schema-versioned persistent model for items, workspaces, collections, pending imports, and UI state.
-- Canvas-only context menu for selected Card/MD/Image/Group: collect to Mini Palette or save directly to a chosen Side Palette Workspace.
+- Canvas-only context menus for selected Card/MD/Image/Group nodes and selected text: collect to Mini Palette or save directly to a chosen Side Palette Workspace.
 - Floating Mini Palette mounted over the active Canvas, with a hover trigger, drag movement, resize, pin/close controls, and direct Canvas drag-and-drop.
 - Separate Collect review and Storage management experiences; Collect uses an attached Inspector drawer that does not resize its parent.
 - PDF-aligned docked three-pane Storage layout with independent left/right toggle and divider resize.
 - Side Palette with representative workspaces, search, Card/List Viewport, Outliner, nested collections, Tag Index, Label Index, and independent scroll regions.
-- Item/collection organization: collection creation, nesting, rename, Canvas drag drop, Viewport reorder, and move-to-collection actions.
-- Type-specific Card, Markdown, Image, and Group rendering; Markdown preview, source image preview, and subgraph preview.
+- Item/collection organization: collection creation, nesting, rename, Canvas drag drop, Viewport reorder, multi-selection, batch tag editing, deletion, and move-to-collection actions.
+- Type-specific Card, Markdown, Image, and Group rendering; rendered Markdown, source image preview, and subgraph preview with content-first card layouts.
+- Double-click detail/editor popup for every asset type, including common metadata, type-specific preview/content, and linked Canvas paths.
+- Canvas placement history per asset, recorded after drag/drop or export and displayed in Side/Mini Palette cards and the detail popup.
 - Group serializer/restorer that remaps IDs while retaining internal nodes, edges, nested parent references, dimensions, and relative positions.
 - Collection-to-Canvas mind-map export.
 - Follow Obsidian, Light, and Dark themes with a shared design system; use the Obsidian accent or a custom accent color.
@@ -34,7 +36,8 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 3. Right-click a Canvas Card, MD, Image, or Group. Under **Canvas Palette**, choose **Collect to Mini Palette** for review or **Save directly to Side Palette** for a Workspace.
 4. Hover the Mini Palette trigger at the upper-right of the Canvas, review items in the Inspector, and import them into a Workspace.
 5. Open Side Palette to organize Collections or Mini Palette Storage to search across Workspaces.
-6. Drag an item from either palette directly into a Canvas. Cards create text nodes, files retain their source reference, and Groups restore their subgraph.
+6. Drag an item from either palette directly into a Canvas. Cards create text nodes, Markdown and images remain source-linked file nodes, and Groups restore their subgraph.
+7. Ctrl/Cmd-click items for multi-selection; double-click any item to open its detail/editor popup.
 
 ## Installation for development
 
@@ -59,7 +62,7 @@ Copy `main.js`, `manifest.json`, and `styles.css` into:
 ## Validation notes
 
 - Canvas integration is implemented through Canvas document JSON plus guarded runtime selection access. It must be exercised against the user's installed Obsidian Canvas version before depending on it for production canvases.
-- Collection entry points deliberately exist only in the Canvas Node context menu; File Explorer and active-file collection shortcuts are not provided.
+- Collection entry points deliberately exist only inside Canvas node and Canvas text-selection context menus; File Explorer and active-file collection shortcuts are not provided.
 - Text scraps preserve source origin/range and are highlighted in the editor; clicking the highlight selects the linked Palette Card and opens Side Palette.
 - `More`, exact copy semantics, final filter-combination rules, and final pane min/max values remain deliberately undecided.
 

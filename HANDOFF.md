@@ -2,19 +2,19 @@
 
 ## Current state
 
-- Version: `0.1.2`
+- Version: `0.1.3`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.2`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Latest release: `0.1.3`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
 
 ## Implemented
 
-- Schema version 2 migration, Workspace Canvas association, per-workspace Side layout, Mini Palette geometry, themes, and custom Accent persistence.
+- Schema version 3 migration, Workspace Canvas association, per-item Canvas placement history, per-workspace Side layout, Mini Palette geometry, themes, and custom Accent persistence.
 - Canvas Adapter for guarded active Canvas selection, Canvas JSON capture, file/text/group creation, Group ID remapping, and Collection mind-map export.
 - Floating Canvas-hosted Mini Palette with hover trigger, window move/resize, Collect Inspector, Storage filters/sort/view modes, docked panes, previews, and Canvas drag/drop.
-- Side Palette divider resize, Card/List Viewport, nested Outliner, Tag/Label indexes, item move/reorder foundations, and Canvas export.
-- Preview service for Markdown, images, and subgraph visualizations.
-- Canvas Node context-menu integration: `Collect to Mini Palette` or `Save directly to Side Palette — <Workspace>`. Vault File Explorer and active-file collection actions were removed because collection is Canvas-native.
+- Side Palette divider resize, content-first type-aware Card/List Viewport, nested Outliner, Tag/Label indexes, item move/reorder, multi-selection, batch tags, guarded deletion, and type-preserving Canvas export.
+- Preview service for rendered Markdown, images, and subgraph visualizations; every asset type opens a shared double-click detail/editor popup.
+- Canvas Node and selected-text context-menu integration: `Collect to Mini Palette` or `Save directly to Side Palette — <Workspace>`. Vault File Explorer and active-file collection actions remain excluded because collection is Canvas-native.
 
 ## Architecture
 
@@ -34,7 +34,7 @@ Views mutate data through `PaletteStore`; search and preview remain separate. Al
 
 ## Important data model
 
-- `PaletteItem`: common metadata plus optional content/group snapshot.
+- `PaletteItem`: common metadata plus optional content/group snapshot and accumulated Canvas placement records.
 - `origin`: optional Canvas path/node, workspace, and Vault file path.
 - `PaletteWorkspace`: Canvas associations, representative Canvas paths, root collections, and loose items.
 - `Collection`: virtual nested folder; it must never create Vault folders.

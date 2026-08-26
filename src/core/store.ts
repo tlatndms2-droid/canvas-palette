@@ -85,7 +85,7 @@ export class PaletteStore {
     this.changed();
   }
 
-  updateItem(id: string, changes: Pick<PaletteItem, "displayTitle" | "tags" | "label" | "caption">): void {
+  updateItem(id: string, changes: Pick<PaletteItem, "displayTitle" | "tags" | "label" | "caption"> & Partial<Pick<PaletteItem, "content">>): void {
     const item = this.data.items[id];
     if (!item) return;
     Object.assign(item, changes, { modifiedAt: Date.now() });
@@ -148,6 +148,19 @@ export class PaletteStore {
     this.changed();
   }
 
+  recordCanvasPlacement(itemId: string, canvasPath: string, nodeIds: string[]): void {
+    const item = this.data.items[itemId];
+    if (!item) return;
+    const placement = item.canvasPlacements.find((candidate) => candidate.canvasPath === canvasPath);
+    if (placement) {
+      placement.nodeIds = [...new Set([...placement.nodeIds, ...nodeIds])];
+      placement.placedAt = Date.now();
+    } else item.canvasPlacements.push({ canvasPath, nodeIds: [...new Set(nodeIds)], placedAt: Date.now() });
+    const workspaceId = item.origin.workspaceId;
+    if (workspaceId) this.associateCanvas(workspaceId, canvasPath);
+    else this.changed();
+  }
+
   itemsForWorkspace(workspaceId: string | null, includeCollections = true): PaletteItem[] {
     if (!workspaceId) return [];
     const workspace = this.data.workspaces[workspaceId];
@@ -173,6 +186,9 @@ export class PaletteStore {
     this.data.pendingItemIds = this.data.pendingItemIds.filter((id) => !itemIds.includes(id));
     for (const workspace of Object.values(this.data.workspaces)) workspace.looseItemIds = workspace.looseItemIds.filter((id) => !itemIds.includes(id));
     for (const collection of Object.values(this.data.collections)) collection.itemIds = collection.itemIds.filter((id) => !itemIds.includes(id));
+    this.data.uiState.sideSelectedItemIds = this.data.uiState.sideSelectedItemIds.filter((id) => !itemIds.includes(id));
+    this.data.uiState.miniPalette.selectedItemIds = this.data.uiState.miniPalette.selectedItemIds.filter((id) => !itemIds.includes(id));
+    if (this.data.uiState.selectedItemId && itemIds.includes(this.data.uiState.selectedItemId)) this.data.uiState.selectedItemId = null;
     this.changed();
   }
 }

@@ -17,12 +17,13 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
   return button;
 }
 
-export interface ItemRenderOptions { selected: boolean; compact?: boolean; draggable?: boolean; onSelect: () => void; onContextMenu?: (event: MouseEvent) => void; }
+export interface ItemRenderOptions { selected: boolean; compact?: boolean; draggable?: boolean; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onContextMenu?: (event: MouseEvent) => void; }
 
 export function renderItem(parent: HTMLElement, item: PaletteItem, options: ItemRenderOptions): HTMLElement {
   const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${options.selected ? " is-selected" : ""}${options.compact ? " is-compact" : ""}` });
   card.dataset.itemId = item.id;
   card.tabIndex = 0;
+  if (options.selected) { const marker = card.createSpan({ cls: "cp-item__selection", attr: { "aria-label": "Selected" } }); setIcon(marker, "check"); }
   const header = card.createDiv({ cls: "cp-item__header" });
   const icon = header.createSpan({ cls: "cp-item__icon" });
   setIcon(icon, TYPE_ICON[item.type]);
@@ -32,6 +33,12 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   if (item.type === "image" && item.origin.filePath) body.createDiv({ cls: "cp-image-placeholder", text: item.origin.filePath });
   else if (item.type === "group") body.createDiv({ text: `${item.group?.nodes.length ?? 0} nodes · ${item.group?.edges.length ?? 0} edges` });
   else body.setText((item.content ?? item.origin.filePath ?? "No preview").slice(0, 240));
+  const canvasPaths = [...new Set([item.origin.canvasPath, ...item.canvasPlacements.map((placement) => placement.canvasPath)].filter((path): path is string => Boolean(path)))];
+  if (canvasPaths.length > 0) {
+    const links = card.createDiv({ cls: "cp-item__canvas-links", attr: { title: canvasPaths.join("\n") } });
+    const linkIcon = links.createSpan(); setIcon(linkIcon, "workflow");
+    links.createSpan({ text: canvasPaths.map(canvasName).slice(0, 2).join(", ") + (canvasPaths.length > 2 ? ` +${canvasPaths.length - 2}` : "") });
+  }
   const footer = card.createDiv({ cls: "cp-item__footer" });
   footer.createSpan({ text: item.tags.map((tag) => `#${tag}`).join(" ") });
   footer.createSpan({ text: new Date(item.modifiedAt).toLocaleDateString() });
@@ -46,11 +53,19 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
     });
     card.addEventListener("dragend", () => card.removeClass("is-dragging"));
   }
-  card.addEventListener("click", options.onSelect);
+  let clickTimer: number | null = null;
+  card.addEventListener("click", (event) => {
+    if (!options.onOpen) { options.onSelect(event); return; }
+    if (clickTimer !== null) window.clearTimeout(clickTimer);
+    clickTimer = window.setTimeout(() => { clickTimer = null; options.onSelect(event); }, 220);
+  });
+  card.addEventListener("dblclick", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; event.preventDefault(); event.stopPropagation(); options.onOpen?.(); });
   card.addEventListener("contextmenu", (event) => options.onContextMenu?.(event));
-  card.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") options.onSelect(); });
+  card.addEventListener("keydown", (event) => { if (event.key === "Enter") options.onOpen?.(); else if (event.key === " ") options.onSelect(event); });
   return card;
 }
+
+function canvasName(path: string): string { return path.split("/").pop()?.replace(/\.canvas$/i, "") ?? path; }
 
 export function renderPreviewInCard(service: PreviewService, parent: HTMLElement, item: PaletteItem): void { void service.render(parent, item, true); }
 

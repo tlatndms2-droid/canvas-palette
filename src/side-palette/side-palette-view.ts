@@ -1,7 +1,7 @@
 import { ItemView, Menu, WorkspaceLeaf } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { Collection, PaletteItem } from "../core/types";
-import { TextPromptModal } from "../ui/modal";
+import { ConfirmDeleteModal, ItemEditorModal, TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, workspaceSelect } from "../ui/render";
 
@@ -52,10 +52,16 @@ export class SidePaletteView extends ItemView {
 
   private renderViewport(parent: HTMLElement, workspaceId: string): void {
     const header = parent.createDiv({ cls: "cp-panel__header" }); header.createEl("h4", { text: "Viewport" });
+    const selectedIds = this.sideSelectedIds().filter((id) => this.plugin.store.data.items[id]);
     const memo = header.createEl("button", { text: "+ Memo" }); memo.addEventListener("click", () => void this.plugin.createMemo());
     const grid = header.createEl("button", { text: "Grid", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "grid" ? "is-active" : "" });
     const list = header.createEl("button", { text: "List", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "list" ? "is-active" : "" });
     grid.addEventListener("click", () => this.setSideView("grid")); list.addEventListener("click", () => this.setSideView("list"));
+    if (selectedIds.length > 0) {
+      const batch = parent.createDiv({ cls: "cp-batch-bar" }); batch.createSpan({ cls: "cp-selection-count", text: `Selected ${selectedIds.length}` });
+      const tags = batch.createEl("button", { text: "Edit tags" }); tags.addEventListener("click", () => this.editSelectedTags(selectedIds));
+      const remove = batch.createEl("button", { text: "Delete", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmDelete(selectedIds));
+    }
     const options = parent.createEl("details", { cls: "cp-view-options" }); options.createEl("summary", { text: "View settings" });
     const cardSize = options.createEl("input", { attr: { type: "range", min: "160", max: "360", value: String(this.plugin.store.data.settings.cardSize) } });
     cardSize.addEventListener("input", () => { this.plugin.store.data.settings.cardSize = Number(cardSize.value); this.plugin.store.changed(); });
@@ -68,8 +74,8 @@ export class SidePaletteView extends ItemView {
       if (sourceId && targetId) { event.preventDefault(); this.plugin.store.reorderItems(workspaceId, sourceId, targetId); }
     });
     for (const item of this.plugin.search.filter(this.items(workspaceId), this.query)) {
-      const card = renderItem(listEl, item, { selected: item.id === this.plugin.store.data.uiState.selectedItemId, onSelect: () => this.plugin.selectItem(item.id), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
-      const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body && (item.type === "image" || item.type === "group")) void this.plugin.preview.render(body, item, true);
+      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), onSelect: (event) => this.selectSideItem(item.id, event.ctrlKey || event.metaKey), onOpen: () => new ItemEditorModal(this.app, this.plugin, item.id).open(), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+      const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body) void this.plugin.preview.render(body, item, true);
     }
     if (listEl.childElementCount === 0) listEl.createDiv({ cls: "cp-empty", text: "No matching items." });
   }
@@ -96,7 +102,11 @@ export class SidePaletteView extends ItemView {
   }
 
   private renderOutlineItem(parent: HTMLElement, item: PaletteItem, depth: number): void {
-    const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${item.id === this.plugin.store.data.uiState.selectedItemId ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.setText(`${item.type.toUpperCase()}  ${item.displayTitle}`); row.addEventListener("click", () => this.plugin.selectItem(item.id));
+    const selected = this.sideSelectedIds().includes(item.id);
+    const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${selected ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.setText(`${selected ? "✓ " : ""}${item.type.toUpperCase()}  ${item.displayTitle}`);
+    let clickTimer: number | null = null;
+    row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.selectSideItem(item.id, event.ctrlKey || event.metaKey); }, 220); });
+    row.addEventListener("dblclick", () => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; new ItemEditorModal(this.app, this.plugin, item.id).open(); });
   }
 
   private renderIndex(parent: HTMLElement, title: string, values: string[], prefix: string): void {
@@ -109,8 +119,27 @@ export class SidePaletteView extends ItemView {
   private promptCollection(workspaceId: string, parentId: string | null): void { new TextPromptModal(this.app, "New collection", "", (value) => this.plugin.store.createCollection(workspaceId, value, parentId), "Collection name").open(); }
   private itemMenu(event: MouseEvent, item: PaletteItem): void {
     event.preventDefault(); const menu = new Menu(); const workspace = this.plugin.activeWorkspace();
-    menu.addItem((entry) => entry.setTitle("Move to workspace root").setIcon("folder-root").onClick(() => workspace && this.plugin.store.assignItemsToCollection(workspace.id, [item.id], null)));
-    if (workspace) for (const collection of Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id)) menu.addItem((entry) => entry.setTitle(`Move to ${collection.name}`).setIcon("folder-input").onClick(() => this.plugin.store.assignItemsToCollection(workspace.id, [item.id], collection.id)));
-    menu.addItem((entry) => entry.setTitle("Open original").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item))); menu.showAtMouseEvent(event);
+    const selected = this.sideSelectedIds(); const targetIds = selected.includes(item.id) ? selected : [item.id];
+    if (!selected.includes(item.id)) this.selectSideItem(item.id, false);
+    if (targetIds.length === 1) menu.addItem((entry) => entry.setTitle("Open details / edit").setIcon("pencil").onClick(() => new ItemEditorModal(this.app, this.plugin, item.id).open()));
+    menu.addItem((entry) => entry.setTitle(`Move ${targetIds.length > 1 ? `${targetIds.length} items` : "to workspace root"}`).setIcon("folder-root").onClick(() => workspace && this.plugin.store.assignItemsToCollection(workspace.id, targetIds, null)));
+    if (workspace) for (const collection of Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id)) menu.addItem((entry) => entry.setTitle(`Move to ${collection.name}`).setIcon("folder-input").onClick(() => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collection.id)));
+    menu.addItem((entry) => entry.setTitle("Open original").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
+    menu.addSeparator(); menu.addItem((entry) => entry.setTitle(`Delete${targetIds.length > 1 ? ` ${targetIds.length} items` : ""}`).setIcon("trash").onClick(() => this.confirmDelete(targetIds)));
+    menu.showAtMouseEvent(event);
+  }
+
+  private sideSelectedIds(): string[] { return this.plugin.store.data.uiState.sideSelectedItemIds; }
+  private selectSideItem(id: string, multiple: boolean): void {
+    const selected = this.sideSelectedIds();
+    this.plugin.store.data.uiState.sideSelectedItemIds = multiple ? (selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id]) : [id];
+    this.plugin.store.data.uiState.selectedItemId = id;
+    this.plugin.store.changed();
+  }
+  private confirmDelete(ids: string[]): void { if (ids.length > 0) new ConfirmDeleteModal(this.app, ids.length, () => this.plugin.store.removeItems(ids)).open(); }
+  private editSelectedTags(ids: string[]): void {
+    const items = ids.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
+    if (items.length === 0) return;
+    new TextPromptModal(this.app, "Set tags", items[0].tags.join(", "), (value) => { const tags = value.split(",").map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean); for (const item of items) this.plugin.store.updateItem(item.id, { displayTitle: item.displayTitle, tags, label: item.label, caption: item.caption }); }, "tag1, tag2").open();
   }
 }

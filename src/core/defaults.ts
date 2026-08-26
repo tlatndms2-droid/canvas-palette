@@ -3,13 +3,13 @@ import type { PaletteData, SideLayoutState } from "./types";
 export const DEFAULT_SIDE_LAYOUT: SideLayoutState = { viewportRatio: 0.52, topRatio: 0.69, indexRatio: 0.5, viewMode: "grid" };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", cardSize: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
   collections: {},
   pendingItemIds: [],
-  uiState: { activeWorkspaceId: null, selectedItemId: null, miniPalette: {
+  uiState: { activeWorkspaceId: null, selectedItemId: null, sideSelectedItemIds: [], miniPalette: {
     tab: "collect", isOpen: false, position: { x: 24, y: 62 }, size: { width: 1120, height: 720 },
     leftPaneOpen: true, rightPaneOpen: true, leftPaneWidth: 248, rightPaneWidth: 310,
     viewMode: "grid", sort: "modified-desc", selectedItemIds: []
@@ -28,12 +28,12 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...raw.settings },
-    schemaVersion: 2,
-    items: raw.items ?? {},
+    schemaVersion: 3,
+    items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => [id, { ...item, canvasPlacements: item.canvasPlacements ?? [] }])),
     workspaces,
     collections: raw.collections ?? {},
     pendingItemIds: raw.pendingItemIds ?? [],
-    uiState: { ...DEFAULT_DATA.uiState, ...legacyUi, miniPalette: {
+    uiState: { ...DEFAULT_DATA.uiState, ...legacyUi, sideSelectedItemIds: legacyUi.sideSelectedItemIds ?? [], miniPalette: {
       ...DEFAULT_DATA.uiState.miniPalette, ...legacyUi.miniPalette,
       tab: legacyUi.miniPalette?.tab ?? legacyUi.miniTab ?? DEFAULT_DATA.uiState.miniPalette.tab,
       leftPaneOpen: legacyUi.miniPalette?.leftPaneOpen ?? legacyUi.leftPaneOpen ?? DEFAULT_DATA.uiState.miniPalette.leftPaneOpen,

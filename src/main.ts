@@ -1,4 +1,4 @@
-import { EventRef, Menu, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import { Editor, EventRef, Menu, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { CanvasAdapter } from "./canvas/canvas-adapter";
 import { TextScrapHighlights } from "./canvas/text-scrap-highlights";
 import { createId } from "./core/ids";
@@ -13,7 +13,7 @@ import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-
 export default class CanvasPalettePlugin extends Plugin {
   store = new PaletteStore(this);
   search = new SearchService();
-  canvas = new CanvasAdapter(this.app);
+  canvas = new CanvasAdapter(this.app, (itemId, canvasPath, nodeIds) => this.store.recordCanvasPlacement(itemId, canvasPath, nodeIds));
   textScrapHighlights = new TextScrapHighlights(this);
   preview = new PreviewService(this.app, this);
   miniPalette = new FloatingMiniPalette(this);
@@ -45,6 +45,7 @@ export default class CanvasPalettePlugin extends Plugin {
       if (!menu || typeof menu.addItem !== "function") return;
       this.addCanvasNodeCollectionMenu(menu, node);
     }));
+    this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor) => this.addCanvasTextCollectionMenu(menu, editor)));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
       if (this.canvas.activeContext()) this.miniPalette.mount();
       else this.miniPalette.destroy();
@@ -75,7 +76,7 @@ export default class CanvasPalettePlugin extends Plugin {
 
   async createMemo(): Promise<void> {
     const now = Date.now();
-    const item: PaletteItem = { id: createId("card"), type: "card", displayTitle: "New memo", tags: [], label: "", caption: "", createdAt: now, modifiedAt: now, origin: {}, content: "" };
+    const item: PaletteItem = { id: createId("card"), type: "card", displayTitle: "New memo", tags: [], label: "", caption: "", createdAt: now, modifiedAt: now, origin: {}, canvasPlacements: [], content: "" };
     this.store.addPending(item);
     const workspace = this.activeWorkspace();
     if (workspace) this.store.importPending(workspace.id, [item.id]);
@@ -90,7 +91,7 @@ export default class CanvasPalettePlugin extends Plugin {
 
   collectText(text: string, sourcePath?: string, textRange?: { from: { line: number; ch: number }; to: { line: number; ch: number } }): void {
     const now = Date.now();
-    this.store.addPending({ id: createId("card"), type: "card", displayTitle: text.split(/\r?\n/, 1)[0].slice(0, 60) || "Text scrap", tags: [], label: "", caption: "Text scrap", createdAt: now, modifiedAt: now, origin: { filePath: sourcePath, textRange }, content: text });
+    this.store.addPending({ id: createId("card"), type: "card", displayTitle: text.split(/\r?\n/, 1)[0].slice(0, 60) || "Text scrap", tags: [], label: "", caption: "Text scrap", createdAt: now, modifiedAt: now, origin: { filePath: sourcePath, textRange }, canvasPlacements: [], content: text });
     new Notice("Text collected in Mini Palette");
   }
 
@@ -113,6 +114,43 @@ export default class CanvasPalettePlugin extends Plugin {
       if (workspace.id === currentWorkspace?.id) continue;
       menu.addItem((item) => item.setTitle(`Save directly to Side Palette — ${workspace.name}`).setIcon("panel-right").onClick(() => void this.collectCanvasNodeToWorkspace(node, workspace.id)));
     }
+  }
+
+  private addCanvasTextCollectionMenu(menu: Menu, editor: Editor): void {
+    const text = editor.getSelection();
+    const context = this.canvas.activeContext();
+    if (!text || !context) return;
+    const range = { from: editor.getCursor("from"), to: editor.getCursor("to") };
+    menu.addSeparator();
+    menu.addItem((item) => item.setTitle("Canvas Palette — collect selected text").setIcon("library-big").setIsLabel(true));
+    menu.addItem((item) => item.setTitle("Collect text to Mini Palette").setIcon("inbox").onClick(() => this.collectCanvasTextToMini(text, context.file.path, range)));
+    const currentWorkspace = this.activeWorkspace();
+    if (currentWorkspace) menu.addItem((item) => item.setTitle(`Save text directly to Side Palette — ${currentWorkspace.name}`).setIcon("panel-right").onClick(() => this.collectCanvasTextToWorkspace(text, context.file.path, range, currentWorkspace.id)));
+    for (const workspace of Object.values(this.store.data.workspaces)) {
+      if (workspace.id === currentWorkspace?.id) continue;
+      menu.addItem((item) => item.setTitle(`Save text directly to Side Palette — ${workspace.name}`).setIcon("panel-right").onClick(() => this.collectCanvasTextToWorkspace(text, context.file.path, range, workspace.id)));
+    }
+  }
+
+  private textItem(text: string, canvasPath: string, textRange: { from: { line: number; ch: number }; to: { line: number; ch: number } }): PaletteItem {
+    const now = Date.now();
+    return { id: createId("card"), type: "card", displayTitle: text.split(/\r?\n/, 1)[0].slice(0, 60) || "Text scrap", tags: [], label: "", caption: "Text scrap", createdAt: now, modifiedAt: now, origin: { canvasPath, textRange }, canvasPlacements: [], content: text };
+  }
+
+  private collectCanvasTextToMini(text: string, canvasPath: string, textRange: { from: { line: number; ch: number }; to: { line: number; ch: number } }): void {
+    this.store.addPending(this.textItem(text, canvasPath, textRange));
+    this.store.data.uiState.miniPalette.tab = "collect";
+    this.miniPalette.open();
+    new Notice("Selected Canvas text collected in Mini Palette.");
+  }
+
+  private collectCanvasTextToWorkspace(text: string, canvasPath: string, textRange: { from: { line: number; ch: number }; to: { line: number; ch: number } }, workspaceId: string): void {
+    const item = this.textItem(text, canvasPath, textRange);
+    this.store.addToWorkspace(workspaceId, item);
+    this.store.data.uiState.activeWorkspaceId = workspaceId;
+    this.selectItem(item.id);
+    void this.openSidePalette();
+    new Notice("Selected Canvas text saved to Side Palette.");
   }
 
   private async collectCanvasNodeToMini(node: unknown): Promise<void> {
@@ -150,15 +188,15 @@ export default class CanvasPalettePlugin extends Plugin {
   async exportActiveWorkspace(): Promise<void> {
     const workspace = this.activeWorkspace();
     if (!workspace) return;
-    const rows: Array<{ id: string; name: string; depth: number }> = [];
+    const rows: Array<{ id: string; name: string; depth: number; item?: PaletteItem }> = [];
     const walk = (collectionId: string, depth: number, parentPath: string): void => {
       const collection = this.store.data.collections[collectionId]; if (!collection) return;
       const id = `${parentPath}/${collection.id}`; rows.push({ id, name: collection.name, depth });
-      for (const itemId of collection.itemIds) { const item = this.store.data.items[itemId]; if (item) rows.push({ id: `${id}/${item.id}`, name: item.displayTitle, depth: depth + 1 }); }
+      for (const itemId of collection.itemIds) { const item = this.store.data.items[itemId]; if (item) rows.push({ id: `${id}/${item.id}`, name: item.displayTitle, depth: depth + 1, item }); }
       for (const childId of collection.childCollectionIds) walk(childId, depth + 1, id);
     };
     const root = `${workspace.id}`; rows.push({ id: root, name: workspace.name, depth: 0 });
-    for (const itemId of workspace.looseItemIds) { const item = this.store.data.items[itemId]; if (item) rows.push({ id: `${root}/${item.id}`, name: item.displayTitle, depth: 1 }); }
+    for (const itemId of workspace.looseItemIds) { const item = this.store.data.items[itemId]; if (item) rows.push({ id: `${root}/${item.id}`, name: item.displayTitle, depth: 1, item }); }
     for (const collectionId of workspace.rootCollectionIds) walk(collectionId, 1, root);
     await this.canvas.exportCollection(`${workspace.name} Export`, rows);
   }

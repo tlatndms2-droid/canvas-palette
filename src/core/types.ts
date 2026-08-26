@@ -5,6 +5,7 @@ export type AssetViewMode = "grid" | "list";
 
 export interface TextSourceRange { from: { line: number; ch: number }; to: { line: number; ch: number }; }
 export interface ItemOrigin { canvasPath?: string; canvasNodeId?: string; workspaceId?: string; filePath?: string; textRange?: TextSourceRange; }
+export interface CanvasPlacement { canvasPath: string; nodeIds: string[]; placedAt: number; }
 
 export interface CanvasNodeSnapshot {
   id: string;
@@ -44,6 +45,7 @@ export interface PaletteItem {
   createdAt: number;
   modifiedAt: number;
   origin: ItemOrigin;
+  canvasPlacements: CanvasPlacement[];
   content?: string;
   group?: GroupSnapshot;
 }
@@ -84,7 +86,7 @@ export interface MiniPaletteState {
   selectedItemIds: string[];
 }
 
-export interface UIState { activeWorkspaceId: string | null; selectedItemId: string | null; miniPalette: MiniPaletteState; }
+export interface UIState { activeWorkspaceId: string | null; selectedItemId: string | null; sideSelectedItemIds: string[]; miniPalette: MiniPaletteState; }
 
 export interface PaletteData {
   schemaVersion: number;

@@ -43,7 +43,7 @@ export class PreviewService {
       return;
     }
     const source = item.content ?? item.origin.filePath ?? "No preview available.";
-    if (item.type === "markdown" && !compact) {
+    if (item.type === "markdown") {
       await MarkdownRenderer.render(this.app, source, parent, item.origin.filePath ?? "", this.component);
       return;
     }

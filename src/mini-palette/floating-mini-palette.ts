@@ -1,7 +1,7 @@
 import { Menu, Notice, setIcon } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { PaletteItem, PaletteItemType } from "../core/types";
-import { TextPromptModal } from "../ui/modal";
+import { ItemEditorModal, TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider } from "../ui/resizable";
 import { iconButton, renderItem, workspaceSelect } from "../ui/render";
 
@@ -47,10 +47,10 @@ export class FloatingMiniPalette {
     setIcon(trigger, "panels-top-left"); trigger.createSpan({ text: "Mini Palette" });
     trigger.addEventListener("mouseenter", () => this.open()); trigger.addEventListener("click", () => this.open());
     this.unsubscribe = this.plugin.store.subscribe(() => this.refresh());
-    const onDragOver = (event: DragEvent) => { if (event.dataTransfer?.types.includes("application/x-canvas-palette-item")) { event.preventDefault(); if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"; } };
-    const onDrop = (event: DragEvent) => { const id = event.dataTransfer?.getData("application/x-canvas-palette-item"); if (!id) return; event.preventDefault(); const item = this.plugin.store.data.items[id]; if (item) void this.plugin.canvas.restoreItem(item, event.clientX, event.clientY); };
-    canvas.addEventListener("dragover", onDragOver); canvas.addEventListener("drop", onDrop);
-    this.detachDrop = () => { canvas.removeEventListener("dragover", onDragOver); canvas.removeEventListener("drop", onDrop); canvas.removeClass("cp-canvas-host"); };
+    const onDragOver = (event: DragEvent) => { if (event.dataTransfer?.types.includes("application/x-canvas-palette-item")) { event.preventDefault(); event.stopPropagation(); if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"; } };
+    const onDrop = (event: DragEvent) => { const id = event.dataTransfer?.getData("application/x-canvas-palette-item"); if (!id) return; event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); const item = this.plugin.store.data.items[id]; if (item) void this.plugin.canvas.restoreItem(item, event.clientX, event.clientY); };
+    canvas.addEventListener("dragover", onDragOver, true); canvas.addEventListener("drop", onDrop, true);
+    this.detachDrop = () => { canvas.removeEventListener("dragover", onDragOver, true); canvas.removeEventListener("drop", onDrop, true); canvas.removeClass("cp-canvas-host"); };
   }
 
   private destroyPanel(): void { this.panel?.remove(); this.panel = undefined; this.inspectorItemId = null; this.hoverItemId = null; }
@@ -139,8 +139,8 @@ export class FloatingMiniPalette {
     heading.createSpan({ text: "Assets" }); if (!this.plugin.store.data.uiState.miniPalette.rightPaneOpen) iconButton(heading, "panel-right-open", "Open preview pane", () => { this.plugin.store.data.uiState.miniPalette.rightPaneOpen = true; this.plugin.store.changed(); });
     const grid = parent.createDiv({ cls: `cp-asset-grid cp-asset-grid--${this.plugin.store.data.uiState.miniPalette.viewMode}` }); grid.style.setProperty("--cp-card-size", `${this.plugin.store.data.settings.cardSize}px`); grid.style.setProperty("--cp-columns", String(this.plugin.store.data.settings.columns));
     for (const item of this.storageItems()) {
-      const card = renderItem(grid, item, { selected: item.id === this.plugin.store.data.uiState.selectedItemId, draggable: true, onSelect: () => this.selectStorage(item.id), onContextMenu: (event) => { event.preventDefault(); this.itemMenu(item); } });
-      const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body && (item.type === "image" || item.type === "group")) void this.plugin.preview.render(body, item, true);
+      const card = renderItem(grid, item, { selected: this.selectedIds().includes(item.id), draggable: true, onSelect: (event) => this.selectStorage(item.id, event.ctrlKey || event.metaKey), onOpen: () => new ItemEditorModal(this.plugin.app, this.plugin, item.id).open(), onContextMenu: (event) => { event.preventDefault(); this.itemMenu(item); } });
+      const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body) void this.plugin.preview.render(body, item, true);
       card.addEventListener("mousemove", (event) => { if (event.ctrlKey && this.hoverItemId !== item.id) { this.hoverItemId = item.id; this.render(); } });
       card.addEventListener("mouseleave", () => { if (this.hoverItemId === item.id) { this.hoverItemId = null; this.render(); } });
     }
@@ -168,7 +168,7 @@ export class FloatingMiniPalette {
   private textarea(parent: HTMLElement, label: string, value: string): HTMLTextAreaElement { parent.createEl("label", { text: label }); return parent.createEl("textarea", { text: value }); }
   private selectedIds(): string[] { return this.plugin.store.data.uiState.miniPalette.selectedItemIds; }
   private selectPending(id: string, multiple: boolean): void { const ids = this.selectedIds(); this.plugin.store.data.uiState.miniPalette.selectedItemIds = multiple ? (ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]) : [id]; this.plugin.selectItem(id); }
-  private selectStorage(id: string): void { this.plugin.store.data.uiState.miniPalette.selectedItemIds = [id]; this.plugin.selectItem(id); }
+  private selectStorage(id: string, multiple: boolean): void { const ids = this.selectedIds(); this.plugin.store.data.uiState.miniPalette.selectedItemIds = multiple ? (ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]) : [id]; this.plugin.selectItem(id); }
   private storageItems(): PaletteItem[] { const active = this.plugin.store.data.uiState.activeWorkspaceId; const candidates = active ? this.plugin.store.itemsForWorkspace(active) : this.plugin.store.allItems().filter((item) => !this.plugin.store.data.pendingItemIds.includes(item.id)); return this.sort(this.filtered(candidates)); }
   private filtered(items: PaletteItem[]): PaletteItem[] { return this.plugin.search.filter(items, this.search).filter((item) => (this.typeFilter === "all" || item.type === this.typeFilter) && (!this.tagFilter || item.tags.some((tag) => tag.toLocaleLowerCase().includes(this.tagFilter.toLocaleLowerCase()))) && (!this.labelFilter || item.label.toLocaleLowerCase().includes(this.labelFilter.toLocaleLowerCase()))); }
   private sort(items: PaletteItem[]): PaletteItem[] { const mode = this.plugin.store.data.uiState.miniPalette.sort; return [...items].sort((a, b) => mode === "modified-desc" ? b.modifiedAt - a.modifiedAt : mode === "modified-asc" ? a.modifiedAt - b.modifiedAt : mode === "title-desc" ? b.displayTitle.localeCompare(a.displayTitle) : a.displayTitle.localeCompare(b.displayTitle)); }
