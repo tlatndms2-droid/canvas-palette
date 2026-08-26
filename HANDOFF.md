@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.1.8`
+- Version: `0.1.9`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.8`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.8.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.8`.
+- Latest release: `0.1.9`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.9.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.9`.
 
 ## Source plan and confirmed product direction
 
@@ -37,6 +37,7 @@
   - Obsidian CLI/CDP runtime validation used a disposable Canvas and disposable Palette fixtures. Image header/thumbnail/footer drops all produced the same image file node; Markdown produced a source-linked file node; a `New memo` item produced body `새로운 메모`; the stored 5-node/1-edge Group retained types, content, dimensions, relative positions, parent links, and edge directions; repeated drops kept the source and generated unique IDs. A zoom `-1.5` and pan `(400, 250)` position check matched the runtime coordinate conversion. All temporary data was removed afterward.
 - `0.1.8` separates Side Palette preview from metadata editing. Double-click now opens a large read-only, type-specific preview for Card, Markdown, Image, and Group items; Markdown is read from its current Vault source, images preserve aspect ratio, and Group previews retain the full stored graph with image nodes and edge direction markers. The Side context menu removes `Open details / edit` and adds a focused `Set tags / label` toggle dialog. Mini Palette behavior is unchanged.
   - Obsidian runtime validation covered Viewport and Outliner double-click, all four preview types, current-source Markdown rendering, long-content internal scrolling, image containment, complete 5-node/1-edge Group rendering, outside-click/Escape close, and tag/label-only updates that preserved title, caption, and source path. Disposable fixtures were removed afterward.
+- `0.1.9` corrects the over-broad `0.1.8` double-click change. Side Palette Card and Markdown items once again route through the existing native Quick Editor and remain editable. Image and Group retain the large preview, and Image preview now supports mouse-wheel zoom from 20% to 500% with a visible percentage indicator.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
@@ -55,7 +56,7 @@
 - Canvas Adapter for guarded active Canvas selection, Canvas JSON capture, file/text/group creation, Group ID remapping, and Collection mind-map export.
 - Floating Canvas-hosted Mini Palette with hover trigger, window move/resize, Collect Inspector, Storage filters/sort/view modes, docked panes, previews, and Canvas drag/drop.
 - Side Palette three-way independent divider resize, per-Pane scrolling, content-first type-aware Card/List Viewport, nested Outliner, Tag/Label indexes, item move/reorder, multi-selection, batch tags, guarded deletion, and type-preserving Canvas export.
-- Preview service for rendered Card/Markdown content, images, and subgraph visualizations; Side Palette double-click uses large read-only type previews while Mini Palette retains its existing native Quick Editor/detail behavior.
+- Preview service for rendered Card/Markdown content, images, and subgraph visualizations; Side Palette Card/Markdown double-click uses the native Quick Editor, while Image/Group opens the large preview and Image supports wheel zoom.
 - Canvas Node and selected-text context-menu integration: `Collect to Mini Palette` or `Save directly to Side Palette — <Workspace>`. Vault File Explorer and active-file collection actions remain excluded because collection is Canvas-native.
 
 ## Architecture

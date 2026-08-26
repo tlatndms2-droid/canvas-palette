@@ -81,7 +81,15 @@ export default class CanvasPalettePlugin extends Plugin {
     new ItemEditorModal(this.app, this, itemId).open();
   }
 
-  openSideItemPreview(itemId: string): void { new ItemPreviewModal(this.app, this, itemId).open(); }
+  async openSideItemPreview(itemId: string): Promise<void> {
+    const item = this.store.data.items[itemId];
+    if (!item) return;
+    if (item.type === "card" || item.type === "markdown") {
+      await this.openItemEditor(itemId);
+      return;
+    }
+    new ItemPreviewModal(this.app, this, itemId).open();
+  }
 
   openSettings(): void {
     const appWithSettings = this.app as unknown as { setting?: { open: () => Promise<void>; openTabById: (id: string) => void } };
