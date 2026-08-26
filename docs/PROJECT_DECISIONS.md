@@ -18,8 +18,8 @@
 
 ## Decision 004 — Canvas API boundary
 
-- Current implementation: group serializer is pure and Canvas runtime integration is pending.
-- Reason: isolate internal Canvas runtime access and keep storage stable.
+- Current implementation: `CanvasAdapter` uses Canvas document JSON for durable mutations and guarded runtime selection access.
+- Reason: isolate unstable Canvas runtime details and keep storage stable.
 
 ## Decision 005 — Underspecified controls
 

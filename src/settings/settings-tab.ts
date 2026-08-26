@@ -12,6 +12,13 @@ export class CanvasPaletteSettingTab extends PluginSettingTab {
       .addOption("obsidian", "Follow Obsidian").addOption("light", "Light").addOption("dark", "Dark")
       .setValue(this.plugin.store.data.settings.theme)
       .onChange(async (value) => { this.plugin.store.data.settings.theme = value as "obsidian" | "light" | "dark"; this.plugin.store.changed(); }));
+    new Setting(containerEl).setName("Accent color").setDesc("Use Obsidian's accent or select a custom Canvas Palette accent.").addDropdown((dropdown) => dropdown
+      .addOption("obsidian", "Use Obsidian accent").addOption("custom", "Custom color")
+      .setValue(this.plugin.store.data.settings.accentMode)
+      .onChange((value) => { this.plugin.store.data.settings.accentMode = value as "obsidian" | "custom"; this.plugin.store.changed(); this.display(); }));
+    if (this.plugin.store.data.settings.accentMode === "custom") new Setting(containerEl).setName("Custom accent").addColorPicker((picker) => picker
+      .setValue(this.plugin.store.data.settings.accentColor)
+      .onChange((value) => { this.plugin.store.data.settings.accentColor = value; this.plugin.store.changed(); }));
     new Setting(containerEl).setName("Card size").setDesc("Default card width in palette grids.").addSlider((slider) => slider
       .setLimits(160, 360, 10).setDynamicTooltip().setValue(this.plugin.store.data.settings.cardSize)
       .onChange((value) => { this.plugin.store.data.settings.cardSize = value; this.plugin.store.changed(); }));

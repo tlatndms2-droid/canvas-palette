@@ -1,6 +1,9 @@
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, WorkspaceLeaf } from "obsidian";
 import type CanvasPalettePlugin from "../main";
-import { renderItem, workspaceSelect } from "../ui/render";
+import type { Collection, PaletteItem } from "../core/types";
+import { TextPromptModal } from "../ui/modal";
+import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
+import { iconButton, renderItem, workspaceSelect } from "../ui/render";
 
 export const SIDE_PALETTE_VIEW = "canvas-palette-side";
 
@@ -12,66 +15,102 @@ export class SidePaletteView extends ItemView {
   getViewType(): string { return SIDE_PALETTE_VIEW; }
   getDisplayText(): string { return "Canvas Palette"; }
   getIcon(): string { return "library-big"; }
-
-  async onOpen(): Promise<void> {
-    this.unsubscribe = this.plugin.store.subscribe(() => this.render());
-    this.render();
-  }
-
+  async onOpen(): Promise<void> { this.unsubscribe = this.plugin.store.subscribe(() => this.render()); this.render(); }
   async onClose(): Promise<void> { this.unsubscribe?.(); }
 
   private render(): void {
     const root = this.contentEl;
-    root.empty();
-    root.addClass("canvas-palette", "cp-side");
-    const toolbar = root.createDiv({ cls: "cp-toolbar" });
-    workspaceSelect(this.plugin, toolbar, this.plugin.store.data.uiState.activeWorkspaceId, (id) => {
-      this.plugin.store.data.uiState.activeWorkspaceId = id;
-      this.plugin.store.changed();
-    });
-    const addMemo = toolbar.createEl("button", { text: "New memo" });
-    addMemo.addEventListener("click", () => void this.plugin.createMemo());
-    const search = root.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search cards, files, tags, labels…" }, value: this.query });
-    search.addEventListener("input", () => { this.query = search.value; this.render(); requestAnimationFrame(() => this.contentEl.querySelector<HTMLInputElement>(".cp-search")?.focus()); });
-
-    const split = root.createDiv({ cls: "cp-side__split" });
-    const viewport = split.createDiv({ cls: "cp-panel cp-viewport" });
-    viewport.createEl("h4", { text: "Viewport" });
+    root.empty(); root.addClass("canvas-palette", "cp-side", `cp-theme-${this.plugin.store.data.settings.theme}`);
+    if (this.plugin.store.data.settings.accentMode === "custom") root.style.setProperty("--cp-accent", this.plugin.store.data.settings.accentColor);
     const workspace = this.plugin.activeWorkspace();
-    const items = workspace ? workspace.looseItemIds.map((id) => this.plugin.store.data.items[id]).filter(Boolean) : [];
-    const matches = this.plugin.search.filter(items, this.query);
-    const grid = viewport.createDiv({ cls: "cp-grid" });
-    for (const item of matches) renderItem(grid, item, item.id === this.plugin.store.data.uiState.selectedItemId, () => this.plugin.selectItem(item.id));
-    if (matches.length === 0) grid.createDiv({ cls: "cp-empty", text: "No items in this workspace." });
-
-    const outliner = split.createDiv({ cls: "cp-panel cp-outliner" });
-    const outlinerHeader = outliner.createDiv({ cls: "cp-panel__header" });
-    outlinerHeader.createEl("h4", { text: "Collections" });
-    const addCollection = outlinerHeader.createEl("button", { text: "+" });
-    addCollection.addEventListener("click", () => this.plugin.createCollection());
-    if (workspace) {
-      for (const collectionId of workspace.rootCollectionIds) this.renderCollection(outliner, collectionId, 0);
-      for (const item of items) outliner.createDiv({ cls: `cp-outline-item${this.plugin.search.matches(item, this.query) && this.query ? " is-match" : ""}`, text: `${item.type.toUpperCase()} · ${item.displayTitle}` });
-    }
-
-    const indexes = root.createDiv({ cls: "cp-indexes" });
-    this.renderIndex(indexes.createDiv({ cls: "cp-panel" }), "Tags", items.flatMap((item) => item.tags));
-    this.renderIndex(indexes.createDiv({ cls: "cp-panel" }), "Labels", items.map((item) => item.label).filter(Boolean));
+    if (!workspace) return;
+    root.style.setProperty("--cp-side-left", `${Math.round(workspace.sideLayout.viewportRatio * 100)}%`);
+    root.style.setProperty("--cp-side-top", `${Math.round(workspace.sideLayout.topRatio * 100)}%`);
+    root.style.setProperty("--cp-side-index", `${Math.round(workspace.sideLayout.indexRatio * 100)}%`);
+    const header = root.createDiv({ cls: "cp-side__header" });
+    header.createDiv({ cls: "cp-brand", text: "Canvas Palette" });
+    const exportButton = header.createEl("button", { text: "Export" }); exportButton.addEventListener("click", () => void this.plugin.exportActiveWorkspace());
+    const collectButton = header.createEl("button", { text: "Send to Mini Palette" }); collectButton.addEventListener("click", () => void this.plugin.collectCanvasSelection());
+    const selectorRow = root.createDiv({ cls: "cp-workspace-row" }); selectorRow.createSpan({ text: "Current workspace" });
+    workspaceSelect(this.plugin, selectorRow, workspace.id, (id) => { this.plugin.store.data.uiState.activeWorkspaceId = id; this.plugin.store.changed(); });
+    const searchWrap = root.createDiv({ cls: "cp-search-wrap" });
+    const search = searchWrap.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search cards, files, tags, labels…" }, value: this.query });
+    search.addEventListener("input", () => { this.query = search.value; this.render(); requestAnimationFrame(() => this.contentEl.querySelector<HTMLInputElement>(".cp-search")?.focus()); });
+    const top = root.createDiv({ cls: "cp-side__top" });
+    const viewport = top.createDiv({ cls: "cp-panel cp-viewport" }); this.renderViewport(viewport, workspace.id);
+    const vDivider = top.createDiv({ cls: "cp-divider cp-divider--vertical" });
+    makeHorizontalDivider(vDivider, (x) => { const rect = top.getBoundingClientRect(); workspace.sideLayout.viewportRatio = Math.max(0.28, Math.min(0.72, (x - rect.left) / rect.width)); this.plugin.store.changed(); });
+    const outliner = top.createDiv({ cls: "cp-panel cp-outliner" }); this.renderOutliner(outliner, workspace.id);
+    const hDivider = root.createDiv({ cls: "cp-divider cp-divider--horizontal" });
+    makeVerticalDivider(hDivider, (y) => { const rect = root.getBoundingClientRect(); workspace.sideLayout.topRatio = Math.max(0.45, Math.min(0.82, (y - rect.top) / rect.height)); this.plugin.store.changed(); });
+    const indexes = root.createDiv({ cls: "cp-side__indexes" });
+    const tags = indexes.createDiv({ cls: "cp-panel" }); this.renderIndex(tags, "Tag index", this.items(workspace.id).flatMap((item) => item.tags), "#");
+    const iDivider = indexes.createDiv({ cls: "cp-divider cp-divider--vertical" });
+    makeHorizontalDivider(iDivider, (x) => { const rect = indexes.getBoundingClientRect(); workspace.sideLayout.indexRatio = Math.max(0.25, Math.min(0.75, (x - rect.left) / rect.width)); this.plugin.store.changed(); });
+    const labels = indexes.createDiv({ cls: "cp-panel" }); this.renderIndex(labels, "Label index", this.items(workspace.id).map((item) => item.label).filter(Boolean), "");
   }
 
-  private renderCollection(parent: HTMLElement, id: string, depth: number): void {
-    const collection = this.plugin.store.data.collections[id];
+  private renderViewport(parent: HTMLElement, workspaceId: string): void {
+    const header = parent.createDiv({ cls: "cp-panel__header" }); header.createEl("h4", { text: "Viewport" });
+    const memo = header.createEl("button", { text: "+ Memo" }); memo.addEventListener("click", () => void this.plugin.createMemo());
+    const grid = header.createEl("button", { text: "Grid", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "grid" ? "is-active" : "" });
+    const list = header.createEl("button", { text: "List", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "list" ? "is-active" : "" });
+    grid.addEventListener("click", () => this.setSideView("grid")); list.addEventListener("click", () => this.setSideView("list"));
+    const options = parent.createEl("details", { cls: "cp-view-options" }); options.createEl("summary", { text: "View settings" });
+    const cardSize = options.createEl("input", { attr: { type: "range", min: "160", max: "360", value: String(this.plugin.store.data.settings.cardSize) } });
+    cardSize.addEventListener("input", () => { this.plugin.store.data.settings.cardSize = Number(cardSize.value); this.plugin.store.changed(); });
+    const fontSize = options.createEl("input", { attr: { type: "range", min: "11", max: "20", value: String(this.plugin.store.data.settings.fontSize) } });
+    fontSize.addEventListener("input", () => { this.plugin.store.data.settings.fontSize = Number(fontSize.value); this.plugin.store.changed(); });
+    const listEl = parent.createDiv({ cls: `cp-grid cp-grid--${this.plugin.activeWorkspace()?.sideLayout.viewMode ?? "grid"}` }); listEl.style.setProperty("--cp-card-size", `${this.plugin.store.data.settings.cardSize}px`);
+    listEl.addEventListener("dragover", (event) => { if (event.dataTransfer?.types.includes("application/x-canvas-palette-item")) event.preventDefault(); });
+    listEl.addEventListener("drop", (event) => {
+      const sourceId = event.dataTransfer?.getData("application/x-canvas-palette-item"); const target = (event.target as HTMLElement).closest<HTMLElement>(".cp-item"); const targetId = target?.dataset.itemId;
+      if (sourceId && targetId) { event.preventDefault(); this.plugin.store.reorderItems(workspaceId, sourceId, targetId); }
+    });
+    for (const item of this.plugin.search.filter(this.items(workspaceId), this.query)) {
+      const card = renderItem(listEl, item, { selected: item.id === this.plugin.store.data.uiState.selectedItemId, onSelect: () => this.plugin.selectItem(item.id), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+      const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body && (item.type === "image" || item.type === "group")) void this.plugin.preview.render(body, item, true);
+    }
+    if (listEl.childElementCount === 0) listEl.createDiv({ cls: "cp-empty", text: "No matching items." });
+  }
+
+  private renderOutliner(parent: HTMLElement, workspaceId: string): void {
+    const header = parent.createDiv({ cls: "cp-panel__header" }); header.createEl("h4", { text: "Outliner" });
+    const collection = header.createEl("button", { text: "+ Collection" }); collection.addEventListener("click", () => this.promptCollection(workspaceId, null));
+    const memo = header.createEl("button", { text: "+ Memo" }); memo.addEventListener("click", () => void this.plugin.createMemo());
+    const workspace = this.plugin.store.data.workspaces[workspaceId]; if (!workspace) return;
+    parent.createDiv({ cls: "cp-outline-root", text: workspace.name });
+    for (const id of workspace.rootCollectionIds) this.renderCollection(parent, this.plugin.store.data.collections[id], 0);
+    for (const item of workspace.looseItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item))) this.renderOutlineItem(parent, item, 0);
+  }
+
+  private renderCollection(parent: HTMLElement, collection: Collection | undefined, depth: number): void {
     if (!collection) return;
-    parent.createDiv({ cls: "cp-collection", text: `${"  ".repeat(depth)}▸ ${collection.name}` });
-    for (const childId of collection.childCollectionIds) this.renderCollection(parent, childId, depth + 1);
+    const row = parent.createDiv({ cls: "cp-outline-row", attr: { style: `--cp-depth:${depth}` } }); row.createSpan({ cls: "cp-outline-row__title", text: `⌄  ${collection.name}` });
+    row.addEventListener("dragover", (event) => { if (event.dataTransfer?.types.includes("application/x-canvas-palette-item")) event.preventDefault(); });
+    row.addEventListener("drop", (event) => { const id = event.dataTransfer?.getData("application/x-canvas-palette-item"); if (id) { event.preventDefault(); this.plugin.store.assignItemsToCollection(collection.workspaceId, [id], collection.id); } });
+    iconButton(row, "plus", "Add nested collection", () => this.promptCollection(collection.workspaceId, collection.id));
+    iconButton(row, "pencil", "Rename collection", () => new TextPromptModal(this.app, "Rename collection", collection.name, (value) => this.plugin.store.renameCollection(collection.id, value)).open());
+    for (const itemId of collection.itemIds) { const item = this.plugin.store.data.items[itemId]; if (item) this.renderOutlineItem(parent, item, depth + 1); }
+    for (const child of collection.childCollectionIds) this.renderCollection(parent, this.plugin.store.data.collections[child], depth + 1);
   }
 
-  private renderIndex(parent: HTMLElement, title: string, values: string[]): void {
-    parent.createEl("h4", { text: title });
-    const counts = new Map<string, number>();
-    for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
-    for (const [value, count] of [...counts].sort((a, b) => b[1] - a[1])) {
-      const row = parent.createDiv({ cls: "cp-index-row" }); row.createSpan({ text: value }); row.createSpan({ text: String(count) });
-    }
+  private renderOutlineItem(parent: HTMLElement, item: PaletteItem, depth: number): void {
+    const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${item.id === this.plugin.store.data.uiState.selectedItemId ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.setText(`${item.type.toUpperCase()}  ${item.displayTitle}`); row.addEventListener("click", () => this.plugin.selectItem(item.id));
+  }
+
+  private renderIndex(parent: HTMLElement, title: string, values: string[], prefix: string): void {
+    parent.createEl("h4", { text: title }); const counts = new Map<string, number>(); for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+    for (const [value, count] of [...counts].sort((a, b) => b[1] - a[1])) { const row = parent.createDiv({ cls: "cp-index-row" }); row.createSpan({ cls: "cp-chip", text: `${prefix}${value}` }); row.createSpan({ text: String(count) }); }
+  }
+
+  private items(workspaceId: string): PaletteItem[] { return this.plugin.store.itemsForWorkspace(workspaceId); }
+  private setSideView(viewMode: "grid" | "list"): void { const workspace = this.plugin.activeWorkspace(); if (!workspace) return; workspace.sideLayout.viewMode = viewMode; this.plugin.store.changed(); }
+  private promptCollection(workspaceId: string, parentId: string | null): void { new TextPromptModal(this.app, "New collection", "", (value) => this.plugin.store.createCollection(workspaceId, value, parentId), "Collection name").open(); }
+  private itemMenu(event: MouseEvent, item: PaletteItem): void {
+    event.preventDefault(); const menu = new Menu(); const workspace = this.plugin.activeWorkspace();
+    menu.addItem((entry) => entry.setTitle("Move to workspace root").setIcon("folder-root").onClick(() => workspace && this.plugin.store.assignItemsToCollection(workspace.id, [item.id], null)));
+    if (workspace) for (const collection of Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id)) menu.addItem((entry) => entry.setTitle(`Move to ${collection.name}`).setIcon("folder-input").onClick(() => this.plugin.store.assignItemsToCollection(workspace.id, [item.id], collection.id)));
+    menu.addItem((entry) => entry.setTitle("Open original").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item))); menu.showAtMouseEvent(event);
   }
 }

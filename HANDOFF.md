@@ -2,35 +2,34 @@
 
 ## Current state
 
-- Version: `0.1.0`
+- Version: `0.1.1`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Release: `0.1.0`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release target: `0.1.1`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
 
 ## Implemented
 
-- Schema-versioned plugin data and default migration merge.
-- `PaletteStore` with debounced persistence and workspace, collection, pending import, and deletion operations.
-- `SearchService` separated from view rendering.
-- Relative-layout group serialization/restoration with internal edge mapping.
-- Side Palette and Mini Palette ItemViews.
-- Commands and file-menu action for editor text, Markdown, and image collection.
-- Settings tab and type-specific UI styling.
+- Schema version 2 migration, Workspace Canvas association, per-workspace Side layout, Mini Palette geometry, themes, and custom Accent persistence.
+- Canvas Adapter for guarded active Canvas selection, Canvas JSON capture, file/text/group creation, Group ID remapping, and Collection mind-map export.
+- Floating Canvas-hosted Mini Palette with hover trigger, window move/resize, Collect Inspector, Storage filters/sort/view modes, docked panes, previews, and Canvas drag/drop.
+- Side Palette divider resize, Card/List Viewport, nested Outliner, Tag/Label indexes, item move/reorder foundations, and Canvas export.
+- Preview service for Markdown, images, and subgraph visualizations.
 
 ## Architecture
 
 ```text
 src/
 ├─ core/             data types, defaults/migration, IDs, store
-├─ canvas/           pure group serializer; runtime adapter pending
+├─ canvas/           guarded Canvas adapter + group serializer
 ├─ side-palette/     workspace management view
-├─ mini-palette/     collect and storage views
+├─ mini-palette/     Canvas-hosted floating Collect and Storage UI
 ├─ search/           query logic
-├─ settings/         plugin settings UI
-└─ ui/               shared rendering primitives
+├─ preview/          Markdown, image, and subgraph previews
+├─ settings/         theme and accent settings UI
+└─ ui/               shared rendering, resize, and modal primitives
 ```
 
-Views mutate data through `PaletteStore`; search logic stays in `SearchService`. Future Canvas-runtime calls belong behind a `CanvasAdapter`, not directly inside either view. Group capture and restore should continue to pass through the serializer.
+Views mutate data through `PaletteStore`; search and preview remain separate. All Canvas document/runtime interaction must pass through `CanvasAdapter`, not directly through either palette view. Group capture and restore must continue to use the serializer.
 
 ## Important data model
 
@@ -40,23 +39,21 @@ Views mutate data through `PaletteStore`; search logic stays in `SearchService`.
 - `Collection`: virtual nested folder; it must never create Vault folders.
 - `pendingItemIds`: reviewed in Mini Palette Collect before workspace import.
 
-## Known gaps / next candidates
+## Manual validation required in Obsidian
 
-1. Implement a guarded Canvas adapter and fixture-based tests.
-2. Capture Canvas Card/MD/Image/Group selection into pending items.
-3. Restore items/groups and export collection trees into Canvas JSON.
-4. Add editable collection/item inspector and robust multi-select.
-5. Implement docked divider resize and persisted pane/workspace layout.
-6. Add real Markdown, image, and subgraph previews.
-7. Add regression coverage and release automation.
+1. Canvas selection object shape on the installed Obsidian release.
+2. Canvas screen-to-document coordinate conversion under pan/zoom.
+3. Canvas automatic refresh after Vault JSON process writes.
+4. Group hierarchy representation in Canvas documents produced by the installed version.
+5. Floating host layering with third-party Canvas plugins.
 
 ## Safety and unresolved behavior
 
 - Do not rename MD/image files when changing display titles.
 - Do not add automatic bidirectional Card synchronization.
-- Keep Collect and Storage separate.
-- Keep the Storage panes docked and the grid responsive.
-- Do not define the More menu, Copy semantics, filter composition, or final pane limits without user direction.
+- Keep Collect and Storage separate, and keep Mini Palette Canvas-hosted rather than as a regular Obsidian tab.
+- Keep the Storage panes docked, the grid responsive, and Light/Dark layouts geometrically identical.
+- Do not define the More menu, final Copy semantics, filter composition, or final pane limits without user direction.
 - Do not advance to `0.2.0` without explicit user instruction.
 
 ## Release checklist

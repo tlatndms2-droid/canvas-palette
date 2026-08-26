@@ -1,4 +1,5 @@
 node_modules/
 *.log
 main.js
+tmp/
 .DS_Store

@@ -2,22 +2,23 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.1.0**
+Current version: **0.1.1**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
-- Versioned local data model for items, workspaces, collections, pending collection, settings, and UI state.
-- Separate Side Palette and Mini Palette views.
-- Side Palette workspace selector, search, responsive card viewport, collection outliner, tag index, and label index.
-- Mini Palette Collect review flow and docked three-pane Storage layout.
-- Card, Markdown, image, and group-specific visual treatment.
-- Commands to collect selected Markdown text or the active file.
-- Vault file context-menu collection.
-- Workspace creation, memo creation, collection creation, selection, import, and deletion foundations.
-- Pure group serializer/restorer that retains internal edges and relative node layout.
-- Theme, card size, font size, and column preferences.
+- Schema-versioned persistent model for items, workspaces, collections, pending imports, and UI state.
+- Canvas adapter for selected Canvas Card/MD/Image/Group collection and Canvas JSON restoration.
+- Floating Mini Palette mounted over the active Canvas, with a hover trigger, drag movement, resize, pin/close controls, and direct Canvas drag-and-drop.
+- Separate Collect review and Storage management experiences; Collect uses an attached Inspector drawer that does not resize its parent.
+- PDF-aligned docked three-pane Storage layout with independent left/right toggle and divider resize.
+- Side Palette with representative workspaces, search, Card/List Viewport, Outliner, nested collections, Tag Index, Label Index, and independent scroll regions.
+- Item/collection organization: collection creation, nesting, rename, Canvas drag drop, Viewport reorder, and move-to-collection actions.
+- Type-specific Card, Markdown, Image, and Group rendering; Markdown preview, source image preview, and subgraph preview.
+- Group serializer/restorer that remaps IDs while retaining internal nodes, edges, nested parent references, dimensions, and relative positions.
+- Collection-to-Canvas mind-map export.
+- Follow Obsidian, Light, and Dark themes with a shared design system; use the Obsidian accent or a custom accent color.
 
 ## Item types
 
@@ -30,9 +31,10 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 
 1. Enable Canvas Palette in Obsidian.
 2. Open the Side Palette from the ribbon or command palette.
-3. Collect selected editor text or an active Markdown/image file from the command palette or file menu.
-4. Open Mini Palette, review pending items, select them, and import them into a workspace.
-5. Browse the imported items in either palette.
+3. On a Canvas, select nodes and use **Collect selected Canvas items**. The selected Card, MD, Image, or Group enters Mini Palette Collect.
+4. Hover the Mini Palette trigger at the upper-right of the Canvas, review items in the Inspector, and import them into a Workspace.
+5. Open Side Palette to organize Collections or Mini Palette Storage to search across Workspaces.
+6. Drag an item from either palette directly into a Canvas. Cards create text nodes, files retain their source reference, and Groups restore their subgraph.
 
 ## Installation for development
 
@@ -54,13 +56,12 @@ Copy `main.js`, `manifest.json`, and `styles.css` into:
 3. Enter `tlatndms2-droid/canvas-palette`.
 4. Enable Canvas Palette under Obsidian's Community plugins settings.
 
-## Known limitations
+## Validation notes
 
-- Direct Canvas node selection, Canvas drag/drop placement, collection-to-Canvas export, and live Canvas group capture are not yet wired to Obsidian's internal Canvas runtime.
-- Item Inspector editing, pane drag resizing, drag reordering, advanced filters, multi-select gestures, Markdown rendering, and image binary previews remain incomplete.
-- Text scraps currently record source file origin but do not create clickable source highlights.
-- Workspace representative-Canvas switching and per-workspace layout restoration are data-model foundations only.
+- Canvas integration is implemented through Canvas document JSON plus guarded runtime selection access. It must be exercised against the user's installed Obsidian Canvas version before depending on it for production canvases.
+- Text scraps preserve source origin/range and are highlighted in the editor; clicking the highlight selects the linked Palette Card and opens Side Palette.
+- `More`, exact copy semantics, final filter-combination rules, and final pane min/max values remain deliberately undecided.
 
 ## Next work
 
-The next implementation milestone is the Canvas adapter: selected node extraction, group capture, safe node insertion, group restoration, and collection tree export. See `HANDOFF.md` and `docs/PROJECT_DECISIONS.md` before changing behavior.
+Install through BRAT and use it on real Canvas files. Report a reproducible issue with the current version and desired behavior; each fix will receive the next sequential `0.1.x` release. See `HANDOFF.md` and `docs/PROJECT_DECISIONS.md` before changing behavior.

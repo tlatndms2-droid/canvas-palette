@@ -1,6 +1,7 @@
 import { setIcon } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { PaletteItem, PaletteItemType } from "../core/types";
+import type { PreviewService } from "../preview/preview-service";
 
 export const TYPE_ICON: Record<PaletteItemType, string> = {
   card: "sticky-note",
@@ -16,8 +17,10 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
   return button;
 }
 
-export function renderItem(parent: HTMLElement, item: PaletteItem, selected: boolean, onSelect: () => void): HTMLElement {
-  const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${selected ? " is-selected" : ""}` });
+export interface ItemRenderOptions { selected: boolean; compact?: boolean; draggable?: boolean; onSelect: () => void; onContextMenu?: (event: MouseEvent) => void; }
+
+export function renderItem(parent: HTMLElement, item: PaletteItem, options: ItemRenderOptions): HTMLElement {
+  const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${options.selected ? " is-selected" : ""}${options.compact ? " is-compact" : ""}` });
   card.dataset.itemId = item.id;
   card.tabIndex = 0;
   const header = card.createDiv({ cls: "cp-item__header" });
@@ -33,10 +36,23 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, selected: boo
   footer.createSpan({ text: item.tags.map((tag) => `#${tag}`).join(" ") });
   footer.createSpan({ text: new Date(item.modifiedAt).toLocaleDateString() });
   if (item.caption) card.createDiv({ cls: "cp-item__caption", text: item.caption });
-  card.addEventListener("click", onSelect);
-  card.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") onSelect(); });
+  if (options.draggable) {
+    card.draggable = true;
+    card.addEventListener("dragstart", (event) => {
+      event.dataTransfer?.setData("application/x-canvas-palette-item", item.id);
+      event.dataTransfer?.setData("text/plain", item.displayTitle);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
+      card.addClass("is-dragging");
+    });
+    card.addEventListener("dragend", () => card.removeClass("is-dragging"));
+  }
+  card.addEventListener("click", options.onSelect);
+  card.addEventListener("contextmenu", (event) => options.onContextMenu?.(event));
+  card.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") options.onSelect(); });
   return card;
 }
+
+export function renderPreviewInCard(service: PreviewService, parent: HTMLElement, item: PaletteItem): void { void service.render(parent, item, true); }
 
 export function workspaceSelect(plugin: CanvasPalettePlugin, parent: HTMLElement, value: string | null, onChange: (id: string) => void): HTMLSelectElement {
   const select = parent.createEl("select", { cls: "dropdown cp-workspace-select" });

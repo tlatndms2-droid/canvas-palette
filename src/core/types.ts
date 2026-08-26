@@ -1,15 +1,14 @@
 export type PaletteItemType = "card" | "markdown" | "image" | "group";
+export type PaletteTheme = "obsidian" | "light" | "dark";
+export type AccentMode = "obsidian" | "custom";
+export type AssetViewMode = "grid" | "list";
 
-export interface ItemOrigin {
-  canvasPath?: string;
-  canvasNodeId?: string;
-  workspaceId?: string;
-  filePath?: string;
-}
+export interface TextSourceRange { from: { line: number; ch: number }; to: { line: number; ch: number }; }
+export interface ItemOrigin { canvasPath?: string; canvasNodeId?: string; workspaceId?: string; filePath?: string; textRange?: TextSourceRange; }
 
 export interface CanvasNodeSnapshot {
   id: string;
-  type: string;
+  type: "text" | "file" | "group" | string;
   x: number;
   y: number;
   width: number;
@@ -26,13 +25,14 @@ export interface CanvasEdgeSnapshot {
   id: string;
   fromNode: string;
   toNode: string;
+  fromSide?: string;
+  toSide?: string;
+  label?: string;
+  color?: string;
   [key: string]: unknown;
 }
 
-export interface GroupSnapshot {
-  nodes: CanvasNodeSnapshot[];
-  edges: CanvasEdgeSnapshot[];
-}
+export interface GroupSnapshot { bounds: { width: number; height: number }; nodes: CanvasNodeSnapshot[]; edges: CanvasEdgeSnapshot[]; }
 
 export interface PaletteItem {
   id: string;
@@ -48,40 +48,43 @@ export interface PaletteItem {
   group?: GroupSnapshot;
 }
 
-export interface Collection {
-  id: string;
-  workspaceId: string;
-  parentId: string | null;
-  name: string;
-  childCollectionIds: string[];
-  itemIds: string[];
-}
+export interface Collection { id: string; workspaceId: string; parentId: string | null; name: string; childCollectionIds: string[]; itemIds: string[]; }
 
+export interface SideLayoutState { viewportRatio: number; topRatio: number; indexRatio: number; viewMode: AssetViewMode; }
 export interface PaletteWorkspace {
   id: string;
   name: string;
   canvasPaths: string[];
-  isRepresentativeFor: string[];
+  representativeCanvasPath: string | null;
   rootCollectionIds: string[];
   looseItemIds: string[];
+  sideLayout: SideLayoutState;
 }
 
 export interface PaletteSettings {
-  theme: "obsidian" | "light" | "dark";
+  theme: PaletteTheme;
+  accentMode: AccentMode;
+  accentColor: string;
   cardSize: number;
   fontSize: number;
   columns: number;
 }
 
-export interface UIState {
-  activeWorkspaceId: string | null;
-  selectedItemId: string | null;
-  miniTab: "collect" | "storage";
+export interface MiniPaletteState {
+  tab: "collect" | "storage";
+  isOpen: boolean;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
   leftPaneOpen: boolean;
   rightPaneOpen: boolean;
   leftPaneWidth: number;
   rightPaneWidth: number;
+  viewMode: AssetViewMode;
+  sort: "modified-desc" | "modified-asc" | "title-asc" | "title-desc";
+  selectedItemIds: string[];
 }
+
+export interface UIState { activeWorkspaceId: string | null; selectedItemId: string | null; miniPalette: MiniPaletteState; }
 
 export interface PaletteData {
   schemaVersion: number;
