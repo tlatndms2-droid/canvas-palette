@@ -1,0 +1,25 @@
+import { PluginSettingTab, Setting } from "obsidian";
+import type CanvasPalettePlugin from "../main";
+
+export class CanvasPaletteSettingTab extends PluginSettingTab {
+  constructor(private readonly plugin: CanvasPalettePlugin) { super(plugin.app, plugin); }
+
+  display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+    containerEl.createEl("h2", { text: "Canvas Palette" });
+    new Setting(containerEl).setName("Theme").setDesc("Follow Obsidian by default; theme changes never alter layout.").addDropdown((dropdown) => dropdown
+      .addOption("obsidian", "Follow Obsidian").addOption("light", "Light").addOption("dark", "Dark")
+      .setValue(this.plugin.store.data.settings.theme)
+      .onChange(async (value) => { this.plugin.store.data.settings.theme = value as "obsidian" | "light" | "dark"; this.plugin.store.changed(); }));
+    new Setting(containerEl).setName("Card size").setDesc("Default card width in palette grids.").addSlider((slider) => slider
+      .setLimits(160, 360, 10).setDynamicTooltip().setValue(this.plugin.store.data.settings.cardSize)
+      .onChange((value) => { this.plugin.store.data.settings.cardSize = value; this.plugin.store.changed(); }));
+    new Setting(containerEl).setName("Font size").addSlider((slider) => slider
+      .setLimits(11, 20, 1).setDynamicTooltip().setValue(this.plugin.store.data.settings.fontSize)
+      .onChange((value) => { this.plugin.store.data.settings.fontSize = value; this.plugin.store.changed(); }));
+    new Setting(containerEl).setName("Grid columns").setDesc("Preferred number of columns; narrow panes reflow automatically.").addSlider((slider) => slider
+      .setLimits(1, 8, 1).setDynamicTooltip().setValue(this.plugin.store.data.settings.columns)
+      .onChange((value) => { this.plugin.store.data.settings.columns = value; this.plugin.store.changed(); }));
+  }
+}
