@@ -111,6 +111,13 @@ export class PaletteStore {
     this.changed();
   }
 
+  addLabelColorPreset(color: string): void {
+    const normalized = color.trim().toLowerCase();
+    if (!/^#[0-9a-f]{6}$/.test(normalized) || this.data.settings.labelColorPresets.includes(normalized)) return;
+    this.data.settings.labelColorPresets.push(normalized);
+    this.changed();
+  }
+
   reorderItems(workspaceId: string, sourceId: string, targetId: string, collectionId: string | null = null): void {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace || sourceId === targetId) return;

@@ -69,6 +69,7 @@ export interface PaletteSettings {
   theme: PaletteTheme;
   accentMode: AccentMode;
   accentColor: string;
+  labelColorPresets: string[];
   cardSize: number;
   fontSize: number;
   columns: number;

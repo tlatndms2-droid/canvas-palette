@@ -1,9 +1,10 @@
 import { App, Modal, Setting } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { PaletteItem, PaletteMetadata } from "../core/types";
+import { createLabelColorPicker } from "./label-color-picker";
 
 export class MetadataEditorModal extends Modal {
-  constructor(app: App, private readonly initial: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">, private readonly onSave: (metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">) => void) { super(app); }
+  constructor(app: App, private readonly plugin: CanvasPalettePlugin, private readonly initial: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">, private readonly onSave: (metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">) => void) { super(app); }
   onOpen(): void {
     this.contentEl.addClass("canvas-palette", "cp-metadata-editor");
     this.contentEl.createEl("h2", { text: "Palette metadata" });
@@ -12,8 +13,7 @@ export class MetadataEditorModal extends Modal {
     this.contentEl.createEl("label", { text: "Label" });
     const label = this.contentEl.createEl("input", { value: this.initial.label, attr: { placeholder: "e.g. In progress" } });
     this.contentEl.createEl("label", { text: "Label color" });
-    const labelColor = this.contentEl.createEl("input", { attr: { type: "color", "aria-label": "Label color" } });
-    labelColor.value = this.initial.labelColor || "#8b5cf6";
+    const labelColor = createLabelColorPicker(this.contentEl, this.initial.labelColor, this.plugin.store.data.settings.labelColorPresets, (color) => this.plugin.store.addLabelColorPreset(color));
     this.contentEl.createEl("label", { text: "Caption" });
     const caption = this.contentEl.createEl("textarea", { text: this.initial.caption, attr: { placeholder: "Short description" } });
     const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });

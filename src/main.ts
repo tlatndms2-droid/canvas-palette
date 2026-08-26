@@ -1,6 +1,7 @@
 import { Editor, EventRef, Menu, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { CanvasAdapter } from "./canvas/canvas-adapter";
 import { CanvasMetadataController } from "./canvas/canvas-metadata-controller";
+import { CanvasNodeToolbarController } from "./canvas/canvas-node-toolbar-controller";
 import { PaletteDropController } from "./canvas/palette-drop-controller";
 import { TextScrapHighlights } from "./canvas/text-scrap-highlights";
 import { createId } from "./core/ids";
@@ -20,6 +21,11 @@ export default class CanvasPalettePlugin extends Plugin {
   search = new SearchService();
   canvas = new CanvasAdapter(this.app, (itemId, canvasPath, nodeIds) => this.store.recordCanvasPlacement(itemId, canvasPath, nodeIds), (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId));
   canvasMetadata = new CanvasMetadataController(this, this.canvas);
+  canvasToolbar = new CanvasNodeToolbarController(this.canvas, {
+    editMetadata: (node) => this.editCanvasNodeMetadata(node),
+    collectToMini: (node) => void this.collectCanvasNodeToMini(node),
+    saveToSide: (node, anchor) => this.saveCanvasNodeFromToolbar(node, anchor)
+  });
   dropController = new PaletteDropController(this.store, this.canvas);
   textScrapHighlights = new TextScrapHighlights(this);
   preview = new PreviewService(this.app, this);
@@ -29,6 +35,7 @@ export default class CanvasPalettePlugin extends Plugin {
   async onload(): Promise<void> {
     await this.store.load();
     this.register(this.dropController.mount(this.app.workspace.containerEl.ownerDocument));
+    this.register(this.canvasToolbar.mount(this.app.workspace.containerEl.ownerDocument));
     this.registerEditorExtension(this.textScrapHighlights.extension());
     this.register(this.store.subscribe(() => { this.textScrapHighlights.refreshVisibleEditors(); this.canvasMetadata.refreshSoon(); }));
     this.registerView(SIDE_PALETTE_VIEW, (leaf) => new SidePaletteView(leaf, this));
@@ -48,26 +55,21 @@ export default class CanvasPalettePlugin extends Plugin {
       this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed(); new Notice(`Created ${workspace.name}`);
     }});
     const workspaceEvents = this.app.workspace as unknown as { on: (name: string, callback: (...args: unknown[]) => unknown) => EventRef };
-    this.registerEvent(workspaceEvents.on("canvas:node-menu", (...args: unknown[]) => {
-      const menu = args[0] as Menu | undefined;
-      const node = args[1];
-      if (!menu || typeof menu.addItem !== "function") return;
-      this.addCanvasNodeCollectionMenu(menu, node);
-    }));
     this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor) => this.addCanvasTextCollectionMenu(menu, editor)));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
       if (this.canvas.activeContext()) this.miniPalette.mount();
       else this.miniPalette.destroy();
       this.selectRepresentativeWorkspace();
       this.canvasMetadata.refreshSoon();
+      this.canvasToolbar.refreshSoon();
     }));
-    this.registerEvent(workspaceEvents.on("layout-change", () => this.canvasMetadata.refreshSoon()));
+    this.registerEvent(workspaceEvents.on("layout-change", () => { this.canvasMetadata.refreshSoon(); this.canvasToolbar.refreshSoon(); }));
     this.addSettingTab(new CanvasPaletteSettingTab(this));
     if (this.canvas.activeContext()) this.miniPalette.mount();
     this.canvasMetadata.refreshSoon();
   }
 
-  async onunload(): Promise<void> { this.canvasMetadata.destroy(); this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
+  async onunload(): Promise<void> { this.canvasToolbar.destroy(); this.canvasMetadata.destroy(); this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
 
   activeWorkspace(): PaletteWorkspace | undefined {
     const id = this.store.data.uiState.activeWorkspaceId;
@@ -131,24 +133,26 @@ export default class CanvasPalettePlugin extends Plugin {
     new Notice(`${items.length} Canvas item${items.length === 1 ? "" : "s"} collected.`);
   }
 
-  private addCanvasNodeCollectionMenu(menu: Menu, node: unknown): void {
-    menu.addSeparator();
-    menu.addItem((item) => item.setTitle("Canvas Palette").setIcon("library-big").setIsLabel(true));
-    menu.addItem((item) => item.setTitle("Edit Palette Metadata").setIcon("tags").onClick(() => this.editCanvasNodeMetadata(node)));
-    menu.addItem((item) => item.setTitle("Collect to Mini Palette").setIcon("inbox").onClick(() => void this.collectCanvasNodeToMini(node)));
-    const currentWorkspace = this.activeWorkspace();
-    if (currentWorkspace) menu.addItem((item) => item.setTitle(`Save directly to Side Palette — ${currentWorkspace.name}`).setIcon("panel-right").onClick(() => void this.collectCanvasNodeToWorkspace(node, currentWorkspace.id)));
-    for (const workspace of Object.values(this.store.data.workspaces)) {
-      if (workspace.id === currentWorkspace?.id) continue;
-      menu.addItem((item) => item.setTitle(`Save directly to Side Palette — ${workspace.name}`).setIcon("panel-right").onClick(() => void this.collectCanvasNodeToWorkspace(node, workspace.id)));
-    }
-  }
-
   private editCanvasNodeMetadata(node: unknown): void {
     const target = this.canvas.nodeContext(node);
     if (!target) { new Notice("Unable to identify the selected Canvas item."); return; }
     const current = this.store.getCanvasNodeMetadata(target.canvasPath, target.nodeId) ?? { tags: [], label: "", caption: "", modifiedAt: Date.now() };
-    new MetadataEditorModal(this.app, current, (metadata) => this.store.setCanvasNodeMetadata(target.canvasPath, target.nodeId, metadata)).open();
+    new MetadataEditorModal(this.app, this, current, (metadata) => this.store.setCanvasNodeMetadata(target.canvasPath, target.nodeId, metadata)).open();
+  }
+
+  private saveCanvasNodeFromToolbar(node: unknown, anchor: HTMLElement): void {
+    const workspaces = Object.values(this.store.data.workspaces);
+    if (workspaces.length === 0) { new Notice("Create a Workspace before saving Canvas items."); return; }
+    if (workspaces.length === 1) { void this.collectCanvasNodeToWorkspace(node, workspaces[0].id); return; }
+    const currentId = this.store.data.uiState.activeWorkspaceId;
+    const ordered = [...workspaces].sort((a, b) => Number(b.id === currentId) - Number(a.id === currentId));
+    const menu = new Menu();
+    for (const workspace of ordered) menu.addItem((item) => item
+      .setTitle(workspace.name)
+      .setIcon(workspace.id === currentId ? "check" : "panel-right")
+      .onClick(() => void this.collectCanvasNodeToWorkspace(node, workspace.id)));
+    const rect = anchor.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
   }
 
   private addCanvasTextCollectionMenu(menu: Menu, editor: Editor): void {

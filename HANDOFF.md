@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.1.13`
+- Version: `0.1.14`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.13`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.13.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.13`.
+- Latest release: `0.1.14`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.14.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.14`.
 
 ## Source plan and confirmed product direction
 
@@ -44,6 +44,8 @@
 - `0.1.12` aligns Canvas metadata cards with the approved single-surface reference: the native content is no longer wrapped by a second bordered panel, Caption is centered plain text outside the card, and each Label can store its own color. Label color is shared through Canvas collection into Side/Mini Palette items and is editable from Canvas, batch metadata, item details, and Mini Inspector.
   - Validation ran only in `Obsidian Sandbox`. A disposable Canvas covered 400×300 and 800×600 text cards, an image file node, and a Group. The two fixed sizes produced metadata scales 1.0 and 2.0, title sizes 17px and 34px, Label sizes 11px and 22px, and footer heights 52px and 104px. Live resize to 700×525 recalculated to 1.75. Native image content remained an image node, Group remained a Group, and clearing metadata restored the original node with no layer, inset, or scale variable. Sandbox fixtures were deleted afterward; the real Vault was not used for validation.
 - `0.1.13` stops restyling Canvas nodes altogether. The plugin no longer changes the native node border, background, shadow, content inset, image radius, native label visibility, or Group chrome. It adds only pointer-transparent Label/Tag/date overlays on the existing card and keeps Caption as plain centered text below it; the original Canvas card remains the sole card surface.
+- `0.1.14` replaces the Canvas `Palette metadata` modal's long color input with seven round default Label-color presets, a selected-state ring, and persistent user-added custom presets. Canvas Palette actions move out of the node context menu and into the native selected-node `.canvas-menu`: edit metadata, collect to Mini Palette, and save to Side Palette. The Side action preserves multi-Workspace routing through a destination menu.
+  - Validation ran only in `Obsidian Sandbox`. A disposable two-node Canvas verified three toolbar buttons for a single selection, no duplicates after repeated refresh/native menu render, Node-target updates after selection changes, complete removal after deselection, and all three button callbacks. The preset modal exposed exactly seven defaults plus the custom-color button; default and custom selection rings, custom-preset persistence across plugin reload, saved Label color, and two-Workspace destination routing were verified. Disposable Canvas data and metadata were removed afterward.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
@@ -58,7 +60,7 @@
 
 ## Implemented
 
-- Schema version 4 migration, pre-collection Canvas-node metadata, Workspace Canvas association, per-item Canvas placement history, per-workspace Side layout, Mini Palette geometry, themes, and custom Accent persistence.
+- Schema version 6 migration, pre-collection Canvas-node metadata, custom Label-color presets, Workspace Canvas association, per-item Canvas placement history, per-workspace Side layout, Mini Palette geometry, themes, and custom Accent persistence.
 - Canvas Adapter for guarded active Canvas selection, Canvas JSON capture, file/text/group creation, Group ID remapping, and Collection mind-map export.
 - Floating Canvas-hosted Mini Palette with hover trigger, window move/resize, Collect Inspector, Storage filters/sort/view modes, docked panes, previews, and Canvas drag/drop.
 - Side Palette three-way independent divider resize, per-Pane scrolling, content-first type-aware Card/List Viewport, nested Outliner, Tag/Label indexes, item move/reorder, multi-selection, batch tags, guarded deletion, and type-preserving Canvas export.
