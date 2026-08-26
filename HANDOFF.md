@@ -2,11 +2,69 @@
 
 ## Current state
 
-- Version: `0.1.18`
+- Version: `0.1.19`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.18`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.18.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.18`.
+- Latest release: `0.1.19`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.19.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.19`.
+
+## Start here on another PC
+
+1. Clone `https://github.com/tlatndms2-droid/canvas-palette`, check out `main`, and confirm the working tree before making changes.
+2. Read this entire file, then inspect the current source and the relevant portions of `Canvas Palette Codex 전체 개발 기획 v1.3`. Do not rely on an old release description when it conflicts with current source or a later user instruction.
+3. Install dependencies with the package manager available on that PC and run the checks defined in `package.json`. Do not assume a globally installed Node executable; locate a usable runtime when necessary.
+4. Locate a disposable `Obsidian Sandbox` vault and its `.obsidian/plugins/canvas-palette` directory before runtime testing. Never substitute the user's real Vault.
+5. Treat the latest explicit user instruction as authoritative. This HANDOFF carries established defaults and decisions across machines, but a later explicit instruction from the user overrides it.
+
+## Development operating instructions
+
+### Authorization and scope
+
+- When the user is demonstrating a problem, supplying images/video/text, or asking for a briefing, inspect and explain only. Do not modify code or publish a release until the user explicitly says to modify, implement, proceed, or update.
+- After an explicit modification request, finish the requested scope rather than leaving knowingly incomplete behavior. Do not wait for a second release command: build, verify, bump the next sequential `0.1.x`, update project documentation, commit, push, and publish the BRAT release unless the user explicitly requests local-only work.
+- Never advance to `0.2.0` without explicit user permission.
+- Do not expand the scope with unrelated UI redesigns, libraries, controls, buttons, or behaviors. Preserve working behavior outside the requested area and avoid touching excluded components.
+- Existing user changes in a dirty worktree are not disposable. Inspect them, preserve unrelated edits, and do not use destructive Git commands to erase them.
+
+### Investigation before implementation
+
+- Read every supplied image, video, pasted requirement, and current code path relevant to the issue before editing. If evidence cannot be read reliably, say so; do not invent observations.
+- Find the actual owning component, state owner, persistence path, event wiring, Canvas runtime adapter, DOM/CSS layout, and overflow/interaction boundary involved in the defect.
+- Determine the real failure mechanism before choosing a fix. A visual divider, overlay, or cursor that merely looks functional is not a substitute for connected state and working interaction.
+- Reuse the current architecture wherever practical. Palette views must mutate through `PaletteStore`, and Canvas JSON/runtime access must remain isolated in `CanvasAdapter` rather than being duplicated across UI components.
+- Check for regressions in adjacent existing behavior whenever a shared path is changed. A focused fix must not silently break Card, Markdown, Image, Group, Mini Palette, Side Palette, metadata, drag/drop, or native editor behavior.
+
+### Implementation quality
+
+- Implement state, events, persistence, and cleanup as a complete behavior. Do not stop at CSS decoration or a mocked interaction.
+- Preserve original Vault data. Palette display-title changes and Palette deletion must not rename, duplicate, or delete original Markdown/Image files or existing Canvas nodes.
+- Keep current product decisions intact unless the user changes them explicitly: Collect and Storage remain separate, Mini Palette remains Canvas-hosted, Storage panes remain docked and responsive, and Light/Dark layouts retain the same geometry.
+- Do not define unresolved behavior such as the More menu, final Copy semantics, filter composition, or final pane limits without user direction.
+- Keep source text, JSON, and Korean content UTF-8 safe. Use literal paths for Windows paths containing spaces or Korean characters.
+
+### Verification and Sandbox safety
+
+- Runtime validation must use only a disposable `Obsidian Sandbox`, never the user's real Vault. Direct UI automation is allowed inside that Sandbox when needed to prove interaction.
+- Use disposable Canvas files, Palette items, metadata, and workspaces for tests. Remove every fixture afterward and verify that no test files or records remain.
+- Run the project's TypeScript no-emit check, production bundle, generated `main.js` syntax check, JSON validation, and available automated tests. A successful build alone is not proof of Obsidian runtime behavior.
+- Install the freshly built `main.js`, `manifest.json`, and `styles.css` into the Sandbox plugin directory, reload the plugin, and verify the installed version.
+- Exercise the exact affected interaction in the real Obsidian runtime, including persistence after plugin reload when state is involved. Check captured Obsidian errors after testing.
+- Report only tests that were actually executed. Separate static checks, automated tests, and runtime/UI verification; explicitly identify anything that remains untested.
+
+### Release and GitHub verification
+
+- Keep `manifest.json`, `package.json`, `versions.json`, README, HANDOFF, Git tag, and GitHub Release version aligned.
+- Publish from `main` as a public, non-draft, non-prerelease GitHub Release suitable for BRAT.
+- Attach `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-<version>.zip` as separate release assets.
+- Verify local HEAD, remote `main`, and the release tag resolve to the same commit. Re-fetch the public release and confirm all four asset names, sizes, and SHA-256 digests.
+- Do not report release completion from a locally created tag or draft page. The public release and downloadable assets must already exist.
+
+### Completion report
+
+- Lead with the outcome. State the actual root cause, changed files or subsystems, state/persistence location when relevant, and the precise behavior implemented.
+- List the checks actually run and their results, including Sandbox runtime results and captured errors. Never claim an unexecuted test passed.
+- Provide the released version, full commit SHA, public release URL, and BRAT asset status.
+- If anything is blocked or unverified, say so directly instead of presenting the task as complete.
 
 ## Source plan and confirmed product direction
 
@@ -54,6 +112,8 @@
   - Validation ran only in `Obsidian Sandbox`. Two selected ordinary text nodes produced two separate Card Items through the real toolbar. Selecting only a Group boundary produced one Group containing its five total nodes, nested Group, and two internal edges while excluding two external/crossing edges. Selecting that Group together with an outside Card and an explicitly selected contained Card produced one Group plus one outside Card without duplicating the contained Card. The error log was empty and all disposable Palette Items and Canvas data were removed afterward.
 - `0.1.18` keeps a collected Palette Item linked to its original Canvas node using the stored Canvas path and Node ID. Original Canvas Card content and collected Card content synchronize in both directions; Tags, Label, Label color, and Caption share the same node metadata in both directions. The linked-Canvas row and a `Locate on Canvas` context action open the source Canvas, select the original node, and zoom it into view. Group snapshots refresh when their original Canvas changes, while Markdown and Image Items continue to reference their original files.
   - Validation ran only in `Obsidian Sandbox`. A disposable Canvas verified preserved Canvas path/Node ID, open-Canvas and closed-file Palette→Canvas Card updates, Canvas→Palette Card title/content updates, Group-child snapshot refresh, metadata synchronization in both directions, plugin-reload persistence, and actual linked-row click selection of the original node. The captured error log was empty and the disposable files and Palette data were removed afterward.
+- `0.1.19` consolidates the user's cross-machine development rules in this HANDOFF: authorization boundaries, investigation-first implementation, scope control, architecture preservation, Sandbox-only runtime testing, honest test reporting, cleanup, sequential `0.1.x` release policy, BRAT asset/SHA verification, and completion-report requirements. It also removes the obsolete pre-`0.1.18` prohibition on bidirectional Card synchronization. No plugin runtime behavior changes in this release.
+  - Documentation-release validation covered TypeScript no-emit, production bundling, generated-bundle syntax, JSON parsing, and installation/reload as version `0.1.19` in `Obsidian Sandbox`. The plugin loaded successfully and the captured error log was empty. Feature-level runtime regressions were not re-run because no runtime source changed.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
@@ -101,9 +161,9 @@ Views mutate data through `PaletteStore`; search and preview remain separate. Al
 - `Collection`: virtual nested folder; it must never create Vault folders.
 - `pendingItemIds`: reviewed in Mini Palette Collect before workspace import.
 
-## Manual validation required in Obsidian
+## Broader regression checks still worth repeating
 
-The user has not yet completed a fresh runtime demonstration of all features unrelated to the focused `0.1.7` drag-and-drop checks. Static build success is not proof that unrelated Obsidian runtime paths are correct:
+Focused release checks are recorded above, but a future change touching shared interaction paths should repeat the relevant broader regressions below. Do not describe them as passed unless they were executed for that change:
 
 1. Selected text inside a Canvas card shows both Canvas Palette collection routes.
 2. Side cards update their linked-Canvas label immediately after a successful export.
@@ -113,7 +173,6 @@ The user has not yet completed a fresh runtime demonstration of all features unr
 ## Safety and unresolved behavior
 
 - Do not rename MD/image files when changing display titles.
-- Do not add automatic bidirectional Card synchronization.
 - Keep Collect and Storage separate, and keep Mini Palette Canvas-hosted rather than as a regular Obsidian tab.
 - Keep the Storage panes docked, the grid responsive, and Light/Dark layouts geometrically identical.
 - Do not define the More menu, final Copy semantics, filter composition, or final pane limits without user direction.
@@ -121,4 +180,4 @@ The user has not yet completed a fresh runtime demonstration of all features unr
 
 ## Release checklist
 
-Build, verify core flows, bump the next sequential `0.1.x` patch, update README and HANDOFF, commit, push, and create a GitHub release with `main.js`, `manifest.json`, and `styles.css` for BRAT.
+Use the complete release and GitHub verification rules in `Development operating instructions`. The short form is: build, Sandbox-test the affected paths, bump the next sequential `0.1.x`, update README/HANDOFF, commit, push, publish all four BRAT assets, and verify the public release and matching SHAs.
