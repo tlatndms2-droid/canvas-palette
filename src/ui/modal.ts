@@ -1,6 +1,27 @@
 import { App, Modal, Setting } from "obsidian";
 import type CanvasPalettePlugin from "../main";
-import type { PaletteItem } from "../core/types";
+import type { PaletteItem, PaletteMetadata } from "../core/types";
+
+export class MetadataEditorModal extends Modal {
+  constructor(app: App, private readonly initial: Pick<PaletteMetadata, "tags" | "label" | "caption">, private readonly onSave: (metadata: Pick<PaletteMetadata, "tags" | "label" | "caption">) => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-metadata-editor");
+    this.contentEl.createEl("h2", { text: "Palette metadata" });
+    this.contentEl.createEl("label", { text: "Tags" });
+    const tags = this.contentEl.createEl("input", { value: this.initial.tags.join(", "), attr: { placeholder: "tag1, tag2" } });
+    this.contentEl.createEl("label", { text: "Label" });
+    const label = this.contentEl.createEl("input", { value: this.initial.label, attr: { placeholder: "e.g. In progress" } });
+    this.contentEl.createEl("label", { text: "Caption" });
+    const caption = this.contentEl.createEl("textarea", { text: this.initial.caption, attr: { placeholder: "Short description" } });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
+    actions.createEl("button", { text: "Save", cls: "mod-cta" }).addEventListener("click", () => {
+      this.onSave({ tags: [...new Set(tags.value.split(",").map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean))], label: label.value.trim(), caption: caption.value.trim() });
+      this.close();
+    });
+  }
+  onClose(): void { this.contentEl.empty(); }
+}
 
 export class TextPromptModal extends Modal {
   private value: string;
@@ -36,7 +57,7 @@ export class TagLabelModal extends Modal {
     const knownTags = [...new Set([...workspaceItems.flatMap((item) => item.tags), ...items.flatMap((item) => item.tags)])].sort((a, b) => a.localeCompare(b));
     const knownLabels = [...new Set([...workspaceItems.map((item) => item.label), ...items.map((item) => item.label)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
     this.contentEl.addClass("canvas-palette", "cp-tag-label-modal");
-    this.contentEl.createEl("h2", { text: items.length === 1 ? "Tags and label" : `Tags and label · ${items.length} items` });
+    this.contentEl.createEl("h2", { text: items.length === 1 ? "Metadata" : `Metadata · ${items.length} items` });
     this.contentEl.createEl("h3", { text: "Tags" });
     const tagControls = new Map<string, HTMLInputElement>();
     const tagList = this.contentEl.createDiv({ cls: "cp-toggle-list" });
@@ -61,6 +82,11 @@ export class TagLabelModal extends Modal {
     this.radio(labelList, radioName, "", "No label", currentLabels.size === 1 && items[0].label === "", (value) => { selectedLabel = value; });
     for (const label of knownLabels) this.radio(labelList, radioName, label, label, currentLabels.size === 1 && items[0].label === label, (value) => { selectedLabel = value; });
     const newLabel = this.contentEl.createEl("input", { attr: { placeholder: "New label" } });
+    this.contentEl.createEl("h3", { text: "Caption" });
+    const currentCaptions = new Set(items.map((item) => item.caption));
+    const caption = this.contentEl.createEl("textarea", { text: currentCaptions.size === 1 ? items[0].caption : "", attr: { placeholder: currentCaptions.size > 1 ? "Keep current captions unless edited" : "Short description" } });
+    let captionTouched = false;
+    caption.addEventListener("input", () => { captionTouched = true; });
     const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
     actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
     actions.createEl("button", { text: "Apply", cls: "mod-cta" }).addEventListener("click", () => {
@@ -74,7 +100,7 @@ export class TagLabelModal extends Modal {
         }
         for (const tag of additions) tags.add(tag);
         const label = explicitLabel || (selectedLabel === "__keep__" ? item.label : selectedLabel);
-        this.plugin.store.updateItem(item.id, { displayTitle: item.displayTitle, tags: [...tags], label, caption: item.caption, ...(item.type === "card" ? { content: item.content ?? "" } : {}) });
+        this.plugin.store.updateItem(item.id, { displayTitle: item.displayTitle, tags: [...tags], label, caption: captionTouched || currentCaptions.size === 1 ? caption.value.trim() : item.caption, ...(item.type === "card" ? { content: item.content ?? "" } : {}) });
       }
       this.close();
     });

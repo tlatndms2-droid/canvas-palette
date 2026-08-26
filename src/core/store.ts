@@ -1,7 +1,7 @@
 import type CanvasPalettePlugin from "../main";
 import { DEFAULT_SIDE_LAYOUT, migrateData } from "./defaults";
 import { createId } from "./ids";
-import type { Collection, PaletteData, PaletteItem, PaletteWorkspace } from "./types";
+import type { Collection, PaletteData, PaletteItem, PaletteMetadata, PaletteWorkspace } from "./types";
 
 type Listener = () => void;
 
@@ -89,6 +89,25 @@ export class PaletteStore {
     const item = this.data.items[id];
     if (!item) return;
     Object.assign(item, changes, { modifiedAt: Date.now() });
+    this.changed();
+  }
+
+  getCanvasNodeMetadata(canvasPath: string, nodeId: string): PaletteMetadata | undefined {
+    return this.data.canvasNodeMetadata[canvasPath]?.[nodeId];
+  }
+
+  setCanvasNodeMetadata(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "caption">): void {
+    const isEmpty = metadata.tags.length === 0 && !metadata.label && !metadata.caption;
+    if (isEmpty) {
+      const canvas = this.data.canvasNodeMetadata[canvasPath];
+      if (canvas) {
+        delete canvas[nodeId];
+        if (Object.keys(canvas).length === 0) delete this.data.canvasNodeMetadata[canvasPath];
+      }
+    } else {
+      const canvas = this.data.canvasNodeMetadata[canvasPath] ??= {};
+      canvas[nodeId] = { tags: [...new Set(metadata.tags)], label: metadata.label, caption: metadata.caption, modifiedAt: Date.now() };
+    }
     this.changed();
   }
 

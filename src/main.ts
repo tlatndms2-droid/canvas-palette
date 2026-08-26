@@ -1,5 +1,6 @@
 import { Editor, EventRef, Menu, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { CanvasAdapter } from "./canvas/canvas-adapter";
+import { CanvasMetadataController } from "./canvas/canvas-metadata-controller";
 import { PaletteDropController } from "./canvas/palette-drop-controller";
 import { TextScrapHighlights } from "./canvas/text-scrap-highlights";
 import { createId } from "./core/ids";
@@ -11,13 +12,14 @@ import { PreviewService } from "./preview/preview-service";
 import { SearchService } from "./search/search-service";
 import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
-import { ItemEditorModal } from "./ui/modal";
+import { ItemEditorModal, MetadataEditorModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 
 export default class CanvasPalettePlugin extends Plugin {
   store = new PaletteStore(this);
   search = new SearchService();
-  canvas = new CanvasAdapter(this.app, (itemId, canvasPath, nodeIds) => this.store.recordCanvasPlacement(itemId, canvasPath, nodeIds));
+  canvas = new CanvasAdapter(this.app, (itemId, canvasPath, nodeIds) => this.store.recordCanvasPlacement(itemId, canvasPath, nodeIds), (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId));
+  canvasMetadata = new CanvasMetadataController(this, this.canvas);
   dropController = new PaletteDropController(this.store, this.canvas);
   textScrapHighlights = new TextScrapHighlights(this);
   preview = new PreviewService(this.app, this);
@@ -28,7 +30,7 @@ export default class CanvasPalettePlugin extends Plugin {
     await this.store.load();
     this.register(this.dropController.mount(this.app.workspace.containerEl.ownerDocument));
     this.registerEditorExtension(this.textScrapHighlights.extension());
-    this.register(this.store.subscribe(() => this.textScrapHighlights.refreshVisibleEditors()));
+    this.register(this.store.subscribe(() => { this.textScrapHighlights.refreshVisibleEditors(); this.canvasMetadata.refreshSoon(); }));
     this.registerView(SIDE_PALETTE_VIEW, (leaf) => new SidePaletteView(leaf, this));
     this.addRibbonIcon("library-big", "Open Canvas Palette", () => void this.activateSidePalette());
     this.addRibbonIcon("panels-top-left", "Open Canvas Mini Palette", () => this.miniPalette.open());
@@ -57,12 +59,15 @@ export default class CanvasPalettePlugin extends Plugin {
       if (this.canvas.activeContext()) this.miniPalette.mount();
       else this.miniPalette.destroy();
       this.selectRepresentativeWorkspace();
+      this.canvasMetadata.refreshSoon();
     }));
+    this.registerEvent(workspaceEvents.on("layout-change", () => this.canvasMetadata.refreshSoon()));
     this.addSettingTab(new CanvasPaletteSettingTab(this));
     if (this.canvas.activeContext()) this.miniPalette.mount();
+    this.canvasMetadata.refreshSoon();
   }
 
-  async onunload(): Promise<void> { this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
+  async onunload(): Promise<void> { this.canvasMetadata.destroy(); this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
 
   activeWorkspace(): PaletteWorkspace | undefined {
     const id = this.store.data.uiState.activeWorkspaceId;
@@ -129,6 +134,7 @@ export default class CanvasPalettePlugin extends Plugin {
   private addCanvasNodeCollectionMenu(menu: Menu, node: unknown): void {
     menu.addSeparator();
     menu.addItem((item) => item.setTitle("Canvas Palette").setIcon("library-big").setIsLabel(true));
+    menu.addItem((item) => item.setTitle("Edit Palette Metadata").setIcon("tags").onClick(() => this.editCanvasNodeMetadata(node)));
     menu.addItem((item) => item.setTitle("Collect to Mini Palette").setIcon("inbox").onClick(() => void this.collectCanvasNodeToMini(node)));
     const currentWorkspace = this.activeWorkspace();
     if (currentWorkspace) menu.addItem((item) => item.setTitle(`Save directly to Side Palette — ${currentWorkspace.name}`).setIcon("panel-right").onClick(() => void this.collectCanvasNodeToWorkspace(node, currentWorkspace.id)));
@@ -136,6 +142,13 @@ export default class CanvasPalettePlugin extends Plugin {
       if (workspace.id === currentWorkspace?.id) continue;
       menu.addItem((item) => item.setTitle(`Save directly to Side Palette — ${workspace.name}`).setIcon("panel-right").onClick(() => void this.collectCanvasNodeToWorkspace(node, workspace.id)));
     }
+  }
+
+  private editCanvasNodeMetadata(node: unknown): void {
+    const target = this.canvas.nodeContext(node);
+    if (!target) { new Notice("Unable to identify the selected Canvas item."); return; }
+    const current = this.store.getCanvasNodeMetadata(target.canvasPath, target.nodeId) ?? { tags: [], label: "", caption: "", modifiedAt: Date.now() };
+    new MetadataEditorModal(this.app, current, (metadata) => this.store.setCanvasNodeMetadata(target.canvasPath, target.nodeId, metadata)).open();
   }
 
   private addCanvasTextCollectionMenu(menu: Menu, editor: Editor): void {

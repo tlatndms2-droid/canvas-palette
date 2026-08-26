@@ -1,6 +1,6 @@
 import { App, Notice, TFile, normalizePath } from "obsidian";
 import { createId } from "../core/ids";
-import type { CanvasEdgeSnapshot, CanvasNodeSnapshot, PaletteItem, PaletteItemType } from "../core/types";
+import type { CanvasEdgeSnapshot, CanvasNodeSnapshot, PaletteItem, PaletteItemType, PaletteMetadata } from "../core/types";
 import { restoreGroup, serializeGroup } from "./group-serializer";
 
 interface CanvasDocument { nodes: CanvasNodeSnapshot[]; edges: CanvasEdgeSnapshot[]; [key: string]: unknown; }
@@ -12,14 +12,16 @@ interface CanvasRuntimeLike {
   posFromClient?: (point: { x: number; y: number }) => { x: number; y: number };
   selection?: unknown;
   selectedNodes?: unknown;
+  nodes?: Map<string, CanvasRuntimeNodeLike>;
 }
+export interface CanvasRuntimeNodeLike { id?: string; nodeEl?: HTMLElement; getData?: () => CanvasNodeSnapshot; }
 interface CanvasViewLike { getViewType?: () => string; file?: TFile; containerEl?: HTMLElement; canvas?: CanvasRuntimeLike; }
 export interface CanvasContext { file: TFile; view: CanvasViewLike; runtime: CanvasRuntimeLike; }
 
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 
 export class CanvasAdapter {
-  constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void) {}
+  constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined) {}
 
   activeContext(): CanvasContext | null {
     const leaf = this.app.workspace.activeLeaf;
@@ -37,6 +39,20 @@ export class CanvasAdapter {
       if (view.file && view.canvas && view.containerEl?.contains(target)) return { file: view.file, view, runtime: view.canvas };
     }
     return null;
+  }
+
+  openContexts(): CanvasContext[] {
+    return this.app.workspace.getLeavesOfType("canvas").map((leaf) => {
+      const view = leaf.view as unknown as CanvasViewLike;
+      return view.file && view.canvas ? { file: view.file, view, runtime: view.canvas } : null;
+    }).filter((value): value is CanvasContext => Boolean(value));
+  }
+
+  nodeContext(value: unknown): { canvasPath: string; nodeId: string } | null {
+    const nodeId = this.runtimeNodeId(value);
+    if (!nodeId) return null;
+    const context = this.openContexts().find((candidate) => candidate.runtime.nodes?.get(nodeId) === value) ?? this.activeContext();
+    return context ? { canvasPath: context.file.path, nodeId } : null;
   }
 
   async collectSelection(): Promise<PaletteItem[]> {
@@ -129,21 +145,24 @@ export class CanvasAdapter {
 
   private async itemFromNode(node: CanvasNodeSnapshot, canvasPath: string): Promise<PaletteItem> {
     const now = Date.now();
+    const metadata = this.getMetadata(canvasPath, node.id);
+    const common = { tags: metadata?.tags ?? [], label: metadata?.label ?? "", caption: metadata?.caption ?? "", modifiedAt: metadata?.modifiedAt ?? now };
     if (node.type === "file" && node.file) {
       const file = this.app.vault.getAbstractFileByPath(node.file);
       const isImage = file instanceof TFile && IMAGE_EXTENSIONS.has(file.extension.toLowerCase());
       const type: PaletteItemType = isImage ? "image" : "markdown";
-      return { id: createId(type), type, displayTitle: file instanceof TFile ? file.basename : node.file, tags: [], label: "", caption: "", createdAt: now, modifiedAt: now, origin: { canvasPath, canvasNodeId: node.id, filePath: node.file }, canvasPlacements: [], content: type === "markdown" && file instanceof TFile ? await this.app.vault.cachedRead(file) : undefined };
+      return { id: createId(type), type, displayTitle: file instanceof TFile ? file.basename : node.file, ...common, createdAt: now, origin: { canvasPath, canvasNodeId: node.id, filePath: node.file }, canvasPlacements: [], content: type === "markdown" && file instanceof TFile ? await this.app.vault.cachedRead(file) : undefined };
     }
-    return { id: createId("card"), type: "card", displayTitle: (node.text ?? "Canvas card").split(/\r?\n/, 1)[0].slice(0, 80), tags: [], label: "", caption: "", createdAt: now, modifiedAt: now, origin: { canvasPath, canvasNodeId: node.id }, canvasPlacements: [], content: node.text ?? "" };
+    return { id: createId("card"), type: "card", displayTitle: (node.text ?? "Canvas card").split(/\r?\n/, 1)[0].slice(0, 80), ...common, createdAt: now, origin: { canvasPath, canvasNodeId: node.id }, canvasPlacements: [], content: node.text ?? "" };
   }
 
   private groupItem(nodes: CanvasNodeSnapshot[], edges: CanvasEdgeSnapshot[], canvasPath: string, nodeId: string): PaletteItem | null {
     if (nodes.length === 0) return null;
     const now = Date.now();
+    const metadata = this.getMetadata(canvasPath, nodeId);
     const snapshot = serializeGroup(nodes, edges);
     const title = nodes.find((node) => node.type === "group")?.label ?? nodes.find((node) => node.text)?.text?.split(/\r?\n/, 1)[0] ?? "Canvas group";
-    return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: [], label: "", caption: "", createdAt: now, modifiedAt: now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
+    return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", caption: metadata?.caption ?? "", createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
   }
 
   private nodeForItem(item: PaletteItem, x: number, y: number): CanvasNodeSnapshot {

@@ -6,6 +6,7 @@ export type AssetViewMode = "grid" | "list";
 export interface TextSourceRange { from: { line: number; ch: number }; to: { line: number; ch: number }; }
 export interface ItemOrigin { canvasPath?: string; canvasNodeId?: string; workspaceId?: string; filePath?: string; textRange?: TextSourceRange; }
 export interface CanvasPlacement { canvasPath: string; nodeIds: string[]; placedAt: number; }
+export interface PaletteMetadata { tags: string[]; label: string; caption: string; modifiedAt: number; }
 
 export interface CanvasNodeSnapshot {
   id: string;
@@ -103,5 +104,6 @@ export interface PaletteData {
   workspaces: Record<string, PaletteWorkspace>;
   collections: Record<string, Collection>;
   pendingItemIds: string[];
+  canvasNodeMetadata: Record<string, Record<string, PaletteMetadata>>;
   uiState: UIState;
 }
