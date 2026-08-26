@@ -43,8 +43,8 @@ export class PreviewService {
       return;
     }
     const source = item.content ?? item.origin.filePath ?? "No preview available.";
-    if (item.type === "markdown") {
-      await MarkdownRenderer.render(this.app, source, parent, item.origin.filePath ?? "", this.component);
+    if (item.type === "markdown" || item.type === "card") {
+      await MarkdownRenderer.render(this.app, compact ? source.slice(0, 360) : source, parent, item.origin.filePath ?? "", this.component);
       return;
     }
     parent.setText(compact ? source.slice(0, 180) : source);

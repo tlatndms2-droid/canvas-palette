@@ -2,12 +2,11 @@
 
 ## Current state
 
-- Version: `0.1.3`
+- Version: `0.1.4`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.3`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.3`.
-- Current release commit: `667ec54` (`fix: complete palette collection and reuse flows`).
+- Latest release: `0.1.4`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.4.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.4`.
 
 ## Source plan and confirmed product direction
 
@@ -20,7 +19,7 @@
 - Markdown and Image items retain references to their original Vault files. Changing a Palette display title must never rename or duplicate those files.
 - Theme choices are Follow Obsidian, Light, and Dark. Layout and component language remain consistent across themes, and Accent can use Obsidian's value or a user-selected custom color.
 - The agreed delivery method is to implement the confirmed plan as an integrated build, then let the user demonstrate it in Obsidian and report concrete failures for sequential `0.1.x` fixes.
-- While the user is listing or demonstrating problems, only inspect, compare with the plan, and brief the findings. Do not edit code or publish a release until the user explicitly requests the modification.
+- While the user is listing or demonstrating problems, only inspect, compare with the plan, and brief the findings. Once the user explicitly requests a modification, complete the next sequential `0.1.x` build and BRAT release without requiring a separate release command, unless the user asks for local-only work.
 
 ## Conversation and release progression
 
@@ -30,6 +29,7 @@
 - `0.1.2` removed the File Explorer/active-file collection route and added Canvas node context-menu choices for Mini Palette or direct Side Palette storage.
 - During live inspection of `0.1.2`, the user identified missing selected-text collection, incorrect file restoration, generic card composition, missing Canvas placement labels, missing deletion and multi-selection, and missing double-click detail/edit behavior.
 - `0.1.3` implements that complete correction batch. Static TypeScript checking, production bundling, JSON validation, Git push, public release state, and all three BRAT assets were verified before handoff.
+- `0.1.4` replaces the tall detail form with an editor-like floating window opened by double-click. It keeps Canvas and Side Palette visible, renders Card Markdown, supports source editing, title editing, save/close/minimize, drag/resize, properties, linked Canvas paths, and `Ctrl/Cmd+S` saving.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
@@ -48,7 +48,7 @@
 - Canvas Adapter for guarded active Canvas selection, Canvas JSON capture, file/text/group creation, Group ID remapping, and Collection mind-map export.
 - Floating Canvas-hosted Mini Palette with hover trigger, window move/resize, Collect Inspector, Storage filters/sort/view modes, docked panes, previews, and Canvas drag/drop.
 - Side Palette divider resize, content-first type-aware Card/List Viewport, nested Outliner, Tag/Label indexes, item move/reorder, multi-selection, batch tags, guarded deletion, and type-preserving Canvas export.
-- Preview service for rendered Markdown, images, and subgraph visualizations; every asset type opens a shared double-click detail/editor popup.
+- Preview service for rendered Card/Markdown content, images, and subgraph visualizations; every asset type opens a shared floating editor window on double-click.
 - Canvas Node and selected-text context-menu integration: `Collect to Mini Palette` or `Save directly to Side Palette — <Workspace>`. Vault File Explorer and active-file collection actions remain excluded because collection is Canvas-native.
 
 ## Architecture
@@ -77,13 +77,13 @@ Views mutate data through `PaletteStore`; search and preview remain separate. Al
 
 ## Manual validation required in Obsidian
 
-The user has not yet completed a fresh runtime demonstration of `0.1.3`. Static build success is not proof that the following Obsidian runtime paths are correct:
+The user has not yet completed a fresh runtime demonstration of `0.1.4`. Static build success is not proof that the following Obsidian runtime paths are correct:
 
 1. Selected text inside a Canvas card shows both Canvas Palette collection routes.
 2. Card, Markdown, Image, and Group drops create exactly one node/subgraph at the intended pan/zoom position.
 3. Markdown and Image drops visibly retain their original Vault file references and full content.
 4. Side cards update their linked-Canvas label immediately after a successful drop or export.
-5. Ctrl/Cmd multi-selection, selection markers, batch tags, guarded delete, and double-click popup all behave correctly without click/double-click conflicts.
+5. Ctrl/Cmd multi-selection, selection markers, batch tags, guarded delete, and the floating editor all behave correctly without click/double-click conflicts.
 6. Canvas automatically refreshes after JSON writes without reopening the file.
 7. Group hierarchy, nested groups, internal edges, directions, dimensions, and relative layout survive restore/export.
 8. Floating Mini Palette layering, hover opening, drag, resize, and drop interception remain compatible with third-party Canvas plugins.
