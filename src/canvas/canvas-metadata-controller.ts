@@ -4,6 +4,13 @@ import type { CanvasAdapter, CanvasRuntimeNodeLike } from "./canvas-adapter";
 
 export class CanvasMetadataController {
   private timer: number | null = null;
+  private readonly nodesByElement = new WeakMap<Element, CanvasRuntimeNodeLike>();
+  private readonly resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const node = this.nodesByElement.get(entry.target);
+      if (node) this.updateScale(node);
+    }
+  });
 
   constructor(private readonly plugin: CanvasPalettePlugin, private readonly adapter: CanvasAdapter) {}
 
@@ -22,6 +29,7 @@ export class CanvasMetadataController {
 
   destroy(): void {
     if (this.timer !== null) window.clearTimeout(this.timer);
+    this.resizeObserver.disconnect();
     for (const context of this.adapter.openContexts()) {
       const nodes = context.runtime.nodes;
       if (!(nodes instanceof Map)) continue;
@@ -34,18 +42,50 @@ export class CanvasMetadataController {
     if (!(nodeEl instanceof HTMLElement)) return;
     this.remove(node);
     if (!metadata || (metadata.tags.length === 0 && !metadata.label && !metadata.caption)) return;
-    nodeEl.addClass("cp-canvas-has-metadata");
-    const layer = nodeEl.createDiv({ cls: "cp-canvas-metadata", attr: { "aria-label": "Canvas Palette metadata" } });
-    if (metadata.label) layer.createDiv({ cls: "cp-canvas-metadata__label", text: metadata.label });
-    if (metadata.tags.length > 0) layer.createDiv({ cls: "cp-canvas-metadata__tags", text: metadata.tags.map((tag) => `#${tag}`).join(" ") });
-    layer.createDiv({ cls: "cp-canvas-metadata__date", text: new Date(metadata.modifiedAt).toLocaleDateString() });
+    const data = node.getData?.();
+    const type = data?.type ?? "unknown";
+    nodeEl.addClass("cp-canvas-has-metadata", `cp-canvas-has-metadata--${type}`);
+    const layer = nodeEl.createDiv({ cls: `cp-canvas-metadata cp-canvas-metadata--${type}`, attr: { "aria-label": "Canvas Palette metadata" } });
+    const header = layer.createDiv({ cls: "cp-canvas-metadata__header" });
+    header.createDiv({ cls: "cp-canvas-metadata__title", text: this.title(data) });
+    if (metadata.label) header.createDiv({ cls: "cp-canvas-metadata__label", text: metadata.label });
+    const footer = layer.createDiv({ cls: "cp-canvas-metadata__footer" });
+    const tags = footer.createDiv({ cls: "cp-canvas-metadata__tags" });
+    for (const tag of metadata.tags) tags.createSpan({ cls: "cp-canvas-metadata__tag", text: `#${tag}` });
+    footer.createDiv({ cls: "cp-canvas-metadata__date", text: new Date(metadata.modifiedAt).toLocaleDateString() });
     if (metadata.caption) layer.createDiv({ cls: "cp-canvas-metadata__caption", text: metadata.caption });
+    this.nodesByElement.set(nodeEl, node);
+    this.resizeObserver.observe(nodeEl);
+    this.updateScale(node);
   }
 
   private remove(node: CanvasRuntimeNodeLike): void {
     const nodeEl = node.nodeEl;
     if (!(nodeEl instanceof HTMLElement)) return;
-    nodeEl.removeClass("cp-canvas-has-metadata");
+    this.resizeObserver.unobserve(nodeEl);
+    nodeEl.removeClass("cp-canvas-has-metadata", "cp-canvas-has-metadata--text", "cp-canvas-has-metadata--file", "cp-canvas-has-metadata--group", "cp-canvas-has-metadata--unknown");
     nodeEl.querySelector(":scope > .cp-canvas-metadata")?.remove();
+    nodeEl.style.removeProperty("--cp-canvas-meta-scale");
+  }
+
+  private updateScale(node: CanvasRuntimeNodeLike): void {
+    const nodeEl = node.nodeEl;
+    const data = node.getData?.();
+    if (!(nodeEl instanceof HTMLElement) || !data) return;
+    const widthScale = Math.max(data.width, 1) / 400;
+    const heightScale = Math.max(data.height, 1) / 300;
+    const scale = Math.min(2.5, Math.max(0.75, Math.min(widthScale, heightScale)));
+    nodeEl.style.setProperty("--cp-canvas-meta-scale", scale.toFixed(3));
+  }
+
+  private title(data: ReturnType<NonNullable<CanvasRuntimeNodeLike["getData"]>> | undefined): string {
+    if (!data) return "Canvas item";
+    if (data.type === "group" && typeof data.label === "string" && data.label.trim()) return data.label.trim();
+    if (data.type === "file" && typeof data.file === "string") return data.file.split("/").pop()?.replace(/\.[^.]+$/, "") || "File";
+    if (data.type === "text" && typeof data.text === "string") {
+      const firstLine = data.text.split(/\r?\n/).find((line) => line.trim())?.trim().replace(/^#{1,6}\s+/, "");
+      if (firstLine) return firstLine.slice(0, 100);
+    }
+    return "Canvas item";
   }
 }

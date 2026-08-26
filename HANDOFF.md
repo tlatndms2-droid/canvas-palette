@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.1.10`
+- Version: `0.1.11`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.10`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.10.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.10`.
+- Latest release: `0.1.11`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.11.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.11`.
 
 ## Source plan and confirmed product direction
 
@@ -40,6 +40,8 @@
 - `0.1.9` corrects the over-broad `0.1.8` double-click change. Side Palette Card and Markdown items once again route through the existing native Quick Editor and remain editable. Image and Group retain the large preview, and Image preview now supports mouse-wheel zoom from 20% to 500% with a visible percentage indicator.
 - `0.1.10` adds common Palette metadata across Canvas, Mini Palette, and Side Palette. Uncollected Canvas nodes store Tags, Label, Caption, and metadata modification time by Canvas path and Node ID; a non-destructive DOM overlay displays only populated values while preserving the native Card, Markdown, Image, and Group node. Collection inherits these values into the existing `PaletteItem`, after which Mini and Side continue to read and update the same Item object. Side and Mini Storage metadata actions now include Caption.
   - Obsidian runtime validation used a disposable four-node Canvas and disposable Palette Items. Canvas context-menu entry and three-field editor, immediate Card overlay positions/content, native node types for Card/Markdown/Image/Group, collection inheritance for all four types, Mini Collect Inspector editing, Side editing and immediate card refresh, shared Item identity, and empty-metadata overlay removal were verified. All disposable files, items, and metadata were removed afterward.
+- `0.1.11` replaces the corner-text metadata overlay with the user's reference-card format. File and image nodes receive a responsive title/Label header, inset native content area, individual Tag chips with a right-aligned date, and an external centered Caption. Text cards keep their native text as the visible content while using the same card chrome and footer; Group metadata uses translucent header/footer chrome so child nodes and edges remain visible. A `ResizeObserver` recalculates a clamped scale from the Canvas node's logical dimensions so type, spacing, chips, footer, shadow, radii, and Caption grow proportionally during resize.
+  - Validation ran only in `Obsidian Sandbox`. A disposable Canvas covered 400×300 and 800×600 text cards, an image file node, and a Group. The two fixed sizes produced metadata scales 1.0 and 2.0, title sizes 17px and 34px, Label sizes 11px and 22px, and footer heights 52px and 104px. Live resize to 700×525 recalculated to 1.75. Native image content remained an image node, Group remained a Group, and clearing metadata restored the original node with no layer, inset, or scale variable. Sandbox fixtures were deleted afterward; the real Vault was not used for validation.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
