@@ -81,7 +81,7 @@ export class SidePaletteView extends ItemView {
       if (sourceId && targetId) { event.preventDefault(); this.plugin.store.reorderItems(workspaceId, sourceId, targetId); }
     });
     for (const item of this.plugin.search.filter(this.items(workspaceId), this.query)) {
-      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), onSelect: (event) => this.selectSideItem(item.id, event.ctrlKey || event.metaKey), onOpen: () => void this.plugin.openSideItemPreview(item.id), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), onSelect: (event) => this.selectSideItem(item.id, event.ctrlKey || event.metaKey), onOpen: () => void this.plugin.openSideItemPreview(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
       const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body) void this.plugin.preview.render(body, item, true);
     }
     if (listEl.childElementCount === 0) listEl.createDiv({ cls: "cp-empty", text: "No matching items." });
@@ -159,6 +159,7 @@ export class SidePaletteView extends ItemView {
     menu.addItem((entry) => entry.setTitle(`Move ${targetIds.length > 1 ? `${targetIds.length} items` : "to workspace root"}`).setIcon("folder-root").onClick(() => workspace && this.plugin.store.assignItemsToCollection(workspace.id, targetIds, null)));
     if (workspace) for (const collection of Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id)) menu.addItem((entry) => entry.setTitle(`Move to ${collection.name}`).setIcon("folder-input").onClick(() => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collection.id)));
     menu.addItem((entry) => entry.setTitle("Open original").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
+    if (item.origin.canvasPath && item.origin.canvasNodeId) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => void this.plugin.locateItemOnCanvas(item)));
     menu.addSeparator(); menu.addItem((entry) => entry.setTitle(`Delete${targetIds.length > 1 ? ` ${targetIds.length} items` : ""}`).setIcon("trash").onClick(() => this.confirmDelete(targetIds)));
     menu.showAtMouseEvent(event);
   }

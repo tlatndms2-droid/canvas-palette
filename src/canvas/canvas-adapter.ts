@@ -13,6 +13,8 @@ interface CanvasRuntimeLike {
   selection?: unknown;
   selectedNodes?: unknown;
   nodes?: Map<string, CanvasRuntimeNodeLike>;
+  selectOnly?: (node: CanvasRuntimeNodeLike) => void;
+  zoomToSelection?: () => void;
 }
 export interface CanvasRuntimeNodeLike { id?: string; nodeEl?: HTMLElement; getData?: () => CanvasNodeSnapshot; }
 interface CanvasViewLike { getViewType?: () => string; file?: TFile; containerEl?: HTMLElement; canvas?: CanvasRuntimeLike; }
@@ -90,6 +92,82 @@ export class CanvasAdapter {
       items.push(await this.itemFromNode(node, canvasPath));
     }
     return items;
+  }
+
+  async syncItemToOrigin(item: PaletteItem): Promise<void> {
+    const canvasPath = item.origin.canvasPath;
+    const nodeId = item.origin.canvasNodeId;
+    if (item.type !== "card" || !canvasPath || !nodeId) return;
+    const open = this.openContexts().find((context) => context.file.path === canvasPath);
+    if (open?.runtime.getData && open.runtime.setData) {
+      const current = open.runtime.getData();
+      if (!current || typeof current !== "object") return;
+      const document = this.parse(JSON.stringify(current));
+      const node = document.nodes.find((candidate) => candidate.id === nodeId && candidate.type === "text");
+      if (!node || node.text === (item.content ?? "")) return;
+      node.text = item.content ?? "";
+      await open.runtime.setData(document);
+      open.runtime.requestSave?.();
+      return;
+    }
+    const file = this.app.vault.getAbstractFileByPath(canvasPath);
+    if (!(file instanceof TFile)) return;
+    const document = await this.read(file);
+    const node = document.nodes.find((candidate) => candidate.id === nodeId && candidate.type === "text");
+    if (!node || node.text === (item.content ?? "")) return;
+    node.text = item.content ?? "";
+    await this.app.vault.modify(file, JSON.stringify(document, null, 2));
+  }
+
+  async syncItemsFromCanvas(file: TFile, items: PaletteItem[]): Promise<number> {
+    const document = await this.read(file);
+    let changed = 0;
+    for (const item of items) {
+      if (item.origin.canvasPath !== file.path || !item.origin.canvasNodeId) continue;
+      const node = document.nodes.find((candidate) => candidate.id === item.origin.canvasNodeId);
+      if (!node) continue;
+      if (item.type === "card" && node.type === "text") {
+        const content = node.text ?? "";
+        const displayTitle = content.split(/\r?\n/, 1)[0].slice(0, 80) || "Canvas card";
+        if (item.content !== content || item.displayTitle !== displayTitle) {
+          item.content = content;
+          item.displayTitle = displayTitle;
+          item.modifiedAt = Date.now();
+          changed++;
+        }
+      } else if (item.type === "group" && node.type === "group") {
+        const nodes = this.expandGroupNodes(document.nodes, [node.id]);
+        const group = serializeGroup(nodes, document.edges);
+        const displayTitle = (node.label ?? nodes.find((candidate) => candidate.text)?.text?.split(/\r?\n/, 1)[0] ?? "Canvas group").slice(0, 80);
+        if (JSON.stringify(item.group) !== JSON.stringify(group) || item.displayTitle !== displayTitle) {
+          item.group = group;
+          item.displayTitle = displayTitle;
+          item.modifiedAt = Date.now();
+          changed++;
+        }
+      }
+    }
+    return changed;
+  }
+
+  async revealNode(canvasPath: string, nodeId: string): Promise<boolean> {
+    const file = this.app.vault.getAbstractFileByPath(canvasPath);
+    if (!(file instanceof TFile)) return false;
+    let context = this.openContexts().find((candidate) => candidate.file.path === canvasPath);
+    let leaf = context ? this.app.workspace.getLeavesOfType("canvas").find((candidate) => (candidate.view as unknown as CanvasViewLike).file?.path === canvasPath) : undefined;
+    if (!context || !leaf) {
+      leaf = this.app.workspace.getLeaf("tab");
+      await leaf.openFile(file);
+      const view = leaf.view as unknown as CanvasViewLike;
+      if (!view.canvas) return false;
+      context = { file, view, runtime: view.canvas };
+    }
+    this.app.workspace.setActiveLeaf(leaf, { focus: true });
+    const node = context.runtime.nodes?.get(nodeId);
+    if (!node || !context.runtime.selectOnly) return false;
+    context.runtime.selectOnly(node);
+    context.runtime.zoomToSelection?.();
+    return true;
   }
 
   async restoreItem(item: PaletteItem, screenX: number, screenY: number): Promise<boolean> {

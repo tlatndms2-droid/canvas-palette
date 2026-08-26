@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.1.17`
+- Version: `0.1.18`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.17`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.17.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.17`.
+- Latest release: `0.1.18`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.18.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.18`.
 
 ## Source plan and confirmed product direction
 
@@ -52,6 +52,8 @@
   - Validation ran only in `Obsidian Sandbox`. A disposable two-node/one-edge Canvas verified three toolbar actions for one and two selected nodes, stable selection keys, no duplicate buttons after repeated refresh, removal after deselection, one metadata save applied identically to both nodes, and both Mini and Side collection producing a two-node/one-edge Group. The error log was empty and all disposable metadata, Palette Items, and Canvas data were removed afterward.
 - `0.1.17` corrects multi-selection classification. Selecting multiple ordinary Canvas nodes now creates one Palette Item per selected node in its original Card/Markdown/Image type. A Group Palette Item is created only for an explicitly selected Canvas Group, and selecting the Group boundary alone automatically captures its contained nodes, nested Groups, and internal edges. Nodes already contained by a selected Group are not duplicated as separate Items.
   - Validation ran only in `Obsidian Sandbox`. Two selected ordinary text nodes produced two separate Card Items through the real toolbar. Selecting only a Group boundary produced one Group containing its five total nodes, nested Group, and two internal edges while excluding two external/crossing edges. Selecting that Group together with an outside Card and an explicitly selected contained Card produced one Group plus one outside Card without duplicating the contained Card. The error log was empty and all disposable Palette Items and Canvas data were removed afterward.
+- `0.1.18` keeps a collected Palette Item linked to its original Canvas node using the stored Canvas path and Node ID. Original Canvas Card content and collected Card content synchronize in both directions; Tags, Label, Label color, and Caption share the same node metadata in both directions. The linked-Canvas row and a `Locate on Canvas` context action open the source Canvas, select the original node, and zoom it into view. Group snapshots refresh when their original Canvas changes, while Markdown and Image Items continue to reference their original files.
+  - Validation ran only in `Obsidian Sandbox`. A disposable Canvas verified preserved Canvas path/Node ID, open-Canvas and closed-file Palette→Canvas Card updates, Canvas→Palette Card title/content updates, Group-child snapshot refresh, metadata synchronization in both directions, plugin-reload persistence, and actual linked-row click selection of the original node. The captured error log was empty and the disposable files and Palette data were removed afterward.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
@@ -72,7 +74,7 @@
 - Side Palette three-way independent divider resize, per-Pane scrolling, content-first type-aware Card/List Viewport, nested Outliner, Tag/Label indexes, item move/reorder, multi-selection, batch tags, guarded deletion, and type-preserving Canvas export.
 - Preview service for rendered Card/Markdown content, images, and subgraph visualizations; Side Palette Card/Markdown double-click uses the native Quick Editor, while Image/Group opens the large preview and Image supports wheel zoom.
 - Canvas Node and selected-text context-menu integration: `Collect to Mini Palette` or `Save directly to Side Palette — <Workspace>`. Vault File Explorer and active-file collection actions remain excluded because collection is Canvas-native.
-- Canvas Node metadata integration: `Edit Palette Metadata` stores pre-collection values under Canvas path and Node ID, decorates the runtime node without changing Canvas JSON/content, and passes the values into the collected Palette Item. This is one-way inheritance at collection time, not ongoing Canvas↔Palette synchronization.
+- Canvas Node metadata integration: `Edit Palette Metadata` stores values under Canvas path and Node ID, decorates the runtime node without changing Canvas JSON/content, and synchronizes Tags, Label, Label color, and Caption with every collected Item linked to that node. Linked Card content also synchronizes between the Canvas text node and Palette Item.
 
 ## Architecture
 

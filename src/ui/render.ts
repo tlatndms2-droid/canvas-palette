@@ -17,7 +17,7 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
   return button;
 }
 
-export interface ItemRenderOptions { selected: boolean; compact?: boolean; draggable?: boolean; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onContextMenu?: (event: MouseEvent) => void; }
+export interface ItemRenderOptions { selected: boolean; compact?: boolean; draggable?: boolean; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
 
 export function renderItem(parent: HTMLElement, item: PaletteItem, options: ItemRenderOptions): HTMLElement {
   const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${options.selected ? " is-selected" : ""}${options.compact ? " is-compact" : ""}` });
@@ -41,6 +41,16 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
     const links = card.createDiv({ cls: "cp-item__canvas-links", attr: { title: canvasPaths.join("\n") } });
     const linkIcon = links.createSpan(); setIcon(linkIcon, "workflow");
     links.createSpan({ text: canvasPaths.map(canvasName).slice(0, 2).join(", ") + (canvasPaths.length > 2 ? ` +${canvasPaths.length - 2}` : "") });
+    if (item.origin.canvasPath && item.origin.canvasNodeId && options.onLocate) {
+      links.addClass("is-clickable");
+      links.tabIndex = 0;
+      links.setAttribute("role", "button");
+      links.setAttribute("aria-label", "Locate original item on Canvas");
+      const locate = (event: Event): void => { event.preventDefault(); event.stopPropagation(); options.onLocate?.(); };
+      links.addEventListener("click", locate);
+      links.addEventListener("dblclick", locate);
+      links.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") locate(event); });
+    }
   }
   const footer = card.createDiv({ cls: "cp-item__footer" });
   footer.createSpan({ text: item.tags.map((tag) => `#${tag}`).join(" ") });

@@ -17,6 +17,7 @@ import { ItemEditorModal, MetadataEditorModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 
 export default class CanvasPalettePlugin extends Plugin {
+  private readonly canvasSyncTimers = new Map<string, number>();
   store = new PaletteStore(this);
   search = new SearchService();
   canvas = new CanvasAdapter(this.app, (itemId, canvasPath, nodeIds) => this.store.recordCanvasPlacement(itemId, canvasPath, nodeIds), (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId));
@@ -56,8 +57,12 @@ export default class CanvasPalettePlugin extends Plugin {
     }});
     const workspaceEvents = this.app.workspace as unknown as { on: (name: string, callback: (...args: unknown[]) => unknown) => EventRef };
     this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor) => this.addCanvasTextCollectionMenu(menu, editor)));
+    this.registerEvent(this.app.vault.on("modify", (file) => {
+      if (file instanceof TFile && file.extension.toLowerCase() === "canvas") this.scheduleCanvasSync(file);
+    }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
-      if (this.canvas.activeContext()) this.miniPalette.mount();
+      const context = this.canvas.activeContext();
+      if (context) { this.miniPalette.mount(); this.scheduleCanvasSync(context.file); }
       else this.miniPalette.destroy();
       this.selectRepresentativeWorkspace();
       this.canvasMetadata.refreshSoon();
@@ -65,11 +70,12 @@ export default class CanvasPalettePlugin extends Plugin {
     }));
     this.registerEvent(workspaceEvents.on("layout-change", () => { this.canvasMetadata.refreshSoon(); this.canvasToolbar.refreshSoon(); }));
     this.addSettingTab(new CanvasPaletteSettingTab(this));
-    if (this.canvas.activeContext()) this.miniPalette.mount();
+    const initialCanvas = this.canvas.activeContext();
+    if (initialCanvas) { this.miniPalette.mount(); this.scheduleCanvasSync(initialCanvas.file); }
     this.canvasMetadata.refreshSoon();
   }
 
-  async onunload(): Promise<void> { this.canvasToolbar.destroy(); this.canvasMetadata.destroy(); this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
+  async onunload(): Promise<void> { for (const timer of this.canvasSyncTimers.values()) window.clearTimeout(timer); this.canvasSyncTimers.clear(); this.canvasToolbar.destroy(); this.canvasMetadata.destroy(); this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
 
   activeWorkspace(): PaletteWorkspace | undefined {
     const id = this.store.data.uiState.activeWorkspaceId;
@@ -217,6 +223,36 @@ export default class CanvasPalettePlugin extends Plugin {
       if (file instanceof TFile) { await this.app.workspace.getLeaf("tab").openFile(file); return; }
     }
     new Notice("The original item is unavailable.");
+  }
+
+  async syncPaletteItemToCanvas(item: PaletteItem): Promise<void> {
+    const canvasPath = item.origin.canvasPath;
+    const nodeId = item.origin.canvasNodeId;
+    if (!canvasPath || !nodeId) return;
+    this.store.setCanvasNodeMetadata(canvasPath, nodeId, { tags: item.tags, label: item.label, labelColor: item.labelColor ?? "", caption: item.caption });
+    try { await this.canvas.syncItemToOrigin(item); }
+    catch (error) { console.error("Canvas Palette failed to synchronize an item to its original Canvas node", error); }
+  }
+
+  async locateItemOnCanvas(item: PaletteItem): Promise<void> {
+    const canvasPath = item.origin.canvasPath;
+    const nodeId = item.origin.canvasNodeId;
+    if (!canvasPath || !nodeId || !(await this.canvas.revealNode(canvasPath, nodeId))) new Notice("The original Canvas item is unavailable.");
+  }
+
+  private scheduleCanvasSync(file: TFile): void {
+    const previous = this.canvasSyncTimers.get(file.path);
+    if (previous !== undefined) window.clearTimeout(previous);
+    this.canvasSyncTimers.set(file.path, window.setTimeout(() => {
+      this.canvasSyncTimers.delete(file.path);
+      void this.syncCanvasFileToPalette(file);
+    }, 150));
+  }
+
+  private async syncCanvasFileToPalette(file: TFile): Promise<void> {
+    try {
+      if (await this.canvas.syncItemsFromCanvas(file, this.store.allItems()) > 0) this.store.changed();
+    } catch (error) { console.error("Canvas Palette failed to synchronize original Canvas items", error); }
   }
 
   async exportActiveWorkspace(): Promise<void> {

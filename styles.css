@@ -62,3 +62,4 @@
 .cp-canvas-metadata__label.cp-canvas-metadata__editor{width:min(16em,100%);color:var(--cp-label-color,var(--text-muted))}
 .cp-canvas-metadata__tag.cp-canvas-metadata__editor{width:min(12em,100%)}
 .cp-canvas-metadata__caption.cp-canvas-metadata__editor{width:min(24em,90%);padding:calc(3px * var(--cp-canvas-meta-scale,1)) calc(6px * var(--cp-canvas-meta-scale,1));border:1px solid var(--interactive-accent);border-radius:calc(4px * var(--cp-canvas-meta-scale,1));background:var(--background-primary)}
+.cp-item__canvas-links.is-clickable{cursor:pointer;border-radius:4px}.cp-item__canvas-links.is-clickable:hover,.cp-item__canvas-links.is-clickable:focus-visible{color:var(--interactive-accent);outline:1px solid var(--interactive-accent);outline-offset:2px}

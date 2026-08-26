@@ -90,6 +90,7 @@ export class PaletteStore {
     if (!item) return;
     Object.assign(item, changes, { modifiedAt: Date.now() });
     this.changed();
+    void this.plugin.syncPaletteItemToCanvas(item);
   }
 
   getCanvasNodeMetadata(canvasPath: string, nodeId: string): PaletteMetadata | undefined {
@@ -97,6 +98,13 @@ export class PaletteStore {
   }
 
   setCanvasNodeMetadata(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">): void {
+    const modifiedAt = Date.now();
+    const normalized = {
+      tags: [...new Set(metadata.tags)],
+      label: metadata.label,
+      labelColor: metadata.label ? metadata.labelColor ?? "" : "",
+      caption: metadata.caption
+    };
     const isEmpty = metadata.tags.length === 0 && !metadata.label && !metadata.caption;
     if (isEmpty) {
       const canvas = this.data.canvasNodeMetadata[canvasPath];
@@ -106,7 +114,11 @@ export class PaletteStore {
       }
     } else {
       const canvas = this.data.canvasNodeMetadata[canvasPath] ??= {};
-      canvas[nodeId] = { tags: [...new Set(metadata.tags)], label: metadata.label, labelColor: metadata.label ? metadata.labelColor ?? "" : "", caption: metadata.caption, modifiedAt: Date.now() };
+      canvas[nodeId] = { ...normalized, modifiedAt };
+    }
+    for (const item of Object.values(this.data.items)) {
+      if (item.origin.canvasPath !== canvasPath || item.origin.canvasNodeId !== nodeId) continue;
+      Object.assign(item, normalized, { modifiedAt });
     }
     this.changed();
   }

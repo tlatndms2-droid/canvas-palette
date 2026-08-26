@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.1.17**
+Current version: **0.1.18**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
@@ -22,6 +22,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - Side Palette double-click opens the existing native editor for Card/Markdown items and a large preview for Image/Group items. Image previews support mouse-wheel zoom from 20% to 500%.
 - Mini and Side Palette use the same stored Item metadata. Their focused metadata editors support Tags, Label, and Caption without changing the title, content, original file, or Canvas node.
 - Canvas placement history per asset, recorded after drag/drop or export and displayed in Side/Mini Palette cards and the detail popup.
+- Collected items remain linked to their original Canvas node by Canvas path and Node ID. Card content and Palette metadata synchronize in both directions, and the linked-Canvas row or context menu locates and zooms to the original node.
 - Multiple ordinary Canvas nodes are collected as separate Card/Markdown/Image assets. A Group asset is created only when an actual Canvas Group is selected; selecting its boundary automatically captures all contained nodes, internal edges, nested parent references, dimensions, and relative positions.
 - Collection-to-Canvas mind-map export.
 - Follow Obsidian, Light, and Dark themes with a shared design system; use the Obsidian accent or a custom accent color.
