@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.1.16`
+- Version: `0.1.17`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.16`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.16.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.16`.
+- Latest release: `0.1.17`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.17.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.17`.
 
 ## Source plan and confirmed product direction
 
@@ -50,6 +50,8 @@
   - Validation ran only in `Obsidian Sandbox`. A disposable text-node Canvas verified Label Enter-save with Label-color preservation, individual Tag deletion by empty blur-save, Caption Escape-cancel and blur-save, edit survival during metadata refresh, pointer-event isolation from the native node, reload persistence, a read-only date, unchanged native node data, single-overlay rendering, and an empty captured error log. The disposable Canvas and metadata were removed afterward.
 - `0.1.16` keeps all three Canvas Palette toolbar actions visible when multiple Canvas nodes are selected. Edit Palette Metadata opens once and applies the saved Tags, Label, Label color, and Caption to every selected node; Collect to Mini Palette and Save directly to Side Palette use the existing complete-selection collection path, preserving the existing multi-node Group snapshot behavior.
   - Validation ran only in `Obsidian Sandbox`. A disposable two-node/one-edge Canvas verified three toolbar actions for one and two selected nodes, stable selection keys, no duplicate buttons after repeated refresh, removal after deselection, one metadata save applied identically to both nodes, and both Mini and Side collection producing a two-node/one-edge Group. The error log was empty and all disposable metadata, Palette Items, and Canvas data were removed afterward.
+- `0.1.17` corrects multi-selection classification. Selecting multiple ordinary Canvas nodes now creates one Palette Item per selected node in its original Card/Markdown/Image type. A Group Palette Item is created only for an explicitly selected Canvas Group, and selecting the Group boundary alone automatically captures its contained nodes, nested Groups, and internal edges. Nodes already contained by a selected Group are not duplicated as separate Items.
+  - Validation ran only in `Obsidian Sandbox`. Two selected ordinary text nodes produced two separate Card Items through the real toolbar. Selecting only a Group boundary produced one Group containing its five total nodes, nested Group, and two internal edges while excluding two external/crossing edges. Selecting that Group together with an outside Card and an explicitly selected contained Card produced one Group plus one outside Card without duplicating the contained Card. The error log was empty and all disposable Palette Items and Canvas data were removed afterward.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 

@@ -75,14 +75,21 @@ export class CanvasAdapter {
   private async collectIds(document: CanvasDocument, canvasPath: string, selectedIds: string[]): Promise<PaletteItem[]> {
     if (selectedIds.length === 0) { new Notice("Select one or more Canvas items first."); return []; }
     const selectedNodes = document.nodes.filter((node) => selectedIds.includes(node.id));
-    const collectAsGroup = selectedNodes.length > 1 || selectedNodes.some((node) => node.type === "group");
-    if (collectAsGroup) {
-      const nodes = this.expandGroupNodes(document.nodes, selectedIds);
-      const item = this.groupItem(nodes, document.edges, canvasPath, selectedIds[0]);
-      return item ? [item] : [];
+    const selectedGroups = selectedNodes.filter((node) => node.type === "group");
+    const groupNodes = new Map<string, CanvasNodeSnapshot[]>();
+    for (const group of selectedGroups) groupNodes.set(group.id, this.expandGroupNodes(document.nodes, [group.id]));
+    const rootGroups = selectedGroups.filter((group) => !selectedGroups.some((other) => other.id !== group.id && groupNodes.get(other.id)?.some((node) => node.id === group.id)));
+    const capturedByGroup = new Set(rootGroups.flatMap((group) => groupNodes.get(group.id)?.map((node) => node.id) ?? []));
+    const items: PaletteItem[] = [];
+    for (const group of rootGroups) {
+      const item = this.groupItem(groupNodes.get(group.id) ?? [group], document.edges, canvasPath, group.id);
+      if (item) items.push(item);
     }
-    const node = selectedNodes[0];
-    return node ? [await this.itemFromNode(node, canvasPath)] : [];
+    for (const node of selectedNodes) {
+      if (node.type === "group" || capturedByGroup.has(node.id)) continue;
+      items.push(await this.itemFromNode(node, canvasPath));
+    }
+    return items;
   }
 
   async restoreItem(item: PaletteItem, screenX: number, screenY: number): Promise<boolean> {
