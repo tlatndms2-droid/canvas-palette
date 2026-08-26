@@ -7,9 +7,9 @@ interface CanvasMenuRuntime {
 }
 
 interface CanvasNodeToolbarActions {
-  editMetadata: (node: CanvasRuntimeNodeLike) => void;
-  collectToMini: (node: CanvasRuntimeNodeLike) => void;
-  saveToSide: (node: CanvasRuntimeNodeLike, anchor: HTMLElement) => void;
+  editMetadata: (nodes: CanvasRuntimeNodeLike[]) => void;
+  collectToMini: () => void;
+  saveToSide: (anchor: HTMLElement) => void;
 }
 
 export class CanvasNodeToolbarController {
@@ -74,19 +74,19 @@ export class CanvasNodeToolbarController {
     const runtime = context.runtime as CanvasMenuRuntime;
     const menuEl = runtime.menu?.menuEl;
     if (!(menuEl instanceof HTMLElement)) return;
-    const selection = runtime.selection instanceof Set ? [...runtime.selection] : [];
-    const node = selection.length === 1 ? selection[0] as CanvasRuntimeNodeLike : null;
-    const nodeId = node ? this.nodeId(node) : "";
+    const selection = runtime.selection instanceof Set ? [...runtime.selection] as CanvasRuntimeNodeLike[] : [];
+    const nodes = selection.filter((node) => Boolean(this.nodeId(node)));
+    const selectionKey = nodes.map((node) => this.nodeId(node)).sort().join("|");
     const currentButtons = menuEl.querySelectorAll(":scope > .cp-canvas-toolbar-action");
     const separator = menuEl.querySelector(":scope > .cp-canvas-toolbar-separator");
-    if (!nodeId) { this.clear(menuEl); return; }
-    if (menuEl.dataset.cpToolbarNodeId === nodeId && currentButtons.length === 3 && separator) return;
+    if (!selectionKey) { this.clear(menuEl); return; }
+    if (menuEl.dataset.cpToolbarSelectionKey === selectionKey && currentButtons.length === 3 && separator) return;
     this.clear(menuEl);
-    menuEl.dataset.cpToolbarNodeId = nodeId;
+    menuEl.dataset.cpToolbarSelectionKey = selectionKey;
     menuEl.createSpan({ cls: "cp-canvas-toolbar-separator", attr: { "aria-hidden": "true" } });
-    this.button(menuEl, "tags", "Edit Palette Metadata", () => this.actions.editMetadata(node!));
-    this.button(menuEl, "inbox", "Collect to Mini Palette", () => this.actions.collectToMini(node!));
-    this.button(menuEl, "panel-right", "Save directly to Side Palette", (button) => this.actions.saveToSide(node!, button));
+    this.button(menuEl, "tags", "Edit Palette Metadata", () => this.actions.editMetadata(nodes));
+    this.button(menuEl, "inbox", "Collect to Mini Palette", () => this.actions.collectToMini());
+    this.button(menuEl, "panel-right", "Save directly to Side Palette", (button) => this.actions.saveToSide(button));
   }
 
   private remove(context: CanvasContext): void {
@@ -98,6 +98,7 @@ export class CanvasNodeToolbarController {
     menuEl.querySelector(":scope > .cp-canvas-toolbar-separator")?.remove();
     for (const button of Array.from(menuEl.querySelectorAll(":scope > .cp-canvas-toolbar-action"))) button.remove();
     delete menuEl.dataset.cpToolbarNodeId;
+    delete menuEl.dataset.cpToolbarSelectionKey;
   }
 
   private button(parent: HTMLElement, icon: string, label: string, action: (button: HTMLButtonElement) => void): void {

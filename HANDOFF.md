@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.1.15`
+- Version: `0.1.16`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.15`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.15.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.15`.
+- Latest release: `0.1.16`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.16.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.16`.
 
 ## Source plan and confirmed product direction
 
@@ -48,6 +48,8 @@
   - Validation ran only in `Obsidian Sandbox`. A disposable two-node Canvas verified three toolbar buttons for a single selection, no duplicates after repeated refresh/native menu render, Node-target updates after selection changes, complete removal after deselection, and all three button callbacks. The preset modal exposed exactly seven defaults plus the custom-color button; default and custom selection rings, custom-preset persistence across plugin reload, saved Label color, and two-Workspace destination routing were verified. Disposable Canvas data and metadata were removed afterward.
 - `0.1.15` makes existing Canvas metadata directly editable in place. Double-clicking a visible Label, individual Tag, or Caption replaces only that value with a small inline input at the same position. Enter or focus loss saves to the same Canvas-path/Node-ID metadata record, Escape cancels, an empty value removes that field (or Tag), and the automatic modification date remains read-only. Canvas selection, dragging, native content, and card styling remain unchanged outside the clicked metadata value.
   - Validation ran only in `Obsidian Sandbox`. A disposable text-node Canvas verified Label Enter-save with Label-color preservation, individual Tag deletion by empty blur-save, Caption Escape-cancel and blur-save, edit survival during metadata refresh, pointer-event isolation from the native node, reload persistence, a read-only date, unchanged native node data, single-overlay rendering, and an empty captured error log. The disposable Canvas and metadata were removed afterward.
+- `0.1.16` keeps all three Canvas Palette toolbar actions visible when multiple Canvas nodes are selected. Edit Palette Metadata opens once and applies the saved Tags, Label, Label color, and Caption to every selected node; Collect to Mini Palette and Save directly to Side Palette use the existing complete-selection collection path, preserving the existing multi-node Group snapshot behavior.
+  - Validation ran only in `Obsidian Sandbox`. A disposable two-node/one-edge Canvas verified three toolbar actions for one and two selected nodes, stable selection keys, no duplicate buttons after repeated refresh, removal after deselection, one metadata save applied identically to both nodes, and both Mini and Side collection producing a two-node/one-edge Group. The error log was empty and all disposable metadata, Palette Items, and Canvas data were removed afterward.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 

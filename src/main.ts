@@ -22,9 +22,9 @@ export default class CanvasPalettePlugin extends Plugin {
   canvas = new CanvasAdapter(this.app, (itemId, canvasPath, nodeIds) => this.store.recordCanvasPlacement(itemId, canvasPath, nodeIds), (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId));
   canvasMetadata = new CanvasMetadataController(this, this.canvas);
   canvasToolbar = new CanvasNodeToolbarController(this.canvas, {
-    editMetadata: (node) => this.editCanvasNodeMetadata(node),
-    collectToMini: (node) => void this.collectCanvasNodeToMini(node),
-    saveToSide: (node, anchor) => this.saveCanvasNodeFromToolbar(node, anchor)
+    editMetadata: (nodes) => this.editCanvasNodesMetadata(nodes),
+    collectToMini: () => void this.collectCanvasSelection(),
+    saveToSide: (anchor) => this.saveCanvasSelectionFromToolbar(anchor)
   });
   dropController = new PaletteDropController(this.store, this.canvas);
   textScrapHighlights = new TextScrapHighlights(this);
@@ -133,24 +133,28 @@ export default class CanvasPalettePlugin extends Plugin {
     new Notice(`${items.length} Canvas item${items.length === 1 ? "" : "s"} collected.`);
   }
 
-  private editCanvasNodeMetadata(node: unknown): void {
-    const target = this.canvas.nodeContext(node);
-    if (!target) { new Notice("Unable to identify the selected Canvas item."); return; }
-    const current = this.store.getCanvasNodeMetadata(target.canvasPath, target.nodeId) ?? { tags: [], label: "", caption: "", modifiedAt: Date.now() };
-    new MetadataEditorModal(this.app, this, current, (metadata) => this.store.setCanvasNodeMetadata(target.canvasPath, target.nodeId, metadata)).open();
+  private editCanvasNodesMetadata(nodes: unknown[]): void {
+    const targets = nodes.map((node) => this.canvas.nodeContext(node)).filter((target): target is { canvasPath: string; nodeId: string } => Boolean(target));
+    if (targets.length === 0) { new Notice("Unable to identify the selected Canvas items."); return; }
+    const first = targets[0];
+    const current = this.store.getCanvasNodeMetadata(first.canvasPath, first.nodeId) ?? { tags: [], label: "", caption: "", modifiedAt: Date.now() };
+    new MetadataEditorModal(this.app, this, current, (metadata) => {
+      for (const target of targets) this.store.setCanvasNodeMetadata(target.canvasPath, target.nodeId, metadata);
+      new Notice(`Palette metadata applied to ${targets.length} Canvas item${targets.length === 1 ? "" : "s"}.`);
+    }).open();
   }
 
-  private saveCanvasNodeFromToolbar(node: unknown, anchor: HTMLElement): void {
+  private saveCanvasSelectionFromToolbar(anchor: HTMLElement): void {
     const workspaces = Object.values(this.store.data.workspaces);
     if (workspaces.length === 0) { new Notice("Create a Workspace before saving Canvas items."); return; }
-    if (workspaces.length === 1) { void this.collectCanvasNodeToWorkspace(node, workspaces[0].id); return; }
+    if (workspaces.length === 1) { void this.collectCanvasSelectionToWorkspace(workspaces[0].id); return; }
     const currentId = this.store.data.uiState.activeWorkspaceId;
     const ordered = [...workspaces].sort((a, b) => Number(b.id === currentId) - Number(a.id === currentId));
     const menu = new Menu();
     for (const workspace of ordered) menu.addItem((item) => item
       .setTitle(workspace.name)
       .setIcon(workspace.id === currentId ? "check" : "panel-right")
-      .onClick(() => void this.collectCanvasNodeToWorkspace(node, workspace.id)));
+      .onClick(() => void this.collectCanvasSelectionToWorkspace(workspace.id)));
     const rect = anchor.getBoundingClientRect();
     menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
   }
@@ -192,17 +196,8 @@ export default class CanvasPalettePlugin extends Plugin {
     new Notice("Selected Canvas text saved to Side Palette.");
   }
 
-  private async collectCanvasNodeToMini(node: unknown): Promise<void> {
-    const items = await this.canvas.collectNode(node);
-    if (items.length === 0) return;
-    for (const item of items) this.store.addPending(item);
-    this.store.data.uiState.miniPalette.tab = "collect";
-    this.miniPalette.open();
-    new Notice(`${items.length} Canvas item${items.length === 1 ? "" : "s"} added to Mini Palette.`);
-  }
-
-  private async collectCanvasNodeToWorkspace(node: unknown, workspaceId: string): Promise<void> {
-    const items = await this.canvas.collectNode(node);
+  private async collectCanvasSelectionToWorkspace(workspaceId: string): Promise<void> {
+    const items = await this.canvas.collectSelection();
     if (items.length === 0) return;
     for (const item of items) this.store.addToWorkspace(workspaceId, item);
     this.store.data.uiState.activeWorkspaceId = workspaceId;
