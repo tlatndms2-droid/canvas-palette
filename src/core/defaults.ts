@@ -9,7 +9,7 @@ export const DEFAULT_DATA: PaletteData = {
   workspaces: {},
   collections: {},
   pendingItemIds: [],
-  uiState: { activeWorkspaceId: null, selectedItemId: null, sideSelectedItemIds: [], miniPalette: {
+  uiState: { activeWorkspaceId: null, selectedItemId: null, sideSelectedItemIds: [], quickEditor: { x: null, y: null, width: null, height: null }, miniPalette: {
     tab: "collect", isOpen: false, position: { x: 24, y: 62 }, size: { width: 1120, height: 720 },
     leftPaneOpen: true, rightPaneOpen: true, leftPaneWidth: 248, rightPaneWidth: 310,
     viewMode: "grid", sort: "modified-desc", selectedItemIds: []
@@ -33,13 +33,19 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     workspaces,
     collections: raw.collections ?? {},
     pendingItemIds: raw.pendingItemIds ?? [],
-    uiState: { ...DEFAULT_DATA.uiState, ...legacyUi, sideSelectedItemIds: legacyUi.sideSelectedItemIds ?? [], miniPalette: {
+    uiState: {
+      ...DEFAULT_DATA.uiState,
+      ...legacyUi,
+      sideSelectedItemIds: legacyUi.sideSelectedItemIds ?? [],
+      quickEditor: { ...DEFAULT_DATA.uiState.quickEditor, ...legacyUi.quickEditor },
+      miniPalette: {
       ...DEFAULT_DATA.uiState.miniPalette, ...legacyUi.miniPalette,
       tab: legacyUi.miniPalette?.tab ?? legacyUi.miniTab ?? DEFAULT_DATA.uiState.miniPalette.tab,
       leftPaneOpen: legacyUi.miniPalette?.leftPaneOpen ?? legacyUi.leftPaneOpen ?? DEFAULT_DATA.uiState.miniPalette.leftPaneOpen,
       rightPaneOpen: legacyUi.miniPalette?.rightPaneOpen ?? legacyUi.rightPaneOpen ?? DEFAULT_DATA.uiState.miniPalette.rightPaneOpen,
       leftPaneWidth: legacyUi.miniPalette?.leftPaneWidth ?? legacyUi.leftPaneWidth ?? DEFAULT_DATA.uiState.miniPalette.leftPaneWidth,
       rightPaneWidth: legacyUi.miniPalette?.rightPaneWidth ?? legacyUi.rightPaneWidth ?? DEFAULT_DATA.uiState.miniPalette.rightPaneWidth
-    } }
+      }
+    }
   };
 }

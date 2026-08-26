@@ -86,7 +86,15 @@ export interface MiniPaletteState {
   selectedItemIds: string[];
 }
 
-export interface UIState { activeWorkspaceId: string | null; selectedItemId: string | null; sideSelectedItemIds: string[]; miniPalette: MiniPaletteState; }
+export interface QuickEditorGeometry { x: number | null; y: number | null; width: number | null; height: number | null; }
+
+export interface UIState {
+  activeWorkspaceId: string | null;
+  selectedItemId: string | null;
+  sideSelectedItemIds: string[];
+  quickEditor: QuickEditorGeometry;
+  miniPalette: MiniPaletteState;
+}
 
 export interface PaletteData {
   schemaVersion: number;

@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.1.4`
+- Version: `0.1.5`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.4`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.4.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.4`.
+- Latest release: `0.1.5`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.5.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.5`.
 
 ## Source plan and confirmed product direction
 
@@ -30,6 +30,7 @@
 - During live inspection of `0.1.2`, the user identified missing selected-text collection, incorrect file restoration, generic card composition, missing Canvas placement labels, missing deletion and multi-selection, and missing double-click detail/edit behavior.
 - `0.1.3` implements that complete correction batch. Static TypeScript checking, production bundling, JSON validation, Git push, public release state, and all three BRAT assets were verified before handoff.
 - `0.1.4` replaces the tall detail form with an editor-like floating window opened by double-click. It keeps Canvas and Side Palette visible, renders Card Markdown, supports source editing, title editing, save/close/minimize, drag/resize, properties, linked Canvas paths, and `Ctrl/Cmd+S` saving.
+- `0.1.5` removes that custom preview/textarea imitation for Card and Markdown items. Double-click now embeds Obsidian's real `WorkspaceLeaf` + `MarkdownView` Live Preview editor using the proven Canvas Visibility Quick Editor structure. Image and Group items continue to use the metadata/details popup.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
@@ -48,7 +49,7 @@
 - Canvas Adapter for guarded active Canvas selection, Canvas JSON capture, file/text/group creation, Group ID remapping, and Collection mind-map export.
 - Floating Canvas-hosted Mini Palette with hover trigger, window move/resize, Collect Inspector, Storage filters/sort/view modes, docked panes, previews, and Canvas drag/drop.
 - Side Palette divider resize, content-first type-aware Card/List Viewport, nested Outliner, Tag/Label indexes, item move/reorder, multi-selection, batch tags, guarded deletion, and type-preserving Canvas export.
-- Preview service for rendered Card/Markdown content, images, and subgraph visualizations; every asset type opens a shared floating editor window on double-click.
+- Preview service for rendered Card/Markdown content, images, and subgraph visualizations; Card/Markdown double-click uses a native Live Preview Quick Editor while Image/Group double-click uses the metadata/details popup.
 - Canvas Node and selected-text context-menu integration: `Collect to Mini Palette` or `Save directly to Side Palette — <Workspace>`. Vault File Explorer and active-file collection actions remain excluded because collection is Canvas-native.
 
 ## Architecture
@@ -61,6 +62,7 @@ src/
 ├─ mini-palette/     Canvas-hosted floating Collect and Storage UI
 ├─ search/           query logic
 ├─ preview/          Markdown, image, and subgraph previews
+├─ editor/           embedded native MarkdownView Quick Editor
 ├─ settings/         theme and accent settings UI
 └─ ui/               shared rendering, resize, and modal primitives
 ```
@@ -77,13 +79,13 @@ Views mutate data through `PaletteStore`; search and preview remain separate. Al
 
 ## Manual validation required in Obsidian
 
-The user has not yet completed a fresh runtime demonstration of `0.1.4`. Static build success is not proof that the following Obsidian runtime paths are correct:
+The user has not yet completed a fresh runtime demonstration of `0.1.5`. Static build success is not proof that the following Obsidian runtime paths are correct:
 
 1. Selected text inside a Canvas card shows both Canvas Palette collection routes.
 2. Card, Markdown, Image, and Group drops create exactly one node/subgraph at the intended pan/zoom position.
 3. Markdown and Image drops visibly retain their original Vault file references and full content.
 4. Side cards update their linked-Canvas label immediately after a successful drop or export.
-5. Ctrl/Cmd multi-selection, selection markers, batch tags, guarded delete, and the floating editor all behave correctly without click/double-click conflicts.
+5. Ctrl/Cmd multi-selection, selection markers, batch tags, guarded delete, and native Quick Editor double-click all behave correctly without click/double-click conflicts.
 6. Canvas automatically refreshes after JSON writes without reopening the file.
 7. Group hierarchy, nested groups, internal edges, directions, dimensions, and relative layout survive restore/export.
 8. Floating Mini Palette layering, hover opening, drag, resize, and drop interception remain compatible with third-party Canvas plugins.

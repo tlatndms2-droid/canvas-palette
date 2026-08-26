@@ -74,7 +74,7 @@ export class SidePaletteView extends ItemView {
       if (sourceId && targetId) { event.preventDefault(); this.plugin.store.reorderItems(workspaceId, sourceId, targetId); }
     });
     for (const item of this.plugin.search.filter(this.items(workspaceId), this.query)) {
-      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), onSelect: (event) => this.selectSideItem(item.id, event.ctrlKey || event.metaKey), onOpen: () => new ItemEditorModal(this.app, this.plugin, item.id).open(), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), onSelect: (event) => this.selectSideItem(item.id, event.ctrlKey || event.metaKey), onOpen: () => void this.plugin.openItemEditor(item.id), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
       const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body) void this.plugin.preview.render(body, item, true);
     }
     if (listEl.childElementCount === 0) listEl.createDiv({ cls: "cp-empty", text: "No matching items." });
@@ -106,7 +106,7 @@ export class SidePaletteView extends ItemView {
     const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${selected ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.setText(`${selected ? "✓ " : ""}${item.type.toUpperCase()}  ${item.displayTitle}`);
     let clickTimer: number | null = null;
     row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.selectSideItem(item.id, event.ctrlKey || event.metaKey); }, 220); });
-    row.addEventListener("dblclick", () => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; new ItemEditorModal(this.app, this.plugin, item.id).open(); });
+    row.addEventListener("dblclick", () => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; void this.plugin.openItemEditor(item.id); });
   }
 
   private renderIndex(parent: HTMLElement, title: string, values: string[], prefix: string): void {

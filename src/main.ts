@@ -4,11 +4,13 @@ import { TextScrapHighlights } from "./canvas/text-scrap-highlights";
 import { createId } from "./core/ids";
 import { PaletteStore } from "./core/store";
 import type { PaletteItem, PaletteWorkspace } from "./core/types";
+import { PaletteEditorManager } from "./editor/editor-manager";
 import { FloatingMiniPalette } from "./mini-palette/floating-mini-palette";
 import { PreviewService } from "./preview/preview-service";
 import { SearchService } from "./search/search-service";
 import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
+import { ItemEditorModal } from "./ui/modal";
 
 export default class CanvasPalettePlugin extends Plugin {
   store = new PaletteStore(this);
@@ -17,6 +19,7 @@ export default class CanvasPalettePlugin extends Plugin {
   textScrapHighlights = new TextScrapHighlights(this);
   preview = new PreviewService(this.app, this);
   miniPalette = new FloatingMiniPalette(this);
+  editorManager = new PaletteEditorManager(this.app, this);
 
   async onload(): Promise<void> {
     await this.store.load();
@@ -55,7 +58,7 @@ export default class CanvasPalettePlugin extends Plugin {
     if (this.canvas.activeContext()) this.miniPalette.mount();
   }
 
-  async onunload(): Promise<void> { this.miniPalette.destroy(); await this.store.flush(); }
+  async onunload(): Promise<void> { this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
 
   activeWorkspace(): PaletteWorkspace | undefined {
     const id = this.store.data.uiState.activeWorkspaceId;
@@ -68,6 +71,11 @@ export default class CanvasPalettePlugin extends Plugin {
   }
 
   selectItem(id: string): void { this.store.data.uiState.selectedItemId = id; this.store.changed(); }
+
+  async openItemEditor(itemId: string): Promise<void> {
+    if (await this.editorManager.openItem(itemId)) return;
+    new ItemEditorModal(this.app, this, itemId).open();
+  }
 
   openSettings(): void {
     const appWithSettings = this.app as unknown as { setting?: { open: () => Promise<void>; openTabById: (id: string) => void } };

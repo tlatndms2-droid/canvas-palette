@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.1.4**
+Current version: **0.1.5**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
@@ -16,7 +16,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - Side Palette with representative workspaces, search, Card/List Viewport, Outliner, nested collections, Tag Index, Label Index, and independent scroll regions.
 - Item/collection organization: collection creation, nesting, rename, Canvas drag drop, Viewport reorder, multi-selection, batch tag editing, deletion, and move-to-collection actions.
 - Type-specific Card, Markdown, Image, and Group rendering; rendered Markdown, source image preview, and subgraph preview with content-first card layouts.
-- Floating editor window on double-click, with rendered Markdown, Card source editing, save/minimize/close controls, drag/resize, properties, and linked Canvas paths.
+- Native Obsidian Live Preview Quick Editor on Card/Markdown double-click, embedded in a movable and resizable floating window with save/close shortcuts. Image and Group items retain the metadata/details popup.
 - Canvas placement history per asset, recorded after drag/drop or export and displayed in Side/Mini Palette cards and the detail popup.
 - Group serializer/restorer that remaps IDs while retaining internal nodes, edges, nested parent references, dimensions, and relative positions.
 - Collection-to-Canvas mind-map export.
@@ -37,7 +37,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 4. Hover the Mini Palette trigger at the upper-right of the Canvas, review items in the Inspector, and import them into a Workspace.
 5. Open Side Palette to organize Collections or Mini Palette Storage to search across Workspaces.
 6. Drag an item from either palette directly into a Canvas. Cards create text nodes, Markdown and images remain source-linked file nodes, and Groups restore their subgraph.
-7. Ctrl/Cmd-click items for multi-selection; double-click any item to open its floating editor window.
+7. Ctrl/Cmd-click items for multi-selection. Double-click a Card or Markdown item to edit it in Obsidian's native Live Preview editor; Image and Group items open their details popup.
 
 ## Installation for development
 

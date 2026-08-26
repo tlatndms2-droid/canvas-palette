@@ -1,7 +1,7 @@
 import { Menu, Notice, setIcon } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { PaletteItem, PaletteItemType } from "../core/types";
-import { ItemEditorModal, TextPromptModal } from "../ui/modal";
+import { TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider } from "../ui/resizable";
 import { iconButton, renderItem, workspaceSelect } from "../ui/render";
 
@@ -139,7 +139,7 @@ export class FloatingMiniPalette {
     heading.createSpan({ text: "Assets" }); if (!this.plugin.store.data.uiState.miniPalette.rightPaneOpen) iconButton(heading, "panel-right-open", "Open preview pane", () => { this.plugin.store.data.uiState.miniPalette.rightPaneOpen = true; this.plugin.store.changed(); });
     const grid = parent.createDiv({ cls: `cp-asset-grid cp-asset-grid--${this.plugin.store.data.uiState.miniPalette.viewMode}` }); grid.style.setProperty("--cp-card-size", `${this.plugin.store.data.settings.cardSize}px`); grid.style.setProperty("--cp-columns", String(this.plugin.store.data.settings.columns));
     for (const item of this.storageItems()) {
-      const card = renderItem(grid, item, { selected: this.selectedIds().includes(item.id), draggable: true, onSelect: (event) => this.selectStorage(item.id, event.ctrlKey || event.metaKey), onOpen: () => new ItemEditorModal(this.plugin.app, this.plugin, item.id).open(), onContextMenu: (event) => { event.preventDefault(); this.itemMenu(item); } });
+      const card = renderItem(grid, item, { selected: this.selectedIds().includes(item.id), draggable: true, onSelect: (event) => this.selectStorage(item.id, event.ctrlKey || event.metaKey), onOpen: () => void this.plugin.openItemEditor(item.id), onContextMenu: (event) => { event.preventDefault(); this.itemMenu(item); } });
       const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body) void this.plugin.preview.render(body, item, true);
       card.addEventListener("mousemove", (event) => { if (event.ctrlKey && this.hoverItemId !== item.id) { this.hoverItemId = item.id; this.render(); } });
       card.addEventListener("mouseleave", () => { if (this.hoverItemId === item.id) { this.hoverItemId = null; this.render(); } });
