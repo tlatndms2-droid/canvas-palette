@@ -46,9 +46,8 @@ export class CanvasMetadataController {
     const type = data?.type ?? "unknown";
     nodeEl.addClass("cp-canvas-has-metadata", `cp-canvas-has-metadata--${type}`);
     const layer = nodeEl.createDiv({ cls: `cp-canvas-metadata cp-canvas-metadata--${type}`, attr: { "aria-label": "Canvas Palette metadata" } });
-    const header = layer.createDiv({ cls: "cp-canvas-metadata__header" });
-    header.createDiv({ cls: "cp-canvas-metadata__title", text: this.title(data) });
     if (metadata.label) {
+      const header = layer.createDiv({ cls: "cp-canvas-metadata__header" });
       const label = header.createDiv({ cls: "cp-canvas-metadata__label", text: metadata.label });
       if (metadata.labelColor) label.style.setProperty("--cp-label-color", metadata.labelColor);
     }
@@ -81,14 +80,4 @@ export class CanvasMetadataController {
     nodeEl.style.setProperty("--cp-canvas-meta-scale", scale.toFixed(3));
   }
 
-  private title(data: ReturnType<NonNullable<CanvasRuntimeNodeLike["getData"]>> | undefined): string {
-    if (!data) return "Canvas item";
-    if (data.type === "group" && typeof data.label === "string" && data.label.trim()) return data.label.trim();
-    if (data.type === "file" && typeof data.file === "string") return data.file.split("/").pop()?.replace(/\.[^.]+$/, "") || "File";
-    if (data.type === "text" && typeof data.text === "string") {
-      const firstLine = data.text.split(/\r?\n/).find((line) => line.trim())?.trim().replace(/^#{1,6}\s+/, "");
-      if (firstLine) return firstLine.slice(0, 100);
-    }
-    return "Canvas item";
-  }
 }

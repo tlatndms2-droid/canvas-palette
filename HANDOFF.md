@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.1.12`
+- Version: `0.1.13`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.12`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.12.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.12`.
+- Latest release: `0.1.13`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.13.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.13`.
 
 ## Source plan and confirmed product direction
 
@@ -43,6 +43,7 @@
 - `0.1.11` replaces the corner-text metadata overlay with the user's reference-card format. File and image nodes receive a responsive title/Label header, inset native content area, individual Tag chips with a right-aligned date, and an external centered Caption. Text cards keep their native text as the visible content while using the same card chrome and footer; Group metadata uses translucent header/footer chrome so child nodes and edges remain visible. A `ResizeObserver` recalculates a clamped scale from the Canvas node's logical dimensions so type, spacing, chips, footer, shadow, radii, and Caption grow proportionally during resize.
 - `0.1.12` aligns Canvas metadata cards with the approved single-surface reference: the native content is no longer wrapped by a second bordered panel, Caption is centered plain text outside the card, and each Label can store its own color. Label color is shared through Canvas collection into Side/Mini Palette items and is editable from Canvas, batch metadata, item details, and Mini Inspector.
   - Validation ran only in `Obsidian Sandbox`. A disposable Canvas covered 400×300 and 800×600 text cards, an image file node, and a Group. The two fixed sizes produced metadata scales 1.0 and 2.0, title sizes 17px and 34px, Label sizes 11px and 22px, and footer heights 52px and 104px. Live resize to 700×525 recalculated to 1.75. Native image content remained an image node, Group remained a Group, and clearing metadata restored the original node with no layer, inset, or scale variable. Sandbox fixtures were deleted afterward; the real Vault was not used for validation.
+- `0.1.13` stops restyling Canvas nodes altogether. The plugin no longer changes the native node border, background, shadow, content inset, image radius, native label visibility, or Group chrome. It adds only pointer-transparent Label/Tag/date overlays on the existing card and keeps Caption as plain centered text below it; the original Canvas card remains the sole card surface.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
