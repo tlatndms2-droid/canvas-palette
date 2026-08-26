@@ -57,3 +57,12 @@
 .cp-canvas-metadata__caption{position:absolute;top:calc(100% + 10px * var(--cp-canvas-meta-scale,1));left:50%;width:max-content;max-width:90%;overflow:hidden;padding:calc(4px * var(--cp-canvas-meta-scale,1)) calc(9px * var(--cp-canvas-meta-scale,1));border-radius:calc(6px * var(--cp-canvas-meta-scale,1));background:color-mix(in srgb,var(--background-primary) 94%,transparent);color:var(--text-muted);font-size:calc(11px * var(--cp-canvas-meta-scale,1));text-align:center;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 calc(1px * var(--cp-canvas-meta-scale,1)) calc(5px * var(--cp-canvas-meta-scale,1)) rgb(0 0 0 / 12%);transform:translateX(-50%)}
 .canvas-node.cp-canvas-has-metadata--group{border-radius:calc(10px * var(--cp-canvas-meta-scale,1));box-shadow:inset 0 0 0 calc(1px * var(--cp-canvas-meta-scale,1)) color-mix(in srgb,var(--interactive-accent) 38%,transparent)}
 .cp-canvas-metadata--group .cp-canvas-metadata__header,.cp-canvas-metadata--group .cp-canvas-metadata__footer{border-radius:calc(8px * var(--cp-canvas-meta-scale,1));background:color-mix(in srgb,var(--background-primary) 90%,transparent);backdrop-filter:blur(3px)}
+
+/* Metadata cards follow the approved single-surface reference. */
+.cp-label{background:color-mix(in srgb,var(--cp-label-color,var(--cp-accent)) 16%,transparent);color:var(--cp-label-color,var(--cp-accent))}
+.cp-metadata-editor input[type="color"],.cp-tag-label-modal input[type="color"],.cp-inspector-drawer input[type="color"],.cp-item-editor input[type="color"]{width:100%;height:38px;padding:4px;cursor:pointer}
+.canvas-node.cp-canvas-has-metadata:not(.cp-canvas-has-metadata--group)>.canvas-node-container{border:0;background:transparent;box-shadow:none}
+.canvas-node.cp-canvas-has-metadata--text>.canvas-node-container{top:0}
+.canvas-node.cp-canvas-has-metadata--file>.canvas-node-container img{border-radius:calc(7px * var(--cp-canvas-meta-scale,1))}
+.cp-canvas-metadata__label{border:1px solid color-mix(in srgb,var(--cp-label-color,var(--text-muted)) 36%,transparent);background:color-mix(in srgb,var(--cp-label-color,var(--background-secondary)) 16%,var(--background-primary));color:var(--cp-label-color,var(--text-muted))}
+.cp-canvas-metadata__caption{padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}

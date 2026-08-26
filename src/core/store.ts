@@ -85,7 +85,7 @@ export class PaletteStore {
     this.changed();
   }
 
-  updateItem(id: string, changes: Pick<PaletteItem, "displayTitle" | "tags" | "label" | "caption"> & Partial<Pick<PaletteItem, "content">>): void {
+  updateItem(id: string, changes: Pick<PaletteItem, "displayTitle" | "tags" | "label" | "caption"> & Partial<Pick<PaletteItem, "content" | "labelColor">>): void {
     const item = this.data.items[id];
     if (!item) return;
     Object.assign(item, changes, { modifiedAt: Date.now() });
@@ -96,7 +96,7 @@ export class PaletteStore {
     return this.data.canvasNodeMetadata[canvasPath]?.[nodeId];
   }
 
-  setCanvasNodeMetadata(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "caption">): void {
+  setCanvasNodeMetadata(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">): void {
     const isEmpty = metadata.tags.length === 0 && !metadata.label && !metadata.caption;
     if (isEmpty) {
       const canvas = this.data.canvasNodeMetadata[canvasPath];
@@ -106,7 +106,7 @@ export class PaletteStore {
       }
     } else {
       const canvas = this.data.canvasNodeMetadata[canvasPath] ??= {};
-      canvas[nodeId] = { tags: [...new Set(metadata.tags)], label: metadata.label, caption: metadata.caption, modifiedAt: Date.now() };
+      canvas[nodeId] = { tags: [...new Set(metadata.tags)], label: metadata.label, labelColor: metadata.label ? metadata.labelColor ?? "" : "", caption: metadata.caption, modifiedAt: Date.now() };
     }
     this.changed();
   }

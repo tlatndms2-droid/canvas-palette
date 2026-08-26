@@ -3,7 +3,7 @@ import type CanvasPalettePlugin from "../main";
 import type { PaletteItem, PaletteMetadata } from "../core/types";
 
 export class MetadataEditorModal extends Modal {
-  constructor(app: App, private readonly initial: Pick<PaletteMetadata, "tags" | "label" | "caption">, private readonly onSave: (metadata: Pick<PaletteMetadata, "tags" | "label" | "caption">) => void) { super(app); }
+  constructor(app: App, private readonly initial: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">, private readonly onSave: (metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">) => void) { super(app); }
   onOpen(): void {
     this.contentEl.addClass("canvas-palette", "cp-metadata-editor");
     this.contentEl.createEl("h2", { text: "Palette metadata" });
@@ -11,12 +11,16 @@ export class MetadataEditorModal extends Modal {
     const tags = this.contentEl.createEl("input", { value: this.initial.tags.join(", "), attr: { placeholder: "tag1, tag2" } });
     this.contentEl.createEl("label", { text: "Label" });
     const label = this.contentEl.createEl("input", { value: this.initial.label, attr: { placeholder: "e.g. In progress" } });
+    this.contentEl.createEl("label", { text: "Label color" });
+    const labelColor = this.contentEl.createEl("input", { attr: { type: "color", "aria-label": "Label color" } });
+    labelColor.value = this.initial.labelColor || "#8b5cf6";
     this.contentEl.createEl("label", { text: "Caption" });
     const caption = this.contentEl.createEl("textarea", { text: this.initial.caption, attr: { placeholder: "Short description" } });
     const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
     actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
     actions.createEl("button", { text: "Save", cls: "mod-cta" }).addEventListener("click", () => {
-      this.onSave({ tags: [...new Set(tags.value.split(",").map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean))], label: label.value.trim(), caption: caption.value.trim() });
+      const labelValue = label.value.trim();
+      this.onSave({ tags: [...new Set(tags.value.split(",").map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean))], label: labelValue, labelColor: labelValue ? labelColor.value : "", caption: caption.value.trim() });
       this.close();
     });
   }
@@ -82,6 +86,12 @@ export class TagLabelModal extends Modal {
     this.radio(labelList, radioName, "", "No label", currentLabels.size === 1 && items[0].label === "", (value) => { selectedLabel = value; });
     for (const label of knownLabels) this.radio(labelList, radioName, label, label, currentLabels.size === 1 && items[0].label === label, (value) => { selectedLabel = value; });
     const newLabel = this.contentEl.createEl("input", { attr: { placeholder: "New label" } });
+    this.contentEl.createEl("label", { text: "Label color" });
+    const sharedColors = new Set(items.map((item) => item.labelColor ?? ""));
+    const labelColor = this.contentEl.createEl("input", { attr: { type: "color", "aria-label": "Label color" } });
+    labelColor.value = sharedColors.size === 1 && items[0].labelColor ? items[0].labelColor : "#8b5cf6";
+    let colorTouched = false;
+    labelColor.addEventListener("input", () => { colorTouched = true; });
     this.contentEl.createEl("h3", { text: "Caption" });
     const currentCaptions = new Set(items.map((item) => item.caption));
     const caption = this.contentEl.createEl("textarea", { text: currentCaptions.size === 1 ? items[0].caption : "", attr: { placeholder: currentCaptions.size > 1 ? "Keep current captions unless edited" : "Short description" } });
@@ -100,7 +110,9 @@ export class TagLabelModal extends Modal {
         }
         for (const tag of additions) tags.add(tag);
         const label = explicitLabel || (selectedLabel === "__keep__" ? item.label : selectedLabel);
-        this.plugin.store.updateItem(item.id, { displayTitle: item.displayTitle, tags: [...tags], label, caption: captionTouched || currentCaptions.size === 1 ? caption.value.trim() : item.caption, ...(item.type === "card" ? { content: item.content ?? "" } : {}) });
+        const labelChanged = explicitLabel.length > 0 || selectedLabel !== "__keep__";
+        const labelColorValue = !label ? "" : colorTouched || labelChanged ? labelColor.value : item.labelColor ?? "";
+        this.plugin.store.updateItem(item.id, { displayTitle: item.displayTitle, tags: [...tags], label, labelColor: labelColorValue, caption: captionTouched || currentCaptions.size === 1 ? caption.value.trim() : item.caption, ...(item.type === "card" ? { content: item.content ?? "" } : {}) });
       }
       this.close();
     });
@@ -130,6 +142,9 @@ export class ItemEditorModal extends Modal {
     const title = this.field("Title", item.displayTitle);
     const tags = this.field("Tags", item.tags.join(", "), "tag1, tag2");
     const label = this.field("Label", item.label, "e.g. Idea");
+    this.contentEl.createEl("label", { text: "Label color" });
+    const labelColor = this.contentEl.createEl("input", { attr: { type: "color", "aria-label": "Label color" } });
+    labelColor.value = item.labelColor || "#8b5cf6";
     const caption = this.area("Caption", item.caption);
     let content: HTMLTextAreaElement | undefined;
     if (item.type === "card") content = this.area("Content", item.content ?? "", "Write card content…");
@@ -142,7 +157,8 @@ export class ItemEditorModal extends Modal {
     actions.createEl("button", { text: "Open original" }).addEventListener("click", () => void this.plugin.openOriginal(item));
     actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
     actions.createEl("button", { text: "Save", cls: "mod-cta" }).addEventListener("click", () => {
-      this.plugin.store.updateItem(item.id, { displayTitle: title.value.trim() || "Untitled", tags: this.parseTags(tags.value), label: label.value.trim(), caption: caption.value, ...(content ? { content: content.value } : {}) });
+      const labelValue = label.value.trim();
+      this.plugin.store.updateItem(item.id, { displayTitle: title.value.trim() || "Untitled", tags: this.parseTags(tags.value), label: labelValue, labelColor: labelValue ? labelColor.value : "", caption: caption.value, ...(content ? { content: content.value } : {}) });
       this.close();
     });
   }

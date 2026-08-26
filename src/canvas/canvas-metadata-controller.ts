@@ -48,7 +48,10 @@ export class CanvasMetadataController {
     const layer = nodeEl.createDiv({ cls: `cp-canvas-metadata cp-canvas-metadata--${type}`, attr: { "aria-label": "Canvas Palette metadata" } });
     const header = layer.createDiv({ cls: "cp-canvas-metadata__header" });
     header.createDiv({ cls: "cp-canvas-metadata__title", text: this.title(data) });
-    if (metadata.label) header.createDiv({ cls: "cp-canvas-metadata__label", text: metadata.label });
+    if (metadata.label) {
+      const label = header.createDiv({ cls: "cp-canvas-metadata__label", text: metadata.label });
+      if (metadata.labelColor) label.style.setProperty("--cp-label-color", metadata.labelColor);
+    }
     const footer = layer.createDiv({ cls: "cp-canvas-metadata__footer" });
     const tags = footer.createDiv({ cls: "cp-canvas-metadata__tags" });
     for (const tag of metadata.tags) tags.createSpan({ cls: "cp-canvas-metadata__tag", text: `#${tag}` });

@@ -146,7 +146,7 @@ export class CanvasAdapter {
   private async itemFromNode(node: CanvasNodeSnapshot, canvasPath: string): Promise<PaletteItem> {
     const now = Date.now();
     const metadata = this.getMetadata(canvasPath, node.id);
-    const common = { tags: metadata?.tags ?? [], label: metadata?.label ?? "", caption: metadata?.caption ?? "", modifiedAt: metadata?.modifiedAt ?? now };
+    const common = { tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", modifiedAt: metadata?.modifiedAt ?? now };
     if (node.type === "file" && node.file) {
       const file = this.app.vault.getAbstractFileByPath(node.file);
       const isImage = file instanceof TFile && IMAGE_EXTENSIONS.has(file.extension.toLowerCase());
@@ -162,7 +162,7 @@ export class CanvasAdapter {
     const metadata = this.getMetadata(canvasPath, nodeId);
     const snapshot = serializeGroup(nodes, edges);
     const title = nodes.find((node) => node.type === "group")?.label ?? nodes.find((node) => node.text)?.text?.split(/\r?\n/, 1)[0] ?? "Canvas group";
-    return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", caption: metadata?.caption ?? "", createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
+    return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
   }
 
   private nodeForItem(item: PaletteItem, x: number, y: number): CanvasNodeSnapshot {

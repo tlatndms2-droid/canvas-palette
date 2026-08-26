@@ -3,7 +3,7 @@ import type { PaletteData, SideLayoutState } from "./types";
 export const DEFAULT_SIDE_LAYOUT: SideLayoutState = { viewportRatio: 0.52, topRatio: 0.69, indexRatio: 0.5, viewMode: "grid" };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", cardSize: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
@@ -29,12 +29,14 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...raw.settings },
-    schemaVersion: 4,
-    items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => [id, { ...item, canvasPlacements: item.canvasPlacements ?? [] }])),
+    schemaVersion: 5,
+    items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => [id, { ...item, labelColor: item.labelColor ?? "", canvasPlacements: item.canvasPlacements ?? [] }])),
     workspaces,
     collections: raw.collections ?? {},
     pendingItemIds: raw.pendingItemIds ?? [],
-    canvasNodeMetadata: raw.canvasNodeMetadata ?? {},
+    canvasNodeMetadata: Object.fromEntries(Object.entries(raw.canvasNodeMetadata ?? {}).map(([canvasPath, nodes]) => [canvasPath,
+      Object.fromEntries(Object.entries(nodes).map(([nodeId, metadata]) => [nodeId, { ...metadata, labelColor: metadata.labelColor ?? "" }]))
+    ])),
     uiState: {
       ...DEFAULT_DATA.uiState,
       ...legacyUi,

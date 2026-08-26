@@ -28,7 +28,10 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   const icon = header.createSpan({ cls: "cp-item__icon" });
   setIcon(icon, TYPE_ICON[item.type]);
   header.createSpan({ cls: "cp-item__title", text: item.displayTitle || "Untitled" });
-  if (item.label) header.createSpan({ cls: "cp-label", text: item.label });
+  if (item.label) {
+    const label = header.createSpan({ cls: "cp-label", text: item.label });
+    if (item.labelColor) label.style.setProperty("--cp-label-color", item.labelColor);
+  }
   const body = card.createDiv({ cls: "cp-item__body" });
   if (item.type === "image" && item.origin.filePath) body.createDiv({ cls: "cp-image-placeholder", text: item.origin.filePath });
   else if (item.type === "group") body.createDiv({ text: `${item.group?.nodes.length ?? 0} nodes · ${item.group?.edges.length ?? 0} edges` });
