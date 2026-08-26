@@ -9,7 +9,7 @@ export class PreviewService {
     parent.addClass("cp-preview-content", `cp-preview-content--${item.type}`);
     if (item.type === "image" && item.origin.filePath) {
       const file = this.app.vault.getAbstractFileByPath(item.origin.filePath);
-      if (file instanceof TFile) parent.createEl("img", { attr: { src: this.app.vault.getResourcePath(file), alt: item.displayTitle } });
+      if (file instanceof TFile) parent.createEl("img", { attr: { src: this.app.vault.getResourcePath(file), alt: item.displayTitle, draggable: "false" } });
       else parent.createDiv({ cls: "cp-empty", text: "Original image is unavailable." });
       return;
     }

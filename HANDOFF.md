@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.1.6`
+- Version: `0.1.7`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.6`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.6.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.6`.
+- Latest release: `0.1.7`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.7.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.7`.
 
 ## Source plan and confirmed product direction
 
@@ -33,6 +33,8 @@
 - `0.1.5` removes that custom preview/textarea imitation for Card and Markdown items. Double-click now embeds Obsidian's real `WorkspaceLeaf` + `MarkdownView` Live Preview editor using the proven Canvas Visibility Quick Editor structure. Image and Group items continue to use the metadata/details popup.
 - `0.1.6` repairs Side Palette split resizing. Pointer movement now updates CSS Grid tracks directly and persists Workspace layout only after the drag ends, preventing the store subscription from destroying the captured Divider during a drag. Upper width, lower width, and upper/lower height remain independent.
   - Obsidian CLI/CDP runtime validation covered all three real pointer drags, pointer capture continuity, correct row/column cursors, upper/lower vertical independence, outer overflow suppression, independent Pane scrolling, Workspace switch/restore, plugin reload persistence, and right Sidebar width resize. No captured runtime or console errors remained after the checks.
+- `0.1.7` repairs Side Palette to Canvas drag-and-drop and type restoration. The shared drag payload now carries only the Palette item ID and stored type, and a plugin-level capture handler resolves the exact Canvas under the pointer before Obsidian's plain-text fallback can run. Card content, Markdown/Image file references, and complete Group snapshots are restored through the live Canvas runtime using `posFromEvt`, `setData`, and `requestSave`.
+  - Obsidian CLI/CDP runtime validation used a disposable Canvas and disposable Palette fixtures. Image header/thumbnail/footer drops all produced the same image file node; Markdown produced a source-linked file node; a `New memo` item produced body `새로운 메모`; the stored 5-node/1-edge Group retained types, content, dimensions, relative positions, parent links, and edge directions; repeated drops kept the source and generated unique IDs. A zoom `-1.5` and pan `(400, 250)` position check matched the runtime coordinate conversion. All temporary data was removed afterward.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
@@ -81,16 +83,12 @@ Views mutate data through `PaletteStore`; search and preview remain separate. Al
 
 ## Manual validation required in Obsidian
 
-The user has not yet completed a fresh runtime demonstration of all `0.1.6` features. Static build success is not proof that unrelated Obsidian runtime paths are correct:
+The user has not yet completed a fresh runtime demonstration of all features unrelated to the focused `0.1.7` drag-and-drop checks. Static build success is not proof that unrelated Obsidian runtime paths are correct:
 
 1. Selected text inside a Canvas card shows both Canvas Palette collection routes.
-2. Card, Markdown, Image, and Group drops create exactly one node/subgraph at the intended pan/zoom position.
-3. Markdown and Image drops visibly retain their original Vault file references and full content.
-4. Side cards update their linked-Canvas label immediately after a successful drop or export.
-5. Ctrl/Cmd multi-selection, selection markers, batch tags, guarded delete, and native Quick Editor double-click all behave correctly without click/double-click conflicts.
-6. Canvas automatically refreshes after JSON writes without reopening the file.
-7. Group hierarchy, nested groups, internal edges, directions, dimensions, and relative layout survive restore/export.
-8. Floating Mini Palette layering, hover opening, drag, resize, and drop interception remain compatible with third-party Canvas plugins.
+2. Side cards update their linked-Canvas label immediately after a successful export.
+3. Ctrl/Cmd multi-selection, selection markers, batch tags, guarded delete, and native Quick Editor double-click all behave correctly without click/double-click conflicts.
+4. Floating Mini Palette layering, hover opening, drag, resize, and drop interception remain compatible with third-party Canvas plugins.
 
 ## Safety and unresolved behavior
 

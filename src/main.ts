@@ -1,5 +1,6 @@
 import { Editor, EventRef, Menu, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { CanvasAdapter } from "./canvas/canvas-adapter";
+import { PaletteDropController } from "./canvas/palette-drop-controller";
 import { TextScrapHighlights } from "./canvas/text-scrap-highlights";
 import { createId } from "./core/ids";
 import { PaletteStore } from "./core/store";
@@ -16,6 +17,7 @@ export default class CanvasPalettePlugin extends Plugin {
   store = new PaletteStore(this);
   search = new SearchService();
   canvas = new CanvasAdapter(this.app, (itemId, canvasPath, nodeIds) => this.store.recordCanvasPlacement(itemId, canvasPath, nodeIds));
+  dropController = new PaletteDropController(this.store, this.canvas);
   textScrapHighlights = new TextScrapHighlights(this);
   preview = new PreviewService(this.app, this);
   miniPalette = new FloatingMiniPalette(this);
@@ -23,6 +25,7 @@ export default class CanvasPalettePlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.store.load();
+    this.register(this.dropController.mount(this.app.workspace.containerEl.ownerDocument));
     this.registerEditorExtension(this.textScrapHighlights.extension());
     this.register(this.store.subscribe(() => this.textScrapHighlights.refreshVisibleEditors()));
     this.registerView(SIDE_PALETTE_VIEW, (leaf) => new SidePaletteView(leaf, this));

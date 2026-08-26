@@ -14,12 +14,12 @@ export function serializeGroup(nodes: CanvasNodeSnapshot[], edges: CanvasEdgeSna
   };
 }
 
-export function restoreGroup(snapshot: GroupSnapshot, x: number, y: number, idFactory: () => string): GroupSnapshot {
+export function restoreGroup(snapshot: GroupSnapshot, x: number, y: number, nodeIdFactory: () => string, edgeIdFactory: () => string): GroupSnapshot {
   const idMap = new Map<string, string>();
-  for (const node of snapshot.nodes) idMap.set(node.id, idFactory());
+  for (const node of snapshot.nodes) idMap.set(node.id, nodeIdFactory());
   return {
     bounds: { ...snapshot.bounds },
     nodes: snapshot.nodes.map((node) => ({ ...node, id: idMap.get(node.id)!, x: node.x + x, y: node.y + y, parentId: node.parentId ? idMap.get(node.parentId) : undefined })),
-    edges: snapshot.edges.map((edge) => ({ ...edge, id: idFactory(), fromNode: idMap.get(edge.fromNode)!, toNode: idMap.get(edge.toNode)! }))
+    edges: snapshot.edges.map((edge) => ({ ...edge, id: edgeIdFactory(), fromNode: idMap.get(edge.fromNode)!, toNode: idMap.get(edge.toNode)! }))
   };
 }

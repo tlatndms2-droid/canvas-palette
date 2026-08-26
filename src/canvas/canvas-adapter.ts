@@ -4,8 +4,17 @@ import type { CanvasEdgeSnapshot, CanvasNodeSnapshot, PaletteItem, PaletteItemTy
 import { restoreGroup, serializeGroup } from "./group-serializer";
 
 interface CanvasDocument { nodes: CanvasNodeSnapshot[]; edges: CanvasEdgeSnapshot[]; [key: string]: unknown; }
-interface CanvasViewLike { getViewType?: () => string; file?: TFile; containerEl?: HTMLElement; canvas?: unknown; }
-interface CanvasContext { file: TFile; view: CanvasViewLike; }
+interface CanvasRuntimeLike {
+  getData?: () => unknown;
+  setData?: (data: CanvasDocument) => void | Promise<void>;
+  requestSave?: () => void;
+  posFromEvt?: (event: MouseEvent) => { x: number; y: number };
+  posFromClient?: (point: { x: number; y: number }) => { x: number; y: number };
+  selection?: unknown;
+  selectedNodes?: unknown;
+}
+interface CanvasViewLike { getViewType?: () => string; file?: TFile; containerEl?: HTMLElement; canvas?: CanvasRuntimeLike; }
+export interface CanvasContext { file: TFile; view: CanvasViewLike; runtime: CanvasRuntimeLike; }
 
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 
@@ -15,11 +24,20 @@ export class CanvasAdapter {
   activeContext(): CanvasContext | null {
     const leaf = this.app.workspace.activeLeaf;
     const view = leaf?.view as unknown as CanvasViewLike | undefined;
-    if (!view || view.getViewType?.() !== "canvas" || !view.file) return null;
-    return { file: view.file, view };
+    if (!view || view.getViewType?.() !== "canvas" || !view.file || !view.canvas) return null;
+    return { file: view.file, view, runtime: view.canvas };
   }
 
   activeContainer(): HTMLElement | null { return this.activeContext()?.view.containerEl ?? null; }
+
+  contextForTarget(target: EventTarget | null): CanvasContext | null {
+    if (!(target instanceof Node)) return null;
+    for (const leaf of this.app.workspace.getLeavesOfType("canvas")) {
+      const view = leaf.view as unknown as CanvasViewLike;
+      if (view.file && view.canvas && view.containerEl?.contains(target)) return { file: view.file, view, runtime: view.canvas };
+    }
+    return null;
+  }
 
   async collectSelection(): Promise<PaletteItem[]> {
     const context = this.activeContext();
@@ -54,25 +72,17 @@ export class CanvasAdapter {
   async restoreItem(item: PaletteItem, screenX: number, screenY: number): Promise<boolean> {
     const context = this.activeContext();
     if (!context) { new Notice("Open a Canvas before dropping an item."); return false; }
-    const point = this.screenToCanvas(context, screenX, screenY);
-    let restoredNodeIds: string[] = [];
-    await this.app.vault.process(context.file, (content) => {
-      const document = this.parse(content);
-      if (item.type === "group" && item.group) {
-        const snapshot = restoreGroup(item.group, point.x, point.y, () => createId("node"));
-        document.nodes.push(...snapshot.nodes);
-        document.edges.push(...snapshot.edges);
-        restoredNodeIds = snapshot.nodes.map((node) => node.id);
-      } else {
-        const node = this.nodeForItem(item, point.x, point.y);
-        document.nodes.push(node);
-        restoredNodeIds = [node.id];
-      }
-      return JSON.stringify(document, null, 2);
-    });
-    this.onRestored(item.id, context.file.path, restoredNodeIds);
-    new Notice(`${item.displayTitle} added to Canvas`);
-    return true;
+    const point = context.runtime.posFromClient?.({ x: screenX, y: screenY });
+    if (!point) { new Notice("Unable to calculate the Canvas drop position."); return false; }
+    return this.restoreToRuntime(context, item, point);
+  }
+
+  async restoreItemFromDrop(item: PaletteItem, event: DragEvent): Promise<boolean> {
+    const context = this.contextForTarget(event.target);
+    if (!context) return false;
+    const point = context.runtime.posFromEvt?.(event);
+    if (!point) { new Notice("Unable to calculate the Canvas drop position."); return false; }
+    return this.restoreToRuntime(context, item, point);
   }
 
   async exportCollection(name: string, nodes: Array<{ id: string; name: string; depth: number; item?: PaletteItem }>): Promise<TFile | null> {
@@ -90,7 +100,7 @@ export class CanvasAdapter {
       rowByDepth.set(entry.depth, row + 1);
       const position = { x: entry.depth * 330, y: row * 180 };
       if (entry.item?.type === "group" && entry.item.group) {
-        const snapshot = restoreGroup(entry.item.group, position.x, position.y, () => createId("node"));
+        const snapshot = restoreGroup(entry.item.group, position.x, position.y, () => createId("node"), () => createId("node"));
         canvasNodes.push(...snapshot.nodes);
         edges.push(...snapshot.edges);
         const ids = snapshot.nodes.map((node) => node.id);
@@ -141,6 +151,16 @@ export class CanvasAdapter {
     return { id: createId("node"), type: "text", text: item.content ?? item.displayTitle, x, y, width: 280, height: 180 };
   }
 
+  private restoreNodeForItem(item: PaletteItem, x: number, y: number): CanvasNodeSnapshot | null {
+    if (item.type === "markdown" || item.type === "image") {
+      const file = item.origin.filePath ? this.app.vault.getAbstractFileByPath(item.origin.filePath) : null;
+      if (!(file instanceof TFile)) { new Notice(`Original file for ${item.displayTitle} is unavailable.`); return null; }
+      return { id: createId("node"), type: "file", file: file.path, x, y, width: item.type === "image" ? 360 : 280, height: item.type === "image" ? 240 : 180 };
+    }
+    if (item.type === "card") return { id: createId("node"), type: "text", text: item.content ?? "", x, y, width: 280, height: 180 };
+    return null;
+  }
+
   private async read(file: TFile): Promise<CanvasDocument> { return this.parse(await this.app.vault.cachedRead(file)); }
   private parse(raw: string): CanvasDocument {
     try {
@@ -150,7 +170,7 @@ export class CanvasAdapter {
   }
 
   private runtimeSelectionIds(view: CanvasViewLike): string[] {
-    const canvas = view.canvas as Record<string, unknown> | undefined;
+    const canvas = view.canvas;
     const candidate = canvas?.selection ?? canvas?.selectedNodes;
     const values = candidate instanceof Set ? [...candidate] : Array.isArray(candidate) ? candidate : [];
     return values.map((value) => {
@@ -191,13 +211,34 @@ export class CanvasAdapter {
     return node.x >= group.x && node.y >= group.y && node.x + node.width <= group.x + group.width && node.y + node.height <= group.y + group.height;
   }
 
-  private screenToCanvas(context: CanvasContext, screenX: number, screenY: number): { x: number; y: number } {
-    const rect = context.view.containerEl?.getBoundingClientRect();
-    const raw = context.view.canvas as Record<string, unknown> | undefined;
-    const zoom = typeof raw?.zoom === "number" ? raw.zoom : 1;
-    const tx = typeof raw?.tx === "number" ? raw.tx : 0;
-    const ty = typeof raw?.ty === "number" ? raw.ty : 0;
-    return { x: Math.round(((screenX - (rect?.left ?? 0)) - tx) / zoom), y: Math.round(((screenY - (rect?.top ?? 0)) - ty) / zoom) };
+  private async restoreToRuntime(context: CanvasContext, item: PaletteItem, point: { x: number; y: number }): Promise<boolean> {
+    const current = context.runtime.getData?.();
+    if (!current || typeof current !== "object" || !context.runtime.setData) { new Notice("This Canvas runtime cannot accept dropped items."); return false; }
+    const document = this.parse(JSON.stringify(current));
+    let restoredNodeIds: string[];
+    if (item.type === "group") {
+      if (!item.group) { new Notice(`Stored group data for ${item.displayTitle} is unavailable.`); return false; }
+      const snapshot = restoreGroup(item.group, point.x, point.y, () => createId("node"), () => createId("edge"));
+      document.nodes.push(...snapshot.nodes);
+      document.edges.push(...snapshot.edges);
+      restoredNodeIds = snapshot.nodes.map((node) => node.id);
+    } else {
+      const node = this.restoreNodeForItem(item, point.x, point.y);
+      if (!node) return false;
+      document.nodes.push(node);
+      restoredNodeIds = [node.id];
+    }
+    try {
+      await context.runtime.setData(document);
+      context.runtime.requestSave?.();
+    } catch (error) {
+      console.error("Canvas Palette failed to restore an item", error);
+      new Notice(`Unable to add ${item.displayTitle} to Canvas.`);
+      return false;
+    }
+    this.onRestored(item.id, context.file.path, restoredNodeIds);
+    new Notice(`${item.displayTitle} added to Canvas`);
+    return true;
   }
 
   private async availablePath(path: string): Promise<string> {

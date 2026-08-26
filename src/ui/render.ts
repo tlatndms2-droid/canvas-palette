@@ -46,11 +46,15 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   if (options.draggable) {
     card.draggable = true;
     card.addEventListener("dragstart", (event) => {
-      event.dataTransfer?.setData("application/x-canvas-palette-item", item.id);
-      event.dataTransfer?.setData("text/plain", item.displayTitle);
-      if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
+      if (event.dataTransfer) {
+        event.dataTransfer.clearData();
+        event.dataTransfer.setData("application/x-canvas-palette-item", item.id);
+        event.dataTransfer.setData("application/x-canvas-palette-type", item.type);
+        event.dataTransfer.effectAllowed = "copy";
+        event.dataTransfer.setDragImage(card, Math.max(0, Math.min(event.offsetX, card.clientWidth)), Math.max(0, Math.min(event.offsetY, card.clientHeight)));
+      }
       card.addClass("is-dragging");
-    });
+    }, true);
     card.addEventListener("dragend", () => card.removeClass("is-dragging"));
   }
   let clickTimer: number | null = null;
