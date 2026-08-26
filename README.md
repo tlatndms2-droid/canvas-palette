@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.1.7**
+Current version: **0.1.8**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
@@ -18,7 +18,8 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - Side Palette drag-and-drop resolves the stored Palette Item by ID and restores Card content, Markdown/Image file references, or complete Group subgraphs through the target Canvas runtime at the real drop position.
 - Item/collection organization: collection creation, nesting, rename, Canvas drag drop, Viewport reorder, multi-selection, batch tag editing, deletion, and move-to-collection actions.
 - Type-specific Card, Markdown, Image, and Group rendering; rendered Markdown, source image preview, and subgraph preview with content-first card layouts.
-- Native Obsidian Live Preview Quick Editor on Card/Markdown double-click, embedded in a movable and resizable floating window with save/close shortcuts. Image and Group items retain the metadata/details popup.
+- Side Palette double-click opens a large type-specific preview: rendered Card content, the current Markdown source, a contained source image, or a complete Group graph. Mini Palette keeps its native Live Preview Quick Editor behavior.
+- Side Palette right-click provides a focused tag/label setter without opening the former full metadata editor.
 - Canvas placement history per asset, recorded after drag/drop or export and displayed in Side/Mini Palette cards and the detail popup.
 - Group serializer/restorer that remaps IDs while retaining internal nodes, edges, nested parent references, dimensions, and relative positions.
 - Collection-to-Canvas mind-map export.
@@ -39,7 +40,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 4. Hover the Mini Palette trigger at the upper-right of the Canvas, review items in the Inspector, and import them into a Workspace.
 5. Open Side Palette to organize Collections or Mini Palette Storage to search across Workspaces.
 6. Drag an item from either palette directly into a Canvas. Cards create text nodes, Markdown and images remain source-linked file nodes, and Groups restore their subgraph.
-7. Ctrl/Cmd-click items for multi-selection. Double-click a Card or Markdown item to edit it in Obsidian's native Live Preview editor; Image and Group items open their details popup.
+7. Ctrl/Cmd-click items for multi-selection. In Side Palette, double-click any item for its large type-specific preview, or right-click and choose **Set tags / label** to change only those classifications.
 
 ## Installation for development
 

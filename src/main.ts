@@ -12,6 +12,7 @@ import { SearchService } from "./search/search-service";
 import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
 import { ItemEditorModal } from "./ui/modal";
+import { ItemPreviewModal } from "./ui/item-preview-modal";
 
 export default class CanvasPalettePlugin extends Plugin {
   store = new PaletteStore(this);
@@ -79,6 +80,8 @@ export default class CanvasPalettePlugin extends Plugin {
     if (await this.editorManager.openItem(itemId)) return;
     new ItemEditorModal(this.app, this, itemId).open();
   }
+
+  openSideItemPreview(itemId: string): void { new ItemPreviewModal(this.app, this, itemId).open(); }
 
   openSettings(): void {
     const appWithSettings = this.app as unknown as { setting?: { open: () => Promise<void>; openTabById: (id: string) => void } };

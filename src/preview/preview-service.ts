@@ -1,6 +1,8 @@
 import { App, Component, MarkdownRenderer, TFile } from "obsidian";
 import type { PaletteItem } from "../core/types";
 
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
+
 export class PreviewService {
   constructor(private readonly app: App, private readonly component: Component) {}
 
@@ -16,7 +18,9 @@ export class PreviewService {
     if (item.type === "group" && item.group) {
       const graph = parent.createDiv({ cls: "cp-subgraph" });
       const { width, height } = item.group.bounds;
-      const scale = Math.min(1, 300 / Math.max(width, 1), 180 / Math.max(height, 1));
+      const availableWidth = compact ? 300 : Math.max(300, parent.clientWidth - 28);
+      const availableHeight = compact ? 180 : Math.max(180, parent.clientHeight - 28);
+      const scale = Math.min(compact ? 1 : Number.POSITIVE_INFINITY, availableWidth / Math.max(width, 1), availableHeight / Math.max(height, 1));
       graph.style.setProperty("--cp-graph-width", `${Math.max(220, width * scale + 28)}px`);
       graph.style.setProperty("--cp-graph-height", `${Math.max(140, height * scale + 28)}px`);
       for (const edge of item.group.edges) {
@@ -38,7 +42,11 @@ export class PreviewService {
         const box = graph.createDiv({ cls: `cp-subgraph__node cp-subgraph__node--${node.type}` });
         box.style.left = `${node.x * scale + 14}px`; box.style.top = `${node.y * scale + 14}px`;
         box.style.width = `${Math.max(30, node.width * scale)}px`; box.style.height = `${Math.max(22, node.height * scale)}px`;
-        box.setText(node.label ?? node.text?.slice(0, 18) ?? node.file?.split("/").pop() ?? "Group");
+        const file = node.file ? this.app.vault.getAbstractFileByPath(node.file) : null;
+        if (file instanceof TFile && IMAGE_EXTENSIONS.has(file.extension.toLowerCase())) {
+          box.addClass("cp-subgraph__node--image");
+          box.createEl("img", { attr: { src: this.app.vault.getResourcePath(file), alt: file.basename, draggable: "false" } });
+        } else box.setText(node.label ?? node.text?.slice(0, compact ? 18 : 120) ?? node.file?.split("/").pop() ?? "Group");
       }
       return;
     }
