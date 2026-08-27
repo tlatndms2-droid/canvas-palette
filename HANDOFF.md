@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.2.0`
+- Version: `0.2.1`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.0`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.2.0.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.0`.
+- Latest release: `0.2.1`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.2.1.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.1`.
 
 ## Start here on another PC
 
@@ -118,6 +118,8 @@
   - Validation ran only in an isolated `Obsidian Sandbox`. A real DOM drag-and-drop from Side Palette created a second linked text node and persisted its Canvas path/Node ID. Editing the dropped node updated the Palette Item and original node; editing the Palette updated both Canvas nodes; editing metadata on the dropped node updated the Item, both metadata records, and both Canvas overlays. All content, placements, metadata, and overlays survived an Obsidian restart. The captured error log was empty and disposable fixtures were removed afterward.
 - `0.2.0` prevents Side Palette selection from resetting or visibly shifting its scrollable panels. Full view rebuilds capture and restore the Viewport, Outliner, Tag Index, and Label Index scroll offsets for the current Workspace. The selection count and Delete action use an always-reserved status slot so the item grid keeps the same vertical origin before and after selection, and the batch `Edit metadata` action is removed from that slot.
   - Validation ran only in an isolated `Obsidian Sandbox` with 36 disposable Card fixtures. After setting Viewport, Outliner, and Tag Index offsets to 620, 430, and 65 pixels, real DOM single selection, Ctrl multi-selection, and Outliner selection all preserved those exact offsets. The status slot remained 43 pixels before and after selection, `Selected 1/2`, Delete, and Card check markers updated correctly, batch `Edit metadata` was absent, and the captured error log was empty. All disposable Items, selections, collections, pending data, plugin data, and the Sandbox vault were removed afterward.
+- `0.2.1` restores the visible `Selected <count>` text in the fixed Side Palette status slot. The slot no longer receives the global `is-active` class, which had applied the solid Accent background intended for active buttons and made the Accent-colored count text disappear against it. Scroll preservation, fixed slot height, Delete, and selection markers remain unchanged.
+  - Validation ran only in an isolated `Obsidian Sandbox` with 20 disposable Card fixtures. In both Light and Dark plugin themes, the count used the same computed foreground color as the panel text, remained visibly sized, and sat on the intended 14% Accent tint instead of a solid Accent fill. The selected state kept a 43-pixel slot, Delete remained visible, batch `Edit metadata` remained absent, and a 420-pixel then 310-pixel Viewport offset survived selection and theme rerenders exactly. The captured error log was empty and all fixtures and the Sandbox vault were removed afterward.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 

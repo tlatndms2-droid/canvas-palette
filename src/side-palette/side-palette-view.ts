@@ -74,7 +74,7 @@ export class SidePaletteView extends ItemView {
     const grid = header.createEl("button", { text: "Grid", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "grid" ? "is-active" : "" });
     const list = header.createEl("button", { text: "List", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "list" ? "is-active" : "" });
     grid.addEventListener("click", () => this.setSideView("grid")); list.addEventListener("click", () => this.setSideView("list"));
-    const batchSlot = parent.createDiv({ cls: `cp-batch-slot${selectedIds.length > 0 ? " is-active" : ""}` });
+    const batchSlot = parent.createDiv({ cls: "cp-batch-slot" });
     if (selectedIds.length > 0) {
       const batch = batchSlot.createDiv({ cls: "cp-batch-bar" }); batch.createSpan({ cls: "cp-selection-count", text: `Selected ${selectedIds.length}` });
       const remove = batch.createEl("button", { text: "Delete", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmDelete(selectedIds));
