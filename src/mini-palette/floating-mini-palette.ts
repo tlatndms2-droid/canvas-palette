@@ -3,7 +3,7 @@ import type CanvasPalettePlugin from "../main";
 import type { PaletteItem, PaletteItemType } from "../core/types";
 import { TagLabelModal } from "../ui/modal";
 import { makeHorizontalDivider } from "../ui/resizable";
-import { iconButton, renderItem, workspaceSelect } from "../ui/render";
+import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
 
 type TypeFilter = "all" | PaletteItemType;
 
@@ -138,8 +138,9 @@ export class FloatingMiniPalette {
     heading.createSpan({ text: "Assets" }); if (!this.plugin.store.data.uiState.miniPalette.rightPaneOpen) iconButton(heading, "panel-right-open", "Open preview pane", () => { this.plugin.store.data.uiState.miniPalette.rightPaneOpen = true; this.plugin.store.changed(); });
     const grid = parent.createDiv({ cls: `cp-asset-grid cp-asset-grid--${this.plugin.store.data.uiState.miniPalette.viewMode}` }); grid.style.setProperty("--cp-columns", String(this.plugin.store.data.settings.columns));
     for (const item of this.storageItems()) {
-      const face = item.facesEnabled ? this.plugin.store.data.uiState.miniItemFaces[item.id] ?? "front" : "front";
-      const card = renderItem(grid, item, { selected: this.selectedIds().includes(item.id), currentFace: face, onToggleFace: item.facesEnabled ? (next) => this.plugin.store.setPaletteFace("mini", item.id, next) : undefined, draggable: true, onSelect: (event) => this.selectStorage(item.id, event.ctrlKey || event.metaKey), onOpen: () => face === "back" ? void this.plugin.editorManager.openBack(item.id) : void this.plugin.openItemEditor(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), onContextMenu: (event) => { event.preventDefault(); this.itemMenu(item); } });
+      const facesEnabled = supportsFrontBack(item) && item.facesEnabled;
+      const face = facesEnabled ? this.plugin.store.data.uiState.miniItemFaces[item.id] ?? "front" : "front";
+      const card = renderItem(grid, item, { selected: this.selectedIds().includes(item.id), currentFace: face, onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("mini", item.id, next) : undefined, draggable: true, onSelect: (event) => this.selectStorage(item.id, event.ctrlKey || event.metaKey), onOpen: () => face === "back" ? void this.plugin.editorManager.openBack(item.id) : void this.plugin.openItemEditor(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), onContextMenu: (event) => { event.preventDefault(); this.itemMenu(item); } });
       const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body) void this.plugin.preview.render(body, item, true, 360, face);
       card.addEventListener("mousemove", (event) => { if (event.ctrlKey && this.hoverItemId !== item.id) { this.hoverItemId = item.id; this.render(); } });
       card.addEventListener("mouseleave", () => { if (this.hoverItemId === item.id) { this.hoverItemId = null; this.render(); } });

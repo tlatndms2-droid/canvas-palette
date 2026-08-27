@@ -50,17 +50,18 @@ export class CanvasMetadataController {
     if (activeEditor && this.activeEditors.has(activeEditor)) return;
     this.remove(node);
     const state = metadata ?? { tags: [], label: "", labelColor: "", caption: "", backContent: "", currentFace: "front" as const, facesEnabled: false, modifiedAt: Date.now() };
+    const supportsFaces = this.adapter.supportsFrontBack(node);
     const data = node.getData?.();
     const type = data?.type ?? "unknown";
     nodeEl.addClass("cp-canvas-has-metadata", `cp-canvas-has-metadata--${type}`);
     const layer = nodeEl.createDiv({ cls: `cp-canvas-metadata cp-canvas-metadata--${type}`, attr: { "aria-label": "Canvas Palette metadata" } });
-    if (state.facesEnabled) {
+    if (supportsFaces && state.facesEnabled) {
       const flip = layer.createEl("button", { cls: "clickable-icon cp-canvas-face-toggle", attr: { type: "button", "aria-label": state.currentFace === "front" ? "Show back" : "Show front", title: state.currentFace === "front" ? "Show back" : "Show front" } });
       setIcon(flip, "refresh-cw");
       flip.addEventListener("pointerdown", (event) => event.stopPropagation());
       flip.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); this.plugin.store.setCanvasNodeFace(canvasPath, nodeId, state.currentFace === "front" ? "back" : "front"); });
     }
-    if (state.facesEnabled && state.currentFace === "back") {
+    if (supportsFaces && state.facesEnabled && state.currentFace === "back") {
       nodeEl.addClass("cp-canvas-showing-back");
       const back = layer.createDiv({ cls: "cp-canvas-back markdown-rendered", attr: { title: "Double-click to edit the back" } });
       void MarkdownRenderer.render(this.plugin.app, state.backContent, back, canvasPath, this.plugin).then(() => {

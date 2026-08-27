@@ -164,6 +164,22 @@ export class PaletteStore {
     this.changed();
   }
 
+  disableCanvasNodeFaces(canvasPath: string, nodeId: string): void {
+    const current = this.canvasNodeState(canvasPath, nodeId);
+    const linkedItems = Object.values(this.data.items).filter((item) => this.itemHasLinkedNode(item, canvasPath, nodeId));
+    const modifiedAt = Date.now();
+    this.setMetadataRecord(canvasPath, nodeId, { ...current, backContent: "", currentFace: "front", facesEnabled: false }, modifiedAt);
+    for (const item of linkedItems) {
+      item.backContent = "";
+      item.facesEnabled = false;
+      item.modifiedAt = modifiedAt;
+      delete (this.data.uiState.sideItemFaces ??= {})[item.id];
+      delete (this.data.uiState.miniItemFaces ??= {})[item.id];
+      this.applyItemMetadataToLinkedNodes(item);
+    }
+    this.changed();
+  }
+
   unlinkCanvasNode(canvasPath: string, nodeId: string): boolean {
     const item = this.allItems().find((candidate) => this.itemHasLinkedNode(candidate, canvasPath, nodeId));
     if (!item) return false;

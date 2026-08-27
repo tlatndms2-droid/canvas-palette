@@ -33,8 +33,10 @@ export class TextScrapHighlights {
 
   refreshVisibleEditors(): void {
     for (const leaf of this.plugin.app.workspace.getLeavesOfType("markdown")) {
-      const view = leaf.view as unknown as { editor?: { cm?: EditorView } };
-      view.editor?.cm?.dispatch({ effects: refreshHighlights.of() });
+      const view = leaf.view as unknown as { containerEl?: HTMLElement; editor?: { cm?: EditorView } };
+      if (view.containerEl?.closest(".cp-native-editor-host")) continue;
+      try { view.editor?.cm?.dispatch({ effects: refreshHighlights.of() }); }
+      catch (error) { console.warn("Canvas Palette skipped an incompatible Markdown editor while refreshing text highlights", error); }
     }
   }
 }

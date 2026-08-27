@@ -57,6 +57,14 @@ export class CanvasAdapter {
     return context ? { canvasPath: context.file.path, nodeId } : null;
   }
 
+  supportsFrontBack(node: CanvasRuntimeNodeLike): boolean {
+    const data = node.getData?.();
+    if (data?.type === "text") return true;
+    if (data?.type !== "file" || !data.file) return false;
+    const file = this.app.vault.getAbstractFileByPath(data.file);
+    return file instanceof TFile && file.extension.toLowerCase() === "md";
+  }
+
   async collectSelection(): Promise<PaletteItem[]> {
     const context = this.activeContext();
     if (!context) { new Notice("Open a Canvas before collecting Canvas items."); return []; }
@@ -251,14 +259,14 @@ export class CanvasAdapter {
   private async itemFromNode(node: CanvasNodeSnapshot, canvasPath: string): Promise<PaletteItem> {
     const now = Date.now();
     const metadata = this.getMetadata(canvasPath, node.id);
-    const common = { tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", backContent: metadata?.backContent ?? "", facesEnabled: metadata?.facesEnabled ?? false, modifiedAt: metadata?.modifiedAt ?? now };
+    const common = { tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", backContent: metadata?.backContent ?? "", modifiedAt: metadata?.modifiedAt ?? now };
     if (node.type === "file" && node.file) {
       const file = this.app.vault.getAbstractFileByPath(node.file);
       const isImage = file instanceof TFile && IMAGE_EXTENSIONS.has(file.extension.toLowerCase());
       const type: PaletteItemType = isImage ? "image" : "markdown";
-      return { id: createId(type), type, displayTitle: file instanceof TFile ? file.basename : node.file, ...common, createdAt: now, origin: { canvasPath, canvasNodeId: node.id, filePath: node.file }, canvasPlacements: [], content: type === "markdown" && file instanceof TFile ? await this.app.vault.cachedRead(file) : undefined };
+      return { id: createId(type), type, displayTitle: file instanceof TFile ? file.basename : node.file, ...common, backContent: type === "markdown" ? common.backContent : "", facesEnabled: type === "markdown" && (metadata?.facesEnabled ?? false), createdAt: now, origin: { canvasPath, canvasNodeId: node.id, filePath: node.file }, canvasPlacements: [], content: type === "markdown" && file instanceof TFile ? await this.app.vault.cachedRead(file) : undefined };
     }
-    return { id: createId("card"), type: "card", displayTitle: (node.text ?? "Canvas card").split(/\r?\n/, 1)[0].slice(0, 80), ...common, createdAt: now, origin: { canvasPath, canvasNodeId: node.id }, canvasPlacements: [], content: node.text ?? "" };
+    return { id: createId("card"), type: "card", displayTitle: (node.text ?? "Canvas card").split(/\r?\n/, 1)[0].slice(0, 80), ...common, facesEnabled: metadata?.facesEnabled ?? false, createdAt: now, origin: { canvasPath, canvasNodeId: node.id }, canvasPlacements: [], content: node.text ?? "" };
   }
 
   private groupItem(nodes: CanvasNodeSnapshot[], edges: CanvasEdgeSnapshot[], canvasPath: string, nodeId: string): PaletteItem | null {
@@ -268,7 +276,7 @@ export class CanvasAdapter {
     const snapshot = serializeGroup(nodes, edges);
     snapshot.nodeBacks = Object.fromEntries(nodes.map((node) => [node.id, this.getMetadata(canvasPath, node.id)?.backContent ?? ""]).filter(([, back]) => Boolean(back)));
     const title = nodes.find((node) => node.type === "group")?.label ?? nodes.find((node) => node.text)?.text?.split(/\r?\n/, 1)[0] ?? "Canvas group";
-    return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", backContent: metadata?.backContent ?? "", facesEnabled: metadata?.facesEnabled ?? false, createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
+    return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", backContent: "", facesEnabled: false, createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
   }
 
   private nodeForItem(item: PaletteItem, x: number, y: number): CanvasNodeSnapshot {

@@ -26,10 +26,15 @@ export default class CanvasPalettePlugin extends Plugin {
     editMetadata: (nodes) => this.editCanvasNodesMetadata(nodes),
     collectToMini: () => void this.collectCanvasSelection(),
     saveToSide: (anchor) => this.saveCanvasSelectionFromToolbar(anchor),
+    supportsFaces: (node) => this.canvas.supportsFrontBack(node),
     facesEnabled: (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId)?.facesEnabled ?? false,
     enableFaces: (canvasPath, nodeId) => {
       this.store.enableCanvasNodeFaces(canvasPath, nodeId);
       new Notice("Front / Back enabled for this Canvas node.");
+    },
+    disableFaces: (canvasPath, nodeId) => {
+      this.store.disableCanvasNodeFaces(canvasPath, nodeId);
+      new Notice("Front / Back removed from this material.");
     },
     isLinked: (canvasPath, nodeId) => Boolean(this.store.linkedItemForNode(canvasPath, nodeId)),
     unlink: (canvasPath, nodeId) => {

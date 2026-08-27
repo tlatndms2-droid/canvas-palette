@@ -117,6 +117,29 @@ test("Unlink from Palette preserves the node snapshot and stops later synchroniz
   await cleanup();
 });
 
+test("removing Front Back clears the linked material and every placement", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.recordCanvasPlacement("card", "B.canvas", ["drop"]);
+  store.enableCanvasNodeFaces("A.canvas", "origin");
+  store.setCanvasNodeBack("A.canvas", "origin", "Back to remove");
+  store.setCanvasNodeFace("B.canvas", "drop", "back");
+
+  store.disableCanvasNodeFaces("B.canvas", "drop");
+
+  assert.equal(store.data.items.card.facesEnabled, false);
+  assert.equal(store.data.items.card.backContent, "");
+  for (const [canvasPath, nodeId] of [["A.canvas", "origin"], ["B.canvas", "drop"]]) {
+    const state = store.getCanvasNodeMetadata(canvasPath, nodeId);
+    assert.equal(state?.facesEnabled, false);
+    assert.equal(state?.backContent, "");
+    assert.equal(state?.currentFace, "front");
+  }
+  await cleanup();
+});
+
 test("deleted Canvas nodes are removed from links and another placement becomes the origin", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
