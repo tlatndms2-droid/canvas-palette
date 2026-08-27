@@ -2,12 +2,12 @@
 
 ## Current state
 
-- Version: `0.2.21`.
+- Version: `0.2.22`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.21`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.21`.
-- Latest runtime change: `0.2.21`; the Side Palette Viewport context menu now exposes state-aware `Enable Front / Back` and `Remove Front / Back` commands for the clicked eligible material. The commands synchronize enabled state across linked Canvas placements, return all locations to Front when removed, and preserve stored Back text. A rendered Canvas Back now has a dedicated Canvas-coordinate drag path, so the card moves normally without sacrificing double-click native Live Preview editing; editor input remains isolated from card movement.
+- Latest release: `0.2.22`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.22`.
+- Latest runtime change: `0.2.22`; Side Palette editing is intentionally asymmetric. Front content continues to use the separate floating popup editor, while a Back-facing Side Palette card mounts native Live Preview directly inside that card. Back editing disables card drag/panning, saves on Escape or outside interaction, and synchronizes through the existing linked material path. Canvas Back inline editing remains unchanged.
 - Automated baseline: 13 Node tests (including opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
@@ -150,6 +150,8 @@
   - Runtime validation used only `Obsidian Sandbox` and no mouse control. An ordinary Image reported zero flip controls; explicit activation reported one and replaced the toolbar action with `Remove Front / Back`. Mini Palette rendered zero controls for an ordinary Image Item and one for an enabled Image Item. Removal preserved Back text, returned Front, removed the flip, and restored the enable action. A linked node showed both Remove and Unlink; Unlink removed only itself while preserving Front/Back/Metadata. The Back preview and editor measured identical top/left offsets (`34px`/`14px`, `0px` difference), the editor filled the complete Back height, captured errors were empty, and all fixtures were removed.
 - `0.2.21` adds the missing Front/Back state command to each eligible Side Palette Viewport card menu. Disabled materials show `Enable Front / Back`; enabled materials show `Remove Front / Back`. Both commands update the shared material and linked Canvas placements, while removal preserves Back text. Canvas Back display now uses a dedicated drag path based on the native Canvas coordinate system and selected-node set, so the card can move while showing Back; double-click editing remains available and editor interaction never drags the card.
   - Runtime validation used only `Obsidian Sandbox` through Obsidian CLI/CDP, without controlling the user's mouse. A Side Palette Image Item changed from `Enable Front / Back` to `Remove Front / Back`, gained and lost its flip control, and retained `Saved back` after removal. A Back-facing Canvas card moved from `(100,100)` to `(180,160)` while remaining on Back. Double-click still opened the embedded native editor, and the same drag gesture during editing left the card at `(180,160)`. Captured errors were empty and the disposable Item and Canvas file were removed.
+- `0.2.22` moves Side Palette Back editing into the Back-facing card instead of opening the floating popup. The card body becomes the native Live Preview editor, card drag and internal panning are disabled during input, and Escape or an outside interaction saves and restores the rendered Back preview. Front editing deliberately keeps the existing floating popup. Mini Palette and Canvas editing behavior are unchanged.
+  - Runtime validation used only `Obsidian Sandbox` through Obsidian CLI/CDP, without controlling the user's mouse. A linked Back-facing Side Palette Card mounted one in-card native editor, opened zero floating popups, disabled card dragging, accepted text, saved it to both the Palette Item and linked Canvas metadata, then returned to rendered Back preview. Switching the same Item to Front opened one floating editor and zero in-card Back editors. Captured errors were empty and the disposable Item and Canvas file were removed.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 

@@ -5,6 +5,7 @@ import { ConfirmDeleteModal, TagLabelModal, TextPromptModal } from "../ui/modal"
 import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
 import { LinkedSpacesModal } from "../ui/linked-spaces-modal";
+import { NativeMarkdownEditor } from "../editor/native-markdown-editor";
 
 export const SIDE_PALETTE_VIEW = "canvas-palette-side";
 
@@ -15,6 +16,7 @@ export class SidePaletteView extends ItemView {
   private visibleItemIds: string[] = [];
   private suppressBlankClick = false;
   private viewSettingsOpen = false;
+  private activeBackEditor: { itemId: string; close: (save: boolean) => Promise<void> } | null = null;
   private readonly scrollSelectors = [".cp-viewport", ".cp-outliner", ".cp-tag-index", ".cp-label-index"] as const;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: CanvasPalettePlugin) { super(leaf); }
@@ -22,9 +24,10 @@ export class SidePaletteView extends ItemView {
   getDisplayText(): string { return "Canvas Palette"; }
   getIcon(): string { return "library-big"; }
   async onOpen(): Promise<void> { this.unsubscribe = this.plugin.store.subscribe(() => this.render()); this.render(); }
-  async onClose(): Promise<void> { this.unsubscribe?.(); }
+  async onClose(): Promise<void> { this.unsubscribe?.(); await this.activeBackEditor?.close(true); }
 
   private render(): void {
+    if (this.activeBackEditor) return;
     const root = this.contentEl;
     const previousWorkspaceId = root.dataset.cpWorkspaceId;
     const scrollPositions = new Map(this.scrollSelectors.map((selector) => [selector, root.querySelector<HTMLElement>(selector)?.scrollTop ?? 0]));
@@ -132,7 +135,7 @@ export class SidePaletteView extends ItemView {
     for (const item of visibleItems) {
       const facesEnabled = supportsFrontBack(item) && item.facesEnabled;
       const face = facesEnabled ? this.plugin.store.data.uiState.sideItemFaces[item.id] ?? "front" : "front";
-      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, currentFace: face, onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("side", item.id, next) : undefined, onSelect: (event) => this.selectSideItem(item.id, event), onOpen: () => face === "back" ? void this.plugin.editorManager.openBack(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, currentFace: face, onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("side", item.id, next) : undefined, onSelect: (event) => this.selectSideItem(item.id, event), onOpen: () => face === "back" ? void this.openInlineBackEditor(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
       const body = card.querySelector<HTMLElement>(".cp-item__body");
       if (body) {
         const compactLimit = Math.round(360 * 14 / this.plugin.store.data.settings.fontSize);
@@ -189,6 +192,62 @@ export class SidePaletteView extends ItemView {
       body.addEventListener("pointerup", finish);
       body.addEventListener("pointercancel", finish);
     });
+  }
+
+  private async openInlineBackEditor(itemId: string): Promise<void> {
+    if (this.activeBackEditor?.itemId === itemId) return;
+    await this.activeBackEditor?.close(true);
+    const item = this.plugin.store.data.items[itemId];
+    const card = this.contentEl.querySelector<HTMLElement>(`.cp-item[data-item-id="${CSS.escape(itemId)}"]`);
+    const body = card?.querySelector<HTMLElement>(".cp-item__body");
+    if (!item || !card || !body || body.dataset.face !== "back") return;
+
+    body.empty();
+    body.removeClass("is-pan-enabled", "is-panning");
+    body.addClass("is-back-editing");
+    card.addClass("is-back-editing");
+    card.draggable = false;
+    const host = body.createDiv({ cls: "cp-side-back-editor cp-native-editor-host", attr: { "aria-label": `Edit ${item.displayTitle} back inside the Palette card` } });
+    const editor = new NativeMarkdownEditor(this.app, { itemId, kind: "card", file: null, title: `${item.displayTitle} — Back`, initialText: item.backContent });
+    const doc = body.ownerDocument;
+    let finishing = false;
+    const close = async (save: boolean): Promise<void> => {
+      if (finishing) return;
+      finishing = true;
+      doc.removeEventListener("pointerdown", onOutsidePointer, true);
+      host.removeEventListener("keydown", onKeyDown, true);
+      const text = editor.getText();
+      editor.detach();
+      if (this.activeBackEditor?.itemId === itemId) this.activeBackEditor = null;
+      if (save && text !== item.backContent) this.plugin.store.setItemBack(itemId, text);
+      else this.render();
+    };
+    const onOutsidePointer = (event: PointerEvent): void => {
+      if (!card.contains(event.target as Node)) window.setTimeout(() => void close(true), 0);
+    };
+    const onKeyDown = (event: KeyboardEvent): void => {
+      event.stopPropagation();
+      if (event.key === "Escape") { event.preventDefault(); void close(true); }
+      else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        this.plugin.store.setItemBack(itemId, editor.getText());
+      }
+    };
+    this.activeBackEditor = { itemId, close };
+    host.addEventListener("pointerdown", (event) => event.stopPropagation());
+    host.addEventListener("click", (event) => event.stopPropagation());
+    host.addEventListener("dblclick", (event) => event.stopPropagation());
+    host.addEventListener("keydown", onKeyDown, true);
+    try {
+      await editor.mount(host, false);
+      window.requestAnimationFrame(() => editor.remeasure());
+      window.setTimeout(() => doc.addEventListener("pointerdown", onOutsidePointer, true), 0);
+    } catch (error) {
+      editor.detach();
+      this.activeBackEditor = null;
+      this.render();
+      console.error("Canvas Palette could not mount the Side Palette Back editor", error);
+    }
   }
 
   private renderOutliner(parent: HTMLElement, workspaceId: string): void {
