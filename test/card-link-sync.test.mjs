@@ -74,3 +74,34 @@ test("Palette edits propagate metadata to every linked Card node", async () => {
 
   await cleanup();
 });
+
+test("deleted Canvas nodes are removed from links and another placement becomes the origin", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.recordCanvasPlacement("card", "B.canvas", ["replacement", "missing"]);
+
+  assert.equal(store.reconcileCanvasLinks("A.canvas", new Set()), true);
+  assert.equal(store.data.items.card.origin.canvasPath, "B.canvas");
+  assert.equal(store.data.items.card.origin.canvasNodeId, "replacement");
+  assert.deepEqual(store.data.items.card.canvasPlacements, [{ canvasPath: "B.canvas", nodeIds: ["missing"], placedAt: store.data.items.card.canvasPlacements[0].placedAt }]);
+
+  assert.equal(store.reconcileCanvasLinks("B.canvas", new Set(["replacement"])), true);
+  assert.deepEqual(store.linkedCanvasNodes(store.data.items.card), [{ canvasPath: "B.canvas", nodeId: "replacement" }]);
+  await cleanup();
+});
+
+test("unlinking a Canvas keeps the Palette item and other linked spaces", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.recordCanvasPlacement("card", "B.canvas", ["drop"]);
+
+  store.unlinkItemsFromCanvas(["card"], "A.canvas");
+  assert.ok(store.data.items.card);
+  assert.equal(store.data.items.card.content, "Body");
+  assert.deepEqual(store.linkedCanvasNodes(store.data.items.card), [{ canvasPath: "B.canvas", nodeId: "drop" }]);
+  await cleanup();
+});

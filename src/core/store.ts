@@ -202,8 +202,66 @@ export class PaletteStore {
     return locations.filter((location, index, all) => all.findIndex((candidate) => candidate.canvasPath === location.canvasPath && candidate.nodeId === location.nodeId) === index);
   }
 
+  reconcileCanvasLinks(canvasPath: string, existingNodeIds: Set<string>): boolean {
+    let changed = false;
+    for (const item of this.allItems()) {
+      if (item.origin.canvasPath === canvasPath && item.origin.canvasNodeId && !existingNodeIds.has(item.origin.canvasNodeId)) {
+        delete item.origin.canvasPath;
+        delete item.origin.canvasNodeId;
+        changed = true;
+      }
+      for (const placement of item.canvasPlacements.filter((candidate) => candidate.canvasPath === canvasPath)) {
+        const next = placement.nodeIds.filter((nodeId) => existingNodeIds.has(nodeId));
+        if (next.length !== placement.nodeIds.length) { placement.nodeIds = next; changed = true; }
+      }
+      const before = item.canvasPlacements.length;
+      item.canvasPlacements = item.canvasPlacements.filter((placement) => placement.nodeIds.length > 0);
+      if (item.canvasPlacements.length !== before) changed = true;
+      if (!item.origin.canvasPath || !item.origin.canvasNodeId) changed = this.promotePlacement(item) || changed;
+    }
+    const metadata = this.data.canvasNodeMetadata[canvasPath];
+    if (metadata) {
+      for (const nodeId of Object.keys(metadata)) if (!existingNodeIds.has(nodeId)) { delete metadata[nodeId]; changed = true; }
+      if (Object.keys(metadata).length === 0) delete this.data.canvasNodeMetadata[canvasPath];
+    }
+    return changed;
+  }
+
+  unlinkItemsFromCanvas(itemIds: string[], canvasPath: string): void {
+    let changed = false;
+    for (const id of itemIds) {
+      const item = this.data.items[id];
+      if (!item) continue;
+      const linkedNodeIds = this.linkedCanvasNodes(item).filter((location) => location.canvasPath === canvasPath).map((location) => location.nodeId);
+      if (item.origin.canvasPath === canvasPath) { delete item.origin.canvasPath; delete item.origin.canvasNodeId; changed = true; }
+      const before = item.canvasPlacements.length;
+      item.canvasPlacements = item.canvasPlacements.filter((placement) => placement.canvasPath !== canvasPath);
+      if (item.canvasPlacements.length !== before) changed = true;
+      for (const nodeId of linkedNodeIds) this.setMetadataRecord(canvasPath, nodeId, { tags: [], label: "", labelColor: "", caption: "" }, Date.now());
+      this.promotePlacement(item);
+    }
+    if (changed) this.changed();
+  }
+
+  reconcileDeletedFile(path: string): void {
+    let changed = path.toLocaleLowerCase().endsWith(".canvas") ? this.reconcileCanvasLinks(path, new Set()) : false;
+    for (const item of this.allItems()) if (item.origin.filePath === path) { delete item.origin.filePath; changed = true; }
+    if (changed) this.changed();
+  }
+
   private itemHasLinkedNode(item: PaletteItem, canvasPath: string, nodeId: string): boolean {
     return this.linkedCanvasNodes(item).some((location) => location.canvasPath === canvasPath && location.nodeId === nodeId);
+  }
+
+  private promotePlacement(item: PaletteItem): boolean {
+    if (item.origin.canvasPath && item.origin.canvasNodeId) return false;
+    const placement = item.canvasPlacements.find((candidate) => candidate.nodeIds.length > 0);
+    const nodeId = placement?.nodeIds.shift();
+    if (!placement || !nodeId) return false;
+    item.origin.canvasPath = placement.canvasPath;
+    item.origin.canvasNodeId = nodeId;
+    if (placement.nodeIds.length === 0) item.canvasPlacements = item.canvasPlacements.filter((candidate) => candidate !== placement);
+    return true;
   }
 
   private applyItemMetadataToLinkedNodes(item: PaletteItem): void {

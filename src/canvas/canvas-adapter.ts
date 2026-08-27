@@ -125,7 +125,7 @@ export class CanvasAdapter {
     await this.app.vault.modify(file, JSON.stringify(document, null, 2));
   }
 
-  async syncItemsFromCanvas(file: TFile, items: PaletteItem[]): Promise<number> {
+  async syncItemsFromCanvas(file: TFile, items: PaletteItem[]): Promise<{ changedItems: number; nodeIds: Set<string> }> {
     const document = await this.read(file);
     let changed = 0;
     for (const item of items) {
@@ -160,7 +160,7 @@ export class CanvasAdapter {
         }
       }
     }
-    return changed;
+    return { changedItems: changed, nodeIds: new Set(document.nodes.map((node) => node.id)) };
   }
 
   async revealNode(canvasPath: string, nodeId: string): Promise<boolean> {

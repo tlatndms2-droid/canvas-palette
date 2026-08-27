@@ -93,7 +93,7 @@ export class SidePaletteView extends ItemView {
       button.addEventListener("click", () => { this.query = this.plugin.search.setFacet(this.query, "type", active ? null : token); this.render(); });
     }
     const spaces = filters.createEl("button", { text: "Linked spaces", cls: /\bspace:/i.test(this.query) ? "is-active cp-linked-spaces-button" : "cp-linked-spaces-button" });
-    spaces.addEventListener("click", () => new LinkedSpacesModal(this.app, this.items(workspaceId), this.query, (token) => this.plugin.search.hasToken(this.query, token), (token) => { this.query = this.plugin.search.setFacet(this.query, "space", token); this.render(); }).open());
+    spaces.addEventListener("click", () => new LinkedSpacesModal(this.app, this.items(workspaceId), this.query, (token) => this.plugin.search.hasToken(this.query, token), (token) => { this.query = this.plugin.search.setFacet(this.query, "space", token); this.render(); }, (itemIds, path) => this.plugin.store.unlinkItemsFromCanvas(itemIds, path)).open());
     const options = parent.createEl("details", { cls: "cp-view-options" });
     options.open = this.viewSettingsOpen;
     options.addEventListener("toggle", () => { this.viewSettingsOpen = options.open; });
@@ -140,6 +140,10 @@ export class SidePaletteView extends ItemView {
         const compactLimit = Math.round(360 * 14 / this.plugin.store.data.settings.fontSize);
         void this.plugin.preview.render(body, item, true, compactLimit);
       }
+      card.addEventListener("wheel", (event) => {
+        event.preventDefault(); event.stopPropagation();
+        if ((item.type === "card" || item.type === "markdown") && body) body.scrollTop += event.deltaY;
+      }, { passive: false });
     }
     if (listEl.childElementCount === 0) listEl.createDiv({ cls: "cp-empty", text: "No matching items." });
     this.mountViewportSelection(listEl);

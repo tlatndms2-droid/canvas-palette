@@ -60,6 +60,7 @@ export default class CanvasPalettePlugin extends Plugin {
     this.registerEvent(this.app.vault.on("modify", (file) => {
       if (file instanceof TFile && file.extension.toLowerCase() === "canvas") this.scheduleCanvasSync(file);
     }));
+    this.registerEvent(this.app.vault.on("delete", (file) => { if (file instanceof TFile) this.store.reconcileDeletedFile(file.path); }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
       const context = this.canvas.activeContext();
       if (context) { this.miniPalette.mount(); this.scheduleCanvasSync(context.file); }
@@ -249,8 +250,9 @@ export default class CanvasPalettePlugin extends Plugin {
 
   private async syncCanvasFileToPalette(file: TFile): Promise<void> {
     try {
-      const changedItems = await this.canvas.syncItemsFromCanvas(file, this.store.allItems());
-      if (changedItems > 0) {
+      const result = await this.canvas.syncItemsFromCanvas(file, this.store.allItems());
+      const linksChanged = this.store.reconcileCanvasLinks(file.path, result.nodeIds);
+      if (result.changedItems > 0 || linksChanged) {
         this.store.changed();
         for (const item of this.store.allItems()) if (item.type === "card") void this.syncPaletteItemToCanvas(item);
       }
