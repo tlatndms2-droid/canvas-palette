@@ -123,14 +123,15 @@ export class PaletteStore {
     this.changed();
   }
 
-  reorderItems(workspaceId: string, sourceId: string, targetId: string, collectionId: string | null = null): void {
+  reorderItems(workspaceId: string, sourceId: string, targetId: string, insertAfter = false): void {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace || sourceId === targetId) return;
-    const target = collectionId ? this.data.collections[collectionId]?.itemIds : workspace.looseItemIds;
-    if (!target) return;
-    const sourceIndex = target.indexOf(sourceId); const targetIndex = target.indexOf(targetId);
-    if (sourceIndex < 0 || targetIndex < 0) return;
-    target.splice(sourceIndex, 1); target.splice(targetIndex, 0, sourceId);
+    const containers = [workspace.looseItemIds, ...Object.values(this.data.collections).filter((collection) => collection.workspaceId === workspaceId).map((collection) => collection.itemIds)];
+    const target = containers.find((ids) => ids.includes(targetId));
+    if (!target || !containers.some((ids) => ids.includes(sourceId))) return;
+    for (const ids of containers) { const index = ids.indexOf(sourceId); if (index >= 0) ids.splice(index, 1); }
+    const targetIndex = target.indexOf(targetId);
+    target.splice(targetIndex + (insertAfter ? 1 : 0), 0, sourceId);
     this.changed();
   }
 

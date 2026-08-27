@@ -63,7 +63,7 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
         event.dataTransfer.clearData();
         event.dataTransfer.setData("application/x-canvas-palette-item", item.id);
         event.dataTransfer.setData("application/x-canvas-palette-type", item.type);
-        event.dataTransfer.effectAllowed = "copy";
+        event.dataTransfer.effectAllowed = "copyMove";
         event.dataTransfer.setDragImage(card, Math.max(0, Math.min(event.offsetX, card.clientWidth)), Math.max(0, Math.min(event.offsetY, card.clientHeight)));
       }
       card.addClass("is-dragging");

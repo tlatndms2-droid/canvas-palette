@@ -126,10 +126,32 @@ export class SidePaletteView extends ItemView {
     rangeControl("Card height", "cardHeight", 32, 220, 220);
     rangeControl("Preview font size", "fontSize", 8, 14, 14);
     applyViewSettings();
-    listEl.addEventListener("dragover", (event) => { if (event.dataTransfer?.types.includes("application/x-canvas-palette-item")) event.preventDefault(); });
+    const dropIndicator = document.createElement("div"); dropIndicator.className = "cp-drop-indicator";
+    let dropTargetId: string | null = null; let dropAfter = false;
+    const clearDropIndicator = (): void => { dropIndicator.remove(); dropTargetId = null; dropAfter = false; };
+    listEl.addEventListener("dragover", (event) => {
+      if (!event.dataTransfer?.types.includes("application/x-canvas-palette-item")) return;
+      event.preventDefault();
+      if (event.target === dropIndicator) return;
+      const sourceId = event.dataTransfer.getData("application/x-canvas-palette-item");
+      const target = (event.target as HTMLElement).closest<HTMLElement>(".cp-item:not(.is-dragging)");
+      if (target?.dataset.itemId && target.dataset.itemId !== sourceId) {
+        const rect = target.getBoundingClientRect();
+        dropAfter = event.clientY > rect.top + rect.height / 2;
+        dropTargetId = target.dataset.itemId;
+        target.insertAdjacentElement(dropAfter ? "afterend" : "beforebegin", dropIndicator);
+      } else if (event.target === listEl) {
+        const cards = Array.from(listEl.querySelectorAll<HTMLElement>(".cp-item:not(.is-dragging)"));
+        const last = cards.at(-1);
+        if (last?.dataset.itemId) { dropTargetId = last.dataset.itemId; dropAfter = true; last.insertAdjacentElement("afterend", dropIndicator); }
+      }
+    });
+    listEl.addEventListener("dragleave", (event) => { if (!(event.relatedTarget instanceof Node) || !listEl.contains(event.relatedTarget)) clearDropIndicator(); });
+    listEl.addEventListener("dragend", clearDropIndicator);
     listEl.addEventListener("drop", (event) => {
-      const sourceId = event.dataTransfer?.getData("application/x-canvas-palette-item"); const target = (event.target as HTMLElement).closest<HTMLElement>(".cp-item"); const targetId = target?.dataset.itemId;
-      if (sourceId && targetId) { event.preventDefault(); this.plugin.store.reorderItems(workspaceId, sourceId, targetId); }
+      const sourceId = event.dataTransfer?.getData("application/x-canvas-palette-item");
+      if (sourceId && dropTargetId) { event.preventDefault(); const targetId = dropTargetId; const after = dropAfter; clearDropIndicator(); this.plugin.store.reorderItems(workspaceId, sourceId, targetId, after); }
+      else clearDropIndicator();
     });
     const visibleItems = this.plugin.search.filter(this.items(workspaceId), this.query);
     this.visibleItemIds = visibleItems.map((item) => item.id);
@@ -142,7 +164,7 @@ export class SidePaletteView extends ItemView {
       }
       card.addEventListener("wheel", (event) => {
         event.preventDefault(); event.stopPropagation();
-        if ((item.type === "card" || item.type === "markdown") && body) body.scrollTop += event.deltaY;
+        if (selectedIds.includes(item.id) && (item.type === "card" || item.type === "markdown") && body?.contains(event.target as Node)) body.scrollTop += event.deltaY;
       }, { passive: false });
     }
     if (listEl.childElementCount === 0) listEl.createDiv({ cls: "cp-empty", text: "No matching items." });

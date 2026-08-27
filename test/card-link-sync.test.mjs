@@ -105,3 +105,19 @@ test("unlinking a Canvas keeps the Palette item and other linked spaces", async 
   assert.deepEqual(store.linkedCanvasNodes(store.data.items.card), [{ canvasPath: "B.canvas", nodeId: "drop" }]);
   await cleanup();
 });
+
+test("drag reordering inserts an item before or after the highlighted gap", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.data.items.second = { ...store.data.items.card, id: "second", displayTitle: "Second", origin: {}, canvasPlacements: [] };
+  store.data.items.third = { ...store.data.items.card, id: "third", displayTitle: "Third", origin: {}, canvasPlacements: [] };
+  store.data.workspaces.workspace.looseItemIds = ["card", "second", "third"];
+
+  store.reorderItems("workspace", "third", "card", false);
+  assert.deepEqual(store.data.workspaces.workspace.looseItemIds, ["third", "card", "second"]);
+  store.reorderItems("workspace", "third", "second", true);
+  assert.deepEqual(store.data.workspaces.workspace.looseItemIds, ["card", "second", "third"]);
+  await cleanup();
+});
