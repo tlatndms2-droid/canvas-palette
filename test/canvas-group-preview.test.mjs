@@ -11,6 +11,9 @@ test("Group previews use Canvas layout instead of the simplified subgraph", asyn
   assert.match(source, /cp-canvas-snapshot__node/);
   assert.match(source, /cp-canvas-snapshot__edges/);
   assert.match(css, /aspect-ratio:var\(--cp-canvas-aspect\)/);
+  assert.match(source, /--cp-canvas-scale/);
+  assert.match(source, /ResizeObserver/);
+  assert.match(css, /font-size:calc\(16px \* var\(--cp-canvas-scale,1\)\)/);
   assert.match(css, /cp-canvas-snapshot__node--image/);
   assert.doesNotMatch(source, /createDiv\(\{ cls: "cp-subgraph"/);
 });

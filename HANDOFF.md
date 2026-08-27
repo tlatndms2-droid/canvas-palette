@@ -2,12 +2,12 @@
 
 ## Current state
 
-- Version: `0.2.25`.
+- Version: `0.2.26`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.25`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.25`.
-- Latest runtime change: `0.2.25`; Group thumbnails and double-click previews now render the stored Canvas group itself instead of a simplified box diagram. Group frame, title, child cards, Markdown content, images, curved edges, Canvas colors, coordinates, dimensions, and original aspect ratio are shared by both preview sizes.
+- Latest release: `0.2.26`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.26`.
+- Latest runtime change: `0.2.26`; Canvas-style Group previews now measure their actual displayed scale and apply it to text, padding, borders, corner radii, shadows, and Group labels. Text therefore shrinks with its Canvas node instead of remaining at preview UI size and clipping inside the node.
 - Automated baseline: 19 Node tests (including Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
@@ -158,6 +158,8 @@
   - The real Vault was inspected read-only to identify one visible but unlinked dropped node whose content exactly matched the demonstrated Palette Card. After installing `0.2.24`, only that confirmed node was relinked; Metadata, Front/Back, Back content, and the flip control survived plugin reload. A separate Sandbox test deliberately suppressed the Canvas save, ran reconciliation against the older disk file, and confirmed the open runtime node retained its link and complete metadata. Sandbox fixtures were removed and no Canvas Palette errors were captured.
 - `0.2.25` replaces the simplified Group subgraph used by the Side Palette thumbnail and double-click preview with one shared Canvas-style renderer. It preserves the original Group aspect ratio and positions every stored Group frame, text/file/image node, and curved edge from its Canvas coordinates. Text and Markdown file nodes use rendered Markdown, image nodes show their Vault image, and stored Canvas colors are retained.
   - Runtime validation used an existing real-Vault Group read-only after installing the development build. The large preview rendered one Group frame, five child nodes, two images, and one edge at the exact stored `1661:487` ratio (`3.4108`). The Side Palette card used the same renderer and contained the same Group structure. No Vault or Palette content was changed during this visual verification.
+- `0.2.26` fixes oversized and clipped text inside the new Canvas-style Group preview. Each preview observes its rendered size, derives the scale from the stored Canvas bounds, and applies that scale to node typography and spacing in both the Side Palette thumbnail and large double-click preview.
+  - Runtime validation used the same existing real-Vault Group read-only. At a measured preview scale of `0.5873`, the node font changed from the Canvas base `16px` to approximately `9.4px`. A screenshot confirmed the Group title and three text cards stayed within the original node layout instead of rendering at unscaled UI text size. No Vault or Palette content was changed.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 

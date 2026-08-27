@@ -4,9 +4,13 @@ import type { CanvasEdgeSnapshot, CanvasNodeSnapshot, CardFace, GroupSnapshot, P
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 
 export class PreviewService {
+  private readonly groupObservers = new WeakMap<HTMLElement, ResizeObserver>();
+
   constructor(private readonly app: App, private readonly component: Component) {}
 
   async render(parent: HTMLElement, item: PaletteItem, compact = false, compactLimit = 360, face: CardFace = "front"): Promise<void> {
+    this.groupObservers.get(parent)?.disconnect();
+    this.groupObservers.delete(parent);
     parent.empty();
     parent.addClass("cp-preview-content", `cp-preview-content--${item.type}`);
     if (face === "back") {
@@ -39,6 +43,15 @@ export class PreviewService {
     const viewport = parent.createDiv({ cls: `cp-canvas-snapshot${compact ? " is-compact" : " is-large"}` });
     viewport.style.setProperty("--cp-canvas-aspect", `${width} / ${height}`);
     const stage = viewport.createDiv({ cls: "cp-canvas-snapshot__stage" });
+    const updateScale = (): void => {
+      if (!viewport.isConnected) return;
+      const scale = Math.min(stage.clientWidth / width, stage.clientHeight / height);
+      viewport.style.setProperty("--cp-canvas-scale", String(Math.max(scale, .001)));
+    };
+    const observer = new ResizeObserver(updateScale);
+    this.groupObservers.set(parent, observer);
+    observer.observe(viewport);
+    window.requestAnimationFrame(updateScale);
 
     for (const node of snapshot.nodes.filter((candidate) => candidate.type === "group")) {
       const frame = stage.createDiv({ cls: "cp-canvas-snapshot__group" });
