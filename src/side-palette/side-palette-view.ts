@@ -10,6 +10,9 @@ export const SIDE_PALETTE_VIEW = "canvas-palette-side";
 export class SidePaletteView extends ItemView {
   private unsubscribe?: () => void;
   private query = "";
+  private selectionAnchorId: string | null = null;
+  private visibleItemIds: string[] = [];
+  private suppressBlankClick = false;
   private readonly scrollSelectors = [".cp-viewport", ".cp-outliner", ".cp-tag-index", ".cp-label-index"] as const;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: CanvasPalettePlugin) { super(leaf); }
@@ -90,11 +93,14 @@ export class SidePaletteView extends ItemView {
       const sourceId = event.dataTransfer?.getData("application/x-canvas-palette-item"); const target = (event.target as HTMLElement).closest<HTMLElement>(".cp-item"); const targetId = target?.dataset.itemId;
       if (sourceId && targetId) { event.preventDefault(); this.plugin.store.reorderItems(workspaceId, sourceId, targetId); }
     });
-    for (const item of this.plugin.search.filter(this.items(workspaceId), this.query)) {
-      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), onSelect: (event) => this.selectSideItem(item.id, event.ctrlKey || event.metaKey), onOpen: () => void this.plugin.openSideItemPreview(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+    const visibleItems = this.plugin.search.filter(this.items(workspaceId), this.query);
+    this.visibleItemIds = visibleItems.map((item) => item.id);
+    for (const item of visibleItems) {
+      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, onSelect: (event) => this.selectSideItem(item.id, event), onOpen: () => void this.plugin.openSideItemPreview(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
       const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body) void this.plugin.preview.render(body, item, true);
     }
     if (listEl.childElementCount === 0) listEl.createDiv({ cls: "cp-empty", text: "No matching items." });
+    this.mountViewportSelection(listEl);
   }
 
   private renderOutliner(parent: HTMLElement, workspaceId: string): void {
@@ -120,9 +126,10 @@ export class SidePaletteView extends ItemView {
 
   private renderOutlineItem(parent: HTMLElement, item: PaletteItem, depth: number): void {
     const selected = this.sideSelectedIds().includes(item.id);
-    const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${selected ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.setText(`${selected ? "✓ " : ""}${item.type.toUpperCase()}  ${item.displayTitle}`);
+    const showMarker = selected && this.sideSelectedIds().length > 1;
+    const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${selected ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.itemId = item.id; row.setText(`${showMarker ? "✓ " : ""}${item.type.toUpperCase()}  ${item.displayTitle}`);
     let clickTimer: number | null = null;
-    row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.selectSideItem(item.id, event.ctrlKey || event.metaKey); }, 220); });
+    row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.selectSideItem(item.id, event); }, 220); });
     row.addEventListener("dblclick", () => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; void this.plugin.openSideItemPreview(item.id); });
   }
 
@@ -164,7 +171,7 @@ export class SidePaletteView extends ItemView {
   private itemMenu(event: MouseEvent, item: PaletteItem): void {
     event.preventDefault(); const menu = new Menu(); const workspace = this.plugin.activeWorkspace();
     const selected = this.sideSelectedIds(); const targetIds = selected.includes(item.id) ? selected : [item.id];
-    if (!selected.includes(item.id)) this.selectSideItem(item.id, false);
+    if (!selected.includes(item.id)) this.selectSideItem(item.id);
     menu.addItem((entry) => entry.setTitle("Edit metadata").setIcon("tags").onClick(() => new TagLabelModal(this.app, this.plugin, targetIds).open()));
     menu.addItem((entry) => entry.setTitle(`Move ${targetIds.length > 1 ? `${targetIds.length} items` : "to workspace root"}`).setIcon("folder-root").onClick(() => workspace && this.plugin.store.assignItemsToCollection(workspace.id, targetIds, null)));
     if (workspace) for (const collection of Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id)) menu.addItem((entry) => entry.setTitle(`Move to ${collection.name}`).setIcon("folder-input").onClick(() => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collection.id)));
@@ -175,11 +182,75 @@ export class SidePaletteView extends ItemView {
   }
 
   private sideSelectedIds(): string[] { return this.plugin.store.data.uiState.sideSelectedItemIds; }
-  private selectSideItem(id: string, multiple: boolean): void {
+  private selectSideItem(id: string, event?: Pick<MouseEvent | KeyboardEvent, "ctrlKey" | "metaKey" | "shiftKey">): void {
     const selected = this.sideSelectedIds();
-    this.plugin.store.data.uiState.sideSelectedItemIds = multiple ? (selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id]) : [id];
-    this.plugin.store.data.uiState.selectedItemId = id;
+    const toggle = Boolean(event?.ctrlKey || event?.metaKey);
+    let next: string[];
+    if (event?.shiftKey && this.selectionAnchorId) {
+      const anchorIndex = this.visibleItemIds.indexOf(this.selectionAnchorId);
+      const targetIndex = this.visibleItemIds.indexOf(id);
+      const range = anchorIndex >= 0 && targetIndex >= 0 ? this.visibleItemIds.slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1) : [id];
+      next = toggle ? [...new Set([...selected, ...range])] : range;
+    } else if (toggle) {
+      next = selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id];
+      this.selectionAnchorId = id;
+    } else {
+      next = [id];
+      this.selectionAnchorId = id;
+    }
+    this.plugin.store.data.uiState.sideSelectedItemIds = next;
+    this.plugin.store.data.uiState.selectedItemId = next.includes(id) ? id : next.at(-1) ?? null;
     this.plugin.store.changed();
+  }
+  private clearSideSelection(): void {
+    if (this.sideSelectedIds().length === 0) return;
+    this.selectionAnchorId = null;
+    this.plugin.store.data.uiState.sideSelectedItemIds = [];
+    this.plugin.store.data.uiState.selectedItemId = null;
+    this.plugin.store.changed();
+  }
+  private mountViewportSelection(listEl: HTMLElement): void {
+    listEl.addEventListener("click", (event) => {
+      if (this.suppressBlankClick) { this.suppressBlankClick = false; return; }
+      if (event.target === listEl) this.clearSideSelection();
+    });
+    listEl.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || event.target !== listEl) return;
+      event.preventDefault();
+      const start = { x: event.clientX, y: event.clientY };
+      const baseSelection = event.ctrlKey || event.metaKey ? new Set(this.sideSelectedIds()) : new Set<string>();
+      const rectangle = document.createElement("div");
+      rectangle.className = "cp-selection-rectangle";
+      document.body.appendChild(rectangle);
+      let dragged = false;
+      let lastHits: string[] = [];
+      const move = (pointer: PointerEvent): void => {
+        if (Math.hypot(pointer.clientX - start.x, pointer.clientY - start.y) < 4 && !dragged) return;
+        dragged = true;
+        const left = Math.min(start.x, pointer.clientX); const top = Math.min(start.y, pointer.clientY);
+        const right = Math.max(start.x, pointer.clientX); const bottom = Math.max(start.y, pointer.clientY);
+        Object.assign(rectangle.style, { display: "block", left: `${left}px`, top: `${top}px`, width: `${right - left}px`, height: `${bottom - top}px` });
+        lastHits = [];
+        for (const card of Array.from(listEl.querySelectorAll<HTMLElement>(".cp-item"))) {
+          const rect = card.getBoundingClientRect();
+          const hit = rect.right >= left && rect.left <= right && rect.bottom >= top && rect.top <= bottom;
+          card.toggleClass("is-selected", hit || baseSelection.has(card.dataset.itemId ?? ""));
+          if (hit && card.dataset.itemId) lastHits.push(card.dataset.itemId);
+        }
+      };
+      const finish = (): void => {
+        window.removeEventListener("pointermove", move, true); window.removeEventListener("pointerup", finish, true); window.removeEventListener("pointercancel", finish, true); rectangle.remove();
+        this.suppressBlankClick = true;
+        window.setTimeout(() => { this.suppressBlankClick = false; }, 0);
+        if (!dragged) { this.clearSideSelection(); return; }
+        const next = [...new Set([...baseSelection, ...lastHits])];
+        this.plugin.store.data.uiState.sideSelectedItemIds = next;
+        this.plugin.store.data.uiState.selectedItemId = next.at(-1) ?? null;
+        this.selectionAnchorId = next.at(-1) ?? null;
+        this.plugin.store.changed();
+      };
+      window.addEventListener("pointermove", move, true); window.addEventListener("pointerup", finish, true); window.addEventListener("pointercancel", finish, true);
+    });
   }
   private confirmDelete(ids: string[]): void { if (ids.length > 0) new ConfirmDeleteModal(this.app, ids.length, () => this.plugin.store.removeItems(ids)).open(); }
 }

@@ -17,13 +17,13 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
   return button;
 }
 
-export interface ItemRenderOptions { selected: boolean; compact?: boolean; draggable?: boolean; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
+export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
 
 export function renderItem(parent: HTMLElement, item: PaletteItem, options: ItemRenderOptions): HTMLElement {
   const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${options.selected ? " is-selected" : ""}${options.compact ? " is-compact" : ""}` });
   card.dataset.itemId = item.id;
   card.tabIndex = 0;
-  if (options.selected) { const marker = card.createSpan({ cls: "cp-item__selection", attr: { "aria-label": "Selected" } }); setIcon(marker, "check"); }
+  if (options.selected && options.showSelectionMarker !== false) { const marker = card.createSpan({ cls: "cp-item__selection", attr: { "aria-label": "Selected" } }); setIcon(marker, "check"); }
   const header = card.createDiv({ cls: "cp-item__header" });
   const icon = header.createSpan({ cls: "cp-item__icon" });
   setIcon(icon, TYPE_ICON[item.type]);

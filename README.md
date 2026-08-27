@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.2.1**
+Current version: **0.2.2**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
@@ -16,6 +16,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - PDF-aligned docked three-pane Storage layout with independent left/right toggle and divider resize.
 - Side Palette with representative workspaces, search, Card/List Viewport, Outliner, nested collections, Tag Index, Label Index, and independent scroll regions.
 - Side Palette selection keeps the Viewport, Outliner, Tag Index, and Label Index scroll positions stable. The visible selection count and Delete action occupy a fixed status slot, so selecting cards never inserts content that pushes the asset list downward; the redundant batch metadata action is removed.
+- Side Palette selection follows Windows File Explorer conventions: plain click selects one Card, Ctrl/Cmd-click toggles individual Cards, Shift-click selects a visible range, blank-space click clears selection, and dragging from blank grid space draws a live selection rectangle. A single selection uses only the Card border; check markers appear only when two or more Cards are selected.
 - Three independent persisted Side Palette splitters resize Viewport/Outliner width, Upper/Lower height, and Tag/Label width without coupling the two vertical ratios.
 - Side Palette drag-and-drop resolves the stored Palette Item by ID and restores Card content, Markdown/Image file references, or complete Group subgraphs through the target Canvas runtime at the real drop position. Every dropped Card remains another linked instance of the same Palette Item: editing any linked Canvas Card or the Palette content updates all other instances.
 - Item/collection organization: collection creation, nesting, rename, Canvas drag drop, Viewport reorder, multi-selection, batch tag editing, deletion, and move-to-collection actions.
@@ -23,6 +24,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - Side Palette double-click opens the existing native editor for Card/Markdown items and a large preview for Image/Group items. Image previews support mouse-wheel zoom from 20% to 500%.
 - Mini and Side Palette use the same stored Item metadata. Their focused metadata editors support Tags, Label, and Caption without changing the title, content, original file, or Canvas node.
 - Canvas placement history per asset, recorded after drag/drop or export and displayed in Side/Mini Palette cards and the detail popup. Card placement records also participate in synchronization instead of serving as display-only history.
+- Grid captions occupy a dedicated centered row below their Card instead of using negative layout space that can overlap the following Card.
 - Collected Cards remain linked to their original and every subsequently placed Canvas node by Canvas path and Node ID. Card content plus Tags, Label, Label color, and Caption synchronize in both directions across the Palette and all linked Canvas Cards. The linked-Canvas row or context menu still locates and zooms to the original node.
 - Multiple ordinary Canvas nodes are collected as separate Card/Markdown/Image assets. A Group asset is created only when an actual Canvas Group is selected; selecting its boundary automatically captures all contained nodes, internal edges, nested parent references, dimensions, and relative positions.
 - Collection-to-Canvas mind-map export.

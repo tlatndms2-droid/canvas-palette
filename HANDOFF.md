@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.2.1`
+- Version: `0.2.2`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.1`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.2.1.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.1`.
+- Latest release: `0.2.2`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.2.2.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.2`.
 
 ## Start here on another PC
 
@@ -120,6 +120,8 @@
   - Validation ran only in an isolated `Obsidian Sandbox` with 36 disposable Card fixtures. After setting Viewport, Outliner, and Tag Index offsets to 620, 430, and 65 pixels, real DOM single selection, Ctrl multi-selection, and Outliner selection all preserved those exact offsets. The status slot remained 43 pixels before and after selection, `Selected 1/2`, Delete, and Card check markers updated correctly, batch `Edit metadata` was absent, and the captured error log was empty. All disposable Items, selections, collections, pending data, plugin data, and the Sandbox vault were removed afterward.
 - `0.2.1` restores the visible `Selected <count>` text in the fixed Side Palette status slot. The slot no longer receives the global `is-active` class, which had applied the solid Accent background intended for active buttons and made the Accent-colored count text disappear against it. Scroll preservation, fixed slot height, Delete, and selection markers remain unchanged.
   - Validation ran only in an isolated `Obsidian Sandbox` with 20 disposable Card fixtures. In both Light and Dark plugin themes, the count used the same computed foreground color as the panel text, remained visibly sized, and sat on the intended 14% Accent tint instead of a solid Accent fill. The selected state kept a 43-pixel slot, Delete remained visible, batch `Edit metadata` remained absent, and a 420-pixel then 310-pixel Viewport offset survived selection and theme rerenders exactly. The captured error log was empty and all fixtures and the Sandbox vault were removed afterward.
+- `0.2.2` adopts Windows File Explorer selection behavior in the Side Palette Viewport. Plain click selects one Card, Ctrl/Cmd-click toggles individual Cards, Shift-click selects the visible range from the anchor, blank-space click clears selection, and a pointer drag beginning only on blank grid space draws a live selection rectangle; Ctrl/Cmd-drag adds its hits to the existing selection. Single selection uses border emphasis without a check marker, while multi-selection shows markers on every selected Card and matching Outliner rows. Card-origin drag continues to use the existing Canvas payload path. Grid Caption layout now reserves 24 pixels below the Card and centers the Caption there instead of collapsing that space with a negative margin.
+  - Validation ran only in an isolated `Obsidian Sandbox` with 16 disposable captioned Card fixtures. Real click events produced one selected Card with zero markers, Ctrl-click produced two Cards with two markers, Shift-click selected the four-Card visible range from the Ctrl-updated anchor, and blank-grid click cleared all selection while the 380-pixel Viewport offset remained exact. A real pointer sequence showed a visible selection rectangle and three live-highlighted Cards before pointer-up; release persisted those three, and Ctrl-pointer-drag added two more. Outliner check counts matched multi-selection. Caption and Card centers were identical, the Card reserved a 24-pixel bottom margin, and the rendered Caption ended 13 pixels before the next Card. A real Card dragstart still wrote the Card ID/type Palette payload and did not invoke marquee selection. The captured error log was empty and all fixtures and the Sandbox vault were removed afterward.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
