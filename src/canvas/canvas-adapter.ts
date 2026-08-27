@@ -1,5 +1,6 @@
 import { App, Notice, TFile, normalizePath } from "obsidian";
 import { createId } from "../core/ids";
+import { SerialTaskQueue } from "../core/serial-task-queue";
 import type { CanvasEdgeSnapshot, CanvasNodeSnapshot, PaletteItem, PaletteItemType, PaletteMetadata } from "../core/types";
 import { restoreGroup, serializeGroup } from "./group-serializer";
 
@@ -32,6 +33,8 @@ export interface CanvasContext { file: TFile; view: CanvasViewLike; runtime: Can
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 
 export class CanvasAdapter {
+  private readonly restoreQueue = new SerialTaskQueue();
+
   constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined, private readonly restoreNodeBack: (canvasPath: string, nodeId: string, backContent: string) => void) {}
 
   activeContext(): CanvasContext | null {
@@ -251,7 +254,7 @@ export class CanvasAdapter {
     if (!context) { new Notice("Open a Canvas before dropping an item."); return false; }
     const point = context.runtime.posFromClient?.({ x: screenX, y: screenY });
     if (!point) { new Notice("Unable to calculate the Canvas drop position."); return false; }
-    return this.restoreToRuntime(context, item, point);
+    return this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, item, point));
   }
 
   async restoreItemFromDrop(item: PaletteItem, event: DragEvent): Promise<boolean> {
@@ -259,7 +262,7 @@ export class CanvasAdapter {
     if (!context) return false;
     const point = context.runtime.posFromEvt?.(event);
     if (!point) { new Notice("Unable to calculate the Canvas drop position."); return false; }
-    return this.restoreToRuntime(context, item, point);
+    return this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, item, point));
   }
 
   async exportCollection(name: string, nodes: Array<{ id: string; name: string; depth: number; item?: PaletteItem }>): Promise<TFile | null> {
@@ -423,13 +426,13 @@ export class CanvasAdapter {
     }
     try {
       await context.runtime.setData(document);
-      context.runtime.requestSave?.();
     } catch (error) {
       console.error("Canvas Palette failed to restore an item", error);
       new Notice(`Unable to add ${item.displayTitle} to Canvas.`);
       return false;
     }
     this.onRestored(item.id, context.file.path, restoredNodeIds);
+    context.runtime.requestSave?.();
     new Notice(`${item.displayTitle} added to Canvas`);
     return true;
   }
