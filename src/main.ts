@@ -20,7 +20,7 @@ export default class CanvasPalettePlugin extends Plugin {
   private readonly canvasSyncTimers = new Map<string, number>();
   store = new PaletteStore(this);
   search = new SearchService();
-  canvas = new CanvasAdapter(this.app, (itemId, canvasPath, nodeIds) => this.store.recordCanvasPlacement(itemId, canvasPath, nodeIds), (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId));
+  canvas = new CanvasAdapter(this.app, (itemId, canvasPath, nodeIds) => this.store.recordCanvasPlacement(itemId, canvasPath, nodeIds), (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId), (canvasPath, nodeId, backContent) => this.store.setCanvasNodeBack(canvasPath, nodeId, backContent));
   canvasMetadata = new CanvasMetadataController(this, this.canvas);
   canvasToolbar = new CanvasNodeToolbarController(this.canvas, {
     editMetadata: (nodes) => this.editCanvasNodesMetadata(nodes),
@@ -112,7 +112,7 @@ export default class CanvasPalettePlugin extends Plugin {
 
   async createMemo(): Promise<void> {
     const now = Date.now();
-    const item: PaletteItem = { id: createId("card"), type: "card", displayTitle: "New memo", tags: [], label: "", caption: "", createdAt: now, modifiedAt: now, origin: {}, canvasPlacements: [], content: "" };
+    const item: PaletteItem = { id: createId("card"), type: "card", displayTitle: "New memo", tags: [], label: "", caption: "", backContent: "", createdAt: now, modifiedAt: now, origin: {}, canvasPlacements: [], content: "" };
     this.store.addPending(item);
     const workspace = this.activeWorkspace();
     if (workspace) this.store.importPending(workspace.id, [item.id]);
@@ -127,7 +127,7 @@ export default class CanvasPalettePlugin extends Plugin {
 
   collectText(text: string, sourcePath?: string, textRange?: { from: { line: number; ch: number }; to: { line: number; ch: number } }): void {
     const now = Date.now();
-    this.store.addPending({ id: createId("card"), type: "card", displayTitle: text.split(/\r?\n/, 1)[0].slice(0, 60) || "Text scrap", tags: [], label: "", caption: "Text scrap", createdAt: now, modifiedAt: now, origin: { filePath: sourcePath, textRange }, canvasPlacements: [], content: text });
+    this.store.addPending({ id: createId("card"), type: "card", displayTitle: text.split(/\r?\n/, 1)[0].slice(0, 60) || "Text scrap", tags: [], label: "", caption: "Text scrap", backContent: "", createdAt: now, modifiedAt: now, origin: { filePath: sourcePath, textRange }, canvasPlacements: [], content: text });
     new Notice("Text collected in Mini Palette");
   }
 
@@ -184,7 +184,7 @@ export default class CanvasPalettePlugin extends Plugin {
 
   private textItem(text: string, canvasPath: string, textRange: { from: { line: number; ch: number }; to: { line: number; ch: number } }): PaletteItem {
     const now = Date.now();
-    return { id: createId("card"), type: "card", displayTitle: text.split(/\r?\n/, 1)[0].slice(0, 60) || "Text scrap", tags: [], label: "", caption: "Text scrap", createdAt: now, modifiedAt: now, origin: { canvasPath, textRange }, canvasPlacements: [], content: text };
+    return { id: createId("card"), type: "card", displayTitle: text.split(/\r?\n/, 1)[0].slice(0, 60) || "Text scrap", tags: [], label: "", caption: "Text scrap", backContent: "", createdAt: now, modifiedAt: now, origin: { canvasPath, textRange }, canvasPlacements: [], content: text };
   }
 
   private collectCanvasTextToMini(text: string, canvasPath: string, textRange: { from: { line: number; ch: number }; to: { line: number; ch: number } }): void {

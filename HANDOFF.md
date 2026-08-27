@@ -2,13 +2,13 @@
 
 ## Current state
 
-- Version: `0.2.15`.
+- Version: `0.2.16`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.15`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.15`.
-- Latest runtime change: `0.2.15`; selected Card/Markdown previews constrain both standard iframe/video embeds and MX-style Shadow DOM players to the actual Viewport width as complete 16:9 media blocks, with media scroll snapping.
-- Automated baseline: 8 Node tests (Card link synchronization, link reconciliation/unlinking, viewport reorder, Obsidian-like search, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
+- Latest release: `0.2.16`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.16`.
+- Latest runtime change: `0.2.16`; Card/Markdown/Image/Group now share a persisted Back Markdown surface across every linked placement. Canvas, Side, and Mini use a 22px local flip control, native Live Preview editing, and location-local current-face state. Canvas `Unlink from Palette` preserves Front, Back, Metadata, and current face while permanently detaching that node.
+- Automated baseline: 10 Node tests (including Back synchronization, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
 

@@ -1,7 +1,7 @@
 import type CanvasPalettePlugin from "../main";
 import { DEFAULT_SIDE_LAYOUT, migrateData } from "./defaults";
 import { createId } from "./ids";
-import type { Collection, PaletteData, PaletteItem, PaletteMetadata, PaletteWorkspace } from "./types";
+import type { CardFace, Collection, PaletteData, PaletteItem, PaletteMetadata, PaletteWorkspace } from "./types";
 
 type Listener = () => void;
 
@@ -85,7 +85,7 @@ export class PaletteStore {
     this.changed();
   }
 
-  updateItem(id: string, changes: Pick<PaletteItem, "displayTitle" | "tags" | "label" | "caption"> & Partial<Pick<PaletteItem, "content" | "labelColor">>): void {
+  updateItem(id: string, changes: Pick<PaletteItem, "displayTitle" | "tags" | "label" | "caption"> & Partial<Pick<PaletteItem, "content" | "backContent" | "labelColor">>): void {
     const item = this.data.items[id];
     if (!item) return;
     Object.assign(item, changes, { modifiedAt: Date.now() });
@@ -94,8 +94,23 @@ export class PaletteStore {
     void this.plugin.syncPaletteItemToCanvas(item);
   }
 
+  setItemBack(id: string, backContent: string): void {
+    const item = this.data.items[id];
+    if (!item || item.backContent === backContent) return;
+    this.updateItem(id, { displayTitle: item.displayTitle, tags: item.tags, label: item.label, labelColor: item.labelColor, caption: item.caption, backContent });
+  }
+
+  setPaletteFace(location: "side" | "mini", itemId: string, face: CardFace): void {
+    (location === "side" ? this.data.uiState.sideItemFaces : this.data.uiState.miniItemFaces)[itemId] = face;
+    this.changed();
+  }
+
   getCanvasNodeMetadata(canvasPath: string, nodeId: string): PaletteMetadata | undefined {
     return this.data.canvasNodeMetadata[canvasPath]?.[nodeId];
+  }
+
+  linkedItemForNode(canvasPath: string, nodeId: string): PaletteItem | undefined {
+    return this.allItems().find((item) => this.itemHasLinkedNode(item, canvasPath, nodeId));
   }
 
   setCanvasNodeMetadata(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">): void {
@@ -114,6 +129,38 @@ export class PaletteStore {
     }
     this.changed();
     for (const item of linkedItems) void this.plugin.syncPaletteItemToCanvas(item);
+  }
+
+  setCanvasNodeBack(canvasPath: string, nodeId: string, backContent: string): void {
+    const current = this.canvasNodeState(canvasPath, nodeId);
+    const modifiedAt = Date.now();
+    this.setMetadataRecord(canvasPath, nodeId, { ...current, backContent }, modifiedAt);
+    const linkedItems = Object.values(this.data.items).filter((item) => this.itemHasLinkedNode(item, canvasPath, nodeId));
+    for (const item of linkedItems) {
+      item.backContent = backContent;
+      item.modifiedAt = modifiedAt;
+      this.applyItemMetadataToLinkedNodes(item);
+    }
+    this.changed();
+  }
+
+  setCanvasNodeFace(canvasPath: string, nodeId: string, currentFace: CardFace): void {
+    const current = this.canvasNodeState(canvasPath, nodeId);
+    this.setMetadataRecord(canvasPath, nodeId, { ...current, currentFace }, current.modifiedAt);
+    this.changed();
+  }
+
+  unlinkCanvasNode(canvasPath: string, nodeId: string): boolean {
+    const item = this.allItems().find((candidate) => this.itemHasLinkedNode(candidate, canvasPath, nodeId));
+    if (!item) return false;
+    const current = this.canvasNodeState(canvasPath, nodeId);
+    this.setMetadataRecord(canvasPath, nodeId, { ...current, tags: [...item.tags], label: item.label, labelColor: item.labelColor ?? "", caption: item.caption, backContent: item.backContent }, item.modifiedAt);
+    if (item.origin.canvasPath === canvasPath && item.origin.canvasNodeId === nodeId) { delete item.origin.canvasPath; delete item.origin.canvasNodeId; }
+    for (const placement of item.canvasPlacements) if (placement.canvasPath === canvasPath) placement.nodeIds = placement.nodeIds.filter((id) => id !== nodeId);
+    item.canvasPlacements = item.canvasPlacements.filter((placement) => placement.nodeIds.length > 0);
+    this.promotePlacement(item);
+    this.changed();
+    return true;
   }
 
   addLabelColorPreset(color: string): void {
@@ -197,9 +244,7 @@ export class PaletteStore {
   linkedCanvasNodes(item: PaletteItem): Array<{ canvasPath: string; nodeId: string }> {
     const locations: Array<{ canvasPath: string; nodeId: string }> = [];
     if (item.origin.canvasPath && item.origin.canvasNodeId) locations.push({ canvasPath: item.origin.canvasPath, nodeId: item.origin.canvasNodeId });
-    if (item.type !== "group") {
-      for (const placement of item.canvasPlacements) for (const nodeId of placement.nodeIds) locations.push({ canvasPath: placement.canvasPath, nodeId });
-    }
+    for (const placement of item.canvasPlacements) for (const nodeId of placement.nodeIds) locations.push({ canvasPath: placement.canvasPath, nodeId });
     return locations.filter((location, index, all) => all.findIndex((candidate) => candidate.canvasPath === location.canvasPath && candidate.nodeId === location.nodeId) === index);
   }
 
@@ -266,12 +311,21 @@ export class PaletteStore {
   }
 
   private applyItemMetadataToLinkedNodes(item: PaletteItem): void {
-    const normalized = { tags: [...new Set(item.tags)], label: item.label, labelColor: item.label ? item.labelColor ?? "" : "", caption: item.caption };
-    for (const location of this.linkedCanvasNodes(item)) this.setMetadataRecord(location.canvasPath, location.nodeId, normalized, item.modifiedAt);
+    const normalized = { tags: [...new Set(item.tags)], label: item.label, labelColor: item.label ? item.labelColor ?? "" : "", caption: item.caption, backContent: item.backContent };
+    for (const location of this.linkedCanvasNodes(item)) {
+      const currentFace = this.data.canvasNodeMetadata[location.canvasPath]?.[location.nodeId]?.currentFace ?? "front";
+      this.setMetadataRecord(location.canvasPath, location.nodeId, { ...normalized, currentFace }, item.modifiedAt);
+    }
   }
 
-  private setMetadataRecord(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">, modifiedAt: number): void {
-    const isEmpty = metadata.tags.length === 0 && !metadata.label && !metadata.caption;
+  private canvasNodeState(canvasPath: string, nodeId: string): PaletteMetadata {
+    return this.data.canvasNodeMetadata[canvasPath]?.[nodeId] ?? { tags: [], label: "", labelColor: "", caption: "", backContent: "", currentFace: "front", modifiedAt: Date.now() };
+  }
+
+  private setMetadataRecord(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption"> & Partial<Pick<PaletteMetadata, "backContent" | "currentFace">>, modifiedAt: number): void {
+    const previous = this.data.canvasNodeMetadata[canvasPath]?.[nodeId];
+    const record: PaletteMetadata = { tags: metadata.tags, label: metadata.label, labelColor: metadata.labelColor, caption: metadata.caption, backContent: metadata.backContent ?? previous?.backContent ?? "", currentFace: metadata.currentFace ?? previous?.currentFace ?? "front", modifiedAt };
+    const isEmpty = record.tags.length === 0 && !record.label && !record.caption && !record.backContent && record.currentFace === "front";
     if (isEmpty) {
       const canvas = this.data.canvasNodeMetadata[canvasPath];
       if (!canvas) return;
@@ -280,7 +334,7 @@ export class PaletteStore {
       return;
     }
     const canvas = this.data.canvasNodeMetadata[canvasPath] ??= {};
-    canvas[nodeId] = { ...metadata, modifiedAt };
+    canvas[nodeId] = record;
   }
 
   itemsForWorkspace(workspaceId: string | null, includeCollections = true): PaletteItem[] {
@@ -309,6 +363,7 @@ export class PaletteStore {
     for (const workspace of Object.values(this.data.workspaces)) workspace.looseItemIds = workspace.looseItemIds.filter((id) => !itemIds.includes(id));
     for (const collection of Object.values(this.data.collections)) collection.itemIds = collection.itemIds.filter((id) => !itemIds.includes(id));
     this.data.uiState.sideSelectedItemIds = this.data.uiState.sideSelectedItemIds.filter((id) => !itemIds.includes(id));
+    for (const id of itemIds) { delete this.data.uiState.sideItemFaces[id]; delete this.data.uiState.miniItemFaces[id]; }
     this.data.uiState.miniPalette.selectedItemIds = this.data.uiState.miniPalette.selectedItemIds.filter((id) => !itemIds.includes(id));
     if (this.data.uiState.selectedItemId && itemIds.includes(this.data.uiState.selectedItemId)) this.data.uiState.selectedItemId = null;
     this.changed();

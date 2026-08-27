@@ -3,14 +3,14 @@ import type { PaletteData, SideLayoutState } from "./types";
 export const DEFAULT_SIDE_LAYOUT: SideLayoutState = { viewportRatio: 0.52, topRatio: 0.69, indexRatio: 0.5, viewMode: "grid" };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
   collections: {},
   pendingItemIds: [],
   canvasNodeMetadata: {},
-  uiState: { activeWorkspaceId: null, selectedItemId: null, sideSelectedItemIds: [], quickEditor: { x: null, y: null, width: null, height: null }, miniPalette: {
+  uiState: { activeWorkspaceId: null, selectedItemId: null, sideSelectedItemIds: [], sideItemFaces: {}, miniItemFaces: {}, quickEditor: { x: null, y: null, width: null, height: null }, miniPalette: {
     tab: "collect", isOpen: false, position: { x: 24, y: 62 }, size: { width: 1120, height: 720 },
     leftPaneOpen: true, rightPaneOpen: true, leftPaneWidth: 248, rightPaneWidth: 310,
     viewMode: "grid", sort: "modified-desc", selectedItemIds: []
@@ -31,18 +31,20 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 6,
-    items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => [id, { ...item, labelColor: item.labelColor ?? "", canvasPlacements: item.canvasPlacements ?? [] }])),
+    schemaVersion: 7,
+    items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => [id, { ...item, backContent: item.backContent ?? "", labelColor: item.labelColor ?? "", canvasPlacements: item.canvasPlacements ?? [] }])),
     workspaces,
     collections: raw.collections ?? {},
     pendingItemIds: raw.pendingItemIds ?? [],
     canvasNodeMetadata: Object.fromEntries(Object.entries(raw.canvasNodeMetadata ?? {}).map(([canvasPath, nodes]) => [canvasPath,
-      Object.fromEntries(Object.entries(nodes).map(([nodeId, metadata]) => [nodeId, { ...metadata, labelColor: metadata.labelColor ?? "" }]))
+      Object.fromEntries(Object.entries(nodes).map(([nodeId, metadata]) => [nodeId, { ...metadata, backContent: metadata.backContent ?? "", currentFace: metadata.currentFace ?? "front", labelColor: metadata.labelColor ?? "" }]))
     ])),
     uiState: {
       ...DEFAULT_DATA.uiState,
       ...legacyUi,
       sideSelectedItemIds: legacyUi.sideSelectedItemIds ?? [],
+      sideItemFaces: legacyUi.sideItemFaces ?? {},
+      miniItemFaces: legacyUi.miniItemFaces ?? {},
       quickEditor: { ...DEFAULT_DATA.uiState.quickEditor, ...legacyUi.quickEditor },
       miniPalette: {
       ...DEFAULT_DATA.uiState.miniPalette, ...legacyUi.miniPalette,

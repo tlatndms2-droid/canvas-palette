@@ -130,12 +130,13 @@ export class SidePaletteView extends ItemView {
     const visibleItems = this.plugin.search.filter(this.items(workspaceId), this.query);
     this.visibleItemIds = visibleItems.map((item) => item.id);
     for (const item of visibleItems) {
-      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, onSelect: (event) => this.selectSideItem(item.id, event), onOpen: () => void this.plugin.openSideItemPreview(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+      const face = this.plugin.store.data.uiState.sideItemFaces[item.id] ?? "front";
+      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, currentFace: face, onToggleFace: (next) => this.plugin.store.setPaletteFace("side", item.id, next), onSelect: (event) => this.selectSideItem(item.id, event), onOpen: () => face === "back" ? void this.plugin.editorManager.openBack(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
       const body = card.querySelector<HTMLElement>(".cp-item__body");
       if (body) {
         const compactLimit = Math.round(360 * 14 / this.plugin.store.data.settings.fontSize);
-        const canBrowseFullBody = selectedIds.includes(item.id) && (item.type === "card" || item.type === "markdown");
-        void this.plugin.preview.render(body, item, true, canBrowseFullBody ? Number.MAX_SAFE_INTEGER : compactLimit);
+        const canBrowseFullBody = selectedIds.includes(item.id) && (face === "back" || item.type === "card" || item.type === "markdown");
+        void this.plugin.preview.render(body, item, true, canBrowseFullBody ? Number.MAX_SAFE_INTEGER : compactLimit, face);
         if (canBrowseFullBody) this.mountBodyDragScroll(card, body);
       }
       card.addEventListener("wheel", (event) => {

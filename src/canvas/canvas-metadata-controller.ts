@@ -1,3 +1,4 @@
+import { MarkdownRenderer, Menu, Notice, setIcon } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { PaletteMetadata } from "../core/types";
 import type { CanvasAdapter, CanvasRuntimeNodeLike } from "./canvas-adapter";
@@ -6,6 +7,7 @@ export class CanvasMetadataController {
   private timer: number | null = null;
   private readonly nodesByElement = new WeakMap<Element, CanvasRuntimeNodeLike>();
   private readonly activeEditors = new WeakSet<HTMLElement>();
+  private readonly contextBound = new WeakSet<HTMLElement>();
   private readonly resizeObserver = new ResizeObserver((entries) => {
     for (const entry of entries) {
       const node = this.nodesByElement.get(entry.target);
@@ -44,43 +46,71 @@ export class CanvasMetadataController {
     const activeEditor = nodeEl.querySelector<HTMLElement>(":scope > .cp-canvas-metadata .cp-canvas-metadata__editor");
     if (activeEditor && this.activeEditors.has(activeEditor)) return;
     this.remove(node);
-    if (!metadata || (metadata.tags.length === 0 && !metadata.label && !metadata.caption)) return;
+    const state = metadata ?? { tags: [], label: "", labelColor: "", caption: "", backContent: "", currentFace: "front" as const, modifiedAt: Date.now() };
     const data = node.getData?.();
     const type = data?.type ?? "unknown";
     nodeEl.addClass("cp-canvas-has-metadata", `cp-canvas-has-metadata--${type}`);
     const layer = nodeEl.createDiv({ cls: `cp-canvas-metadata cp-canvas-metadata--${type}`, attr: { "aria-label": "Canvas Palette metadata" } });
-    if (metadata.label) {
+    const flip = layer.createEl("button", { cls: "clickable-icon cp-canvas-face-toggle", attr: { type: "button", "aria-label": state.currentFace === "front" ? "Show back" : "Show front", title: state.currentFace === "front" ? "Show back" : "Show front" } });
+    setIcon(flip, "refresh-cw");
+    flip.addEventListener("pointerdown", (event) => event.stopPropagation());
+    flip.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); this.plugin.store.setCanvasNodeFace(canvasPath, nodeId, state.currentFace === "front" ? "back" : "front"); });
+    if (state.currentFace === "back") {
+      nodeEl.addClass("cp-canvas-showing-back");
+      const back = layer.createDiv({ cls: "cp-canvas-back markdown-rendered", attr: { title: "Double-click to edit the back" } });
+      void MarkdownRenderer.render(this.plugin.app, state.backContent, back, canvasPath, this.plugin).then(() => {
+        if (!state.backContent) back.createDiv({ cls: "cp-empty", text: "Write on the back…" });
+      });
+      back.addEventListener("pointerdown", (event) => event.stopPropagation());
+      back.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); void this.plugin.editorManager.openCanvasBack(canvasPath, nodeId, data?.label ?? data?.text?.split(/\r?\n/, 1)[0] ?? "Canvas node"); });
+    }
+    if (state.label) {
       const header = layer.createDiv({ cls: "cp-canvas-metadata__header" });
-      const label = header.createDiv({ cls: "cp-canvas-metadata__label", text: metadata.label });
-      if (metadata.labelColor) label.style.setProperty("--cp-label-color", metadata.labelColor);
-      this.makeInlineEditable(label, "Edit label", metadata.label, (value) => {
+      const label = header.createDiv({ cls: "cp-canvas-metadata__label", text: state.label });
+      if (state.labelColor) label.style.setProperty("--cp-label-color", state.labelColor);
+      this.makeInlineEditable(label, "Edit label", state.label, (value) => {
         this.saveMetadata(canvasPath, nodeId, { label: value });
       });
     }
-    const footer = layer.createDiv({ cls: "cp-canvas-metadata__footer" });
-    const tags = footer.createDiv({ cls: "cp-canvas-metadata__tags" });
-    for (const [index, tag] of metadata.tags.entries()) {
-      const tagEl = tags.createSpan({ cls: "cp-canvas-metadata__tag", text: `#${tag}` });
-      this.makeInlineEditable(tagEl, "Edit tag", tag, (value) => {
-        const current = this.plugin.store.getCanvasNodeMetadata(canvasPath, nodeId);
-        if (!current) return;
-        const nextTags = [...current.tags];
-        const normalized = value.trim().replace(/^#/, "");
-        if (normalized) nextTags[index] = normalized;
-        else nextTags.splice(index, 1);
-        this.saveMetadata(canvasPath, nodeId, { tags: [...new Set(nextTags)] });
-      });
+    if (state.tags.length > 0 || state.label || state.caption) {
+      const footer = layer.createDiv({ cls: "cp-canvas-metadata__footer" });
+      const tags = footer.createDiv({ cls: "cp-canvas-metadata__tags" });
+      for (const [index, tag] of state.tags.entries()) {
+        const tagEl = tags.createSpan({ cls: "cp-canvas-metadata__tag", text: `#${tag}` });
+        this.makeInlineEditable(tagEl, "Edit tag", tag, (value) => {
+          const current = this.plugin.store.getCanvasNodeMetadata(canvasPath, nodeId);
+          if (!current) return;
+          const nextTags = [...current.tags];
+          const normalized = value.trim().replace(/^#/, "");
+          if (normalized) nextTags[index] = normalized;
+          else nextTags.splice(index, 1);
+          this.saveMetadata(canvasPath, nodeId, { tags: [...new Set(nextTags)] });
+        });
+      }
+      footer.createDiv({ cls: "cp-canvas-metadata__date", text: new Date(state.modifiedAt).toLocaleDateString() });
     }
-    footer.createDiv({ cls: "cp-canvas-metadata__date", text: new Date(metadata.modifiedAt).toLocaleDateString() });
-    if (metadata.caption) {
-      const caption = layer.createDiv({ cls: "cp-canvas-metadata__caption", text: metadata.caption });
-      this.makeInlineEditable(caption, "Edit caption", metadata.caption, (value) => {
+    if (state.caption) {
+      const caption = layer.createDiv({ cls: "cp-canvas-metadata__caption", text: state.caption });
+      this.makeInlineEditable(caption, "Edit caption", state.caption, (value) => {
         this.saveMetadata(canvasPath, nodeId, { caption: value });
       });
     }
     this.nodesByElement.set(nodeEl, node);
     this.resizeObserver.observe(nodeEl);
     this.updateScale(node);
+    if (!this.contextBound.has(nodeEl)) {
+      this.contextBound.add(nodeEl);
+      nodeEl.addEventListener("contextmenu", (event) => {
+        if (!this.plugin.store.linkedItemForNode(canvasPath, nodeId)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const menu = new Menu();
+        menu.addItem((item) => item.setTitle("Unlink from Palette").setIcon("unlink").onClick(() => {
+          if (this.plugin.store.unlinkCanvasNode(canvasPath, nodeId)) new Notice("Canvas node unlinked from Palette. Its Front, Back, and Metadata were preserved.");
+        }));
+        menu.showAtMouseEvent(event);
+      });
+    }
   }
 
   private makeInlineEditable(element: HTMLElement, label: string, value: string, onCommit: (value: string) => void): void {
@@ -143,6 +173,7 @@ export class CanvasMetadataController {
     if (!(nodeEl instanceof HTMLElement)) return;
     this.resizeObserver.unobserve(nodeEl);
     nodeEl.removeClass("cp-canvas-has-metadata", "cp-canvas-has-metadata--text", "cp-canvas-has-metadata--file", "cp-canvas-has-metadata--group", "cp-canvas-has-metadata--unknown");
+    nodeEl.removeClass("cp-canvas-showing-back");
     nodeEl.querySelector(":scope > .cp-canvas-metadata")?.remove();
     nodeEl.style.removeProperty("--cp-canvas-meta-scale");
   }

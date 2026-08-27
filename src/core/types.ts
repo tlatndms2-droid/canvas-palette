@@ -2,11 +2,12 @@ export type PaletteItemType = "card" | "markdown" | "image" | "group";
 export type PaletteTheme = "obsidian" | "light" | "dark";
 export type AccentMode = "obsidian" | "custom";
 export type AssetViewMode = "grid" | "list";
+export type CardFace = "front" | "back";
 
 export interface TextSourceRange { from: { line: number; ch: number }; to: { line: number; ch: number }; }
 export interface ItemOrigin { canvasPath?: string; canvasNodeId?: string; workspaceId?: string; filePath?: string; textRange?: TextSourceRange; }
 export interface CanvasPlacement { canvasPath: string; nodeIds: string[]; placedAt: number; }
-export interface PaletteMetadata { tags: string[]; label: string; labelColor?: string; caption: string; modifiedAt: number; }
+export interface PaletteMetadata { tags: string[]; label: string; labelColor?: string; caption: string; backContent: string; currentFace: CardFace; modifiedAt: number; }
 
 export interface CanvasNodeSnapshot {
   id: string;
@@ -34,7 +35,7 @@ export interface CanvasEdgeSnapshot {
   [key: string]: unknown;
 }
 
-export interface GroupSnapshot { bounds: { width: number; height: number }; nodes: CanvasNodeSnapshot[]; edges: CanvasEdgeSnapshot[]; }
+export interface GroupSnapshot { bounds: { width: number; height: number }; nodes: CanvasNodeSnapshot[]; edges: CanvasEdgeSnapshot[]; nodeBacks?: Record<string, string>; }
 
 export interface PaletteItem {
   id: string;
@@ -49,6 +50,7 @@ export interface PaletteItem {
   origin: ItemOrigin;
   canvasPlacements: CanvasPlacement[];
   content?: string;
+  backContent: string;
   group?: GroupSnapshot;
 }
 
@@ -95,6 +97,8 @@ export interface UIState {
   activeWorkspaceId: string | null;
   selectedItemId: string | null;
   sideSelectedItemIds: string[];
+  sideItemFaces: Record<string, CardFace>;
+  miniItemFaces: Record<string, CardFace>;
   quickEditor: QuickEditorGeometry;
   miniPalette: MiniPaletteState;
 }

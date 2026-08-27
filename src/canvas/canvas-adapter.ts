@@ -23,7 +23,7 @@ export interface CanvasContext { file: TFile; view: CanvasViewLike; runtime: Can
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 
 export class CanvasAdapter {
-  constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined) {}
+  constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined, private readonly restoreNodeBack: (canvasPath: string, nodeId: string, backContent: string) => void) {}
 
   activeContext(): CanvasContext | null {
     const leaf = this.app.workspace.activeLeaf;
@@ -208,6 +208,7 @@ export class CanvasAdapter {
     const edges: CanvasEdgeSnapshot[] = [];
     const anchors = new Map<string, string>();
     const restoredByItem = new Map<string, string[]>();
+    const restoredBacks: Array<{ nodeId: string; backContent: string }> = [];
     const rowByDepth = new Map<number, number>();
     for (const entry of nodes) {
       const row = rowByDepth.get(entry.depth) ?? 0;
@@ -220,7 +221,12 @@ export class CanvasAdapter {
         const ids = snapshot.nodes.map((node) => node.id);
         const anchor = snapshot.nodes.find((node) => node.type === "group")?.id ?? ids[0];
         if (anchor) anchors.set(entry.id, anchor);
-        restoredByItem.set(entry.item.id, ids);
+        restoredByItem.set(entry.item.id, snapshot.nodes.filter((node) => node.type === "group").map((node) => node.id));
+        for (let index = 0; index < entry.item.group.nodes.length; index++) {
+          const backContent = entry.item.group.nodeBacks?.[entry.item.group.nodes[index].id];
+          const restored = snapshot.nodes[index];
+          if (backContent && restored) restoredBacks.push({ nodeId: restored.id, backContent });
+        }
       } else {
         const node = entry.item
           ? this.nodeForItem(entry.item, position.x, position.y)
@@ -237,6 +243,7 @@ export class CanvasAdapter {
     }
     const file = await this.app.vault.create(path, JSON.stringify({ nodes: canvasNodes, edges }, null, 2));
     for (const [itemId, nodeIds] of restoredByItem) this.onRestored(itemId, file.path, nodeIds);
+    for (const state of restoredBacks) this.restoreNodeBack(file.path, state.nodeId, state.backContent);
     new Notice(`Collection exported to ${file.name}`);
     return file;
   }
@@ -244,7 +251,7 @@ export class CanvasAdapter {
   private async itemFromNode(node: CanvasNodeSnapshot, canvasPath: string): Promise<PaletteItem> {
     const now = Date.now();
     const metadata = this.getMetadata(canvasPath, node.id);
-    const common = { tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", modifiedAt: metadata?.modifiedAt ?? now };
+    const common = { tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", backContent: metadata?.backContent ?? "", modifiedAt: metadata?.modifiedAt ?? now };
     if (node.type === "file" && node.file) {
       const file = this.app.vault.getAbstractFileByPath(node.file);
       const isImage = file instanceof TFile && IMAGE_EXTENSIONS.has(file.extension.toLowerCase());
@@ -259,8 +266,9 @@ export class CanvasAdapter {
     const now = Date.now();
     const metadata = this.getMetadata(canvasPath, nodeId);
     const snapshot = serializeGroup(nodes, edges);
+    snapshot.nodeBacks = Object.fromEntries(nodes.map((node) => [node.id, this.getMetadata(canvasPath, node.id)?.backContent ?? ""]).filter(([, back]) => Boolean(back)));
     const title = nodes.find((node) => node.type === "group")?.label ?? nodes.find((node) => node.text)?.text?.split(/\r?\n/, 1)[0] ?? "Canvas group";
-    return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
+    return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", backContent: metadata?.backContent ?? "", createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
   }
 
   private nodeForItem(item: PaletteItem, x: number, y: number): CanvasNodeSnapshot {
@@ -338,7 +346,12 @@ export class CanvasAdapter {
       const snapshot = restoreGroup(item.group, point.x, point.y, () => createId("node"), () => createId("edge"));
       document.nodes.push(...snapshot.nodes);
       document.edges.push(...snapshot.edges);
-      restoredNodeIds = snapshot.nodes.map((node) => node.id);
+      restoredNodeIds = snapshot.nodes.filter((node) => node.type === "group").map((node) => node.id);
+      for (let index = 0; index < item.group.nodes.length; index++) {
+        const back = item.group.nodeBacks?.[item.group.nodes[index].id];
+        const restored = snapshot.nodes[index];
+        if (back && restored) this.restoreNodeBack(context.file.path, restored.id, back);
+      }
     } else {
       const node = this.restoreNodeForItem(item, point.x, point.y);
       if (!node) return false;

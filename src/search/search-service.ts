@@ -77,7 +77,7 @@ export class SearchService {
     const tag = lower.startsWith("tag:#") ? token.slice(5) : token.startsWith("#") ? token.slice(1) : null;
     if (tag !== null) return item.tags.some((value) => value.toLocaleLowerCase() === tag.toLocaleLowerCase());
     const needle = this.unquote(token).toLocaleLowerCase();
-    return [item.displayTitle, item.content ?? "", item.caption, item.label, ...item.tags].join("\n").toLocaleLowerCase().includes(needle);
+    return [item.displayTitle, item.content ?? "", item.backContent, item.caption, item.label, ...item.tags].join("\n").toLocaleLowerCase().includes(needle);
   }
 
   private unquote(value: string): string {

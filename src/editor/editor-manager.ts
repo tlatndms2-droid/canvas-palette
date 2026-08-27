@@ -10,16 +10,31 @@ export class PaletteEditorManager {
   async openItem(itemId: string): Promise<boolean> {
     const target = await this.buildTarget(itemId);
     if (!target) return false;
+    return this.openTarget(target, (text) => {
+      const item = this.plugin.store.data.items[itemId];
+      if (!item) return;
+      this.plugin.store.updateItem(itemId, { displayTitle: item.displayTitle, tags: item.tags, label: item.label, caption: item.caption, content: text });
+    });
+  }
+
+  async openBack(itemId: string): Promise<boolean> {
+    const item = this.plugin.store.data.items[itemId];
+    if (!item) return false;
+    return this.openTarget({ itemId, kind: "card", file: null, title: `${item.displayTitle} — Back`, initialText: item.backContent }, (text) => this.plugin.store.setItemBack(itemId, text));
+  }
+
+  async openCanvasBack(canvasPath: string, nodeId: string, title: string): Promise<boolean> {
+    const state = this.plugin.store.getCanvasNodeMetadata(canvasPath, nodeId);
+    return this.openTarget({ itemId: `${canvasPath}:${nodeId}`, kind: "card", file: null, title: `${title} — Back`, initialText: state?.backContent ?? "" }, (text) => this.plugin.store.setCanvasNodeBack(canvasPath, nodeId, text));
+  }
+
+  private async openTarget(target: PaletteEditorTarget, onSave: (text: string) => void): Promise<boolean> {
     if (this.activeEditor) await this.activeEditor.close(true);
     const editor = new FloatingEditor(
       this.app,
       target,
       this.plugin.store.data.uiState.quickEditor,
-      (text) => {
-        const item = this.plugin.store.data.items[itemId];
-        if (!item) return;
-        this.plugin.store.updateItem(itemId, { displayTitle: item.displayTitle, tags: item.tags, label: item.label, caption: item.caption, content: text });
-      },
+      onSave,
       () => this.plugin.store.changed(),
       () => { if (this.activeEditor === editor) this.activeEditor = null; }
     );

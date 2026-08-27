@@ -75,6 +75,41 @@ test("Palette edits propagate metadata to every linked Card node", async () => {
   await cleanup();
 });
 
+test("Back content synchronizes while each placement keeps its own current face", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.recordCanvasPlacement("card", "B.canvas", ["drop"]);
+  store.setCanvasNodeFace("A.canvas", "origin", "back");
+  store.setCanvasNodeBack("B.canvas", "drop", "## Shared back");
+
+  assert.equal(store.data.items.card.backContent, "## Shared back");
+  assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.backContent, "## Shared back");
+  assert.equal(store.getCanvasNodeMetadata("B.canvas", "drop")?.backContent, "## Shared back");
+  assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.currentFace, "back");
+  assert.equal(store.getCanvasNodeMetadata("B.canvas", "drop")?.currentFace, "front");
+  await cleanup();
+});
+
+test("Unlink from Palette preserves the node snapshot and stops later synchronization", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.data.items.card.backContent = "Before unlink";
+  store.recordCanvasPlacement("card", "B.canvas", ["drop"]);
+  store.setCanvasNodeFace("B.canvas", "drop", "back");
+
+  assert.equal(store.unlinkCanvasNode("B.canvas", "drop"), true);
+  store.setItemBack("card", "After unlink");
+  const detached = store.getCanvasNodeMetadata("B.canvas", "drop");
+  assert.equal(detached?.backContent, "Before unlink");
+  assert.equal(detached?.currentFace, "back");
+  assert.equal(store.linkedItemForNode("B.canvas", "drop"), undefined);
+  await cleanup();
+});
+
 test("deleted Canvas nodes are removed from links and another placement becomes the origin", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };

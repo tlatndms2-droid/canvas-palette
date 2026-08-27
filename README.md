@@ -2,13 +2,15 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.2.15**
+Current version: **0.2.16**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
 - Schema-versioned persistent model for items, workspaces, collections, pending imports, and UI state.
+- Every Card, Markdown, Image, and Group has a shared Front/Back data pair. Front keeps the original content or file reference; Back is ordinary Markdown edited through Obsidian's native Live Preview. Tiny 22px flip controls appear on Canvas, Side Palette, and Mini Palette without changing the card geometry.
+- Back content and Metadata synchronize across the Palette Item and every linked Canvas placement, while each Canvas node, Side card, and Mini card keeps its own current face. `Unlink from Palette` is a one-time Canvas context command that preserves the detached node's Front, Back, Metadata, and current face and stops all later synchronization.
 - The native selected-node Canvas toolbar remains available for both single and multiple Card/MD/Image/Group selections. Metadata editing applies one edit to every selected node, while Mini Palette collection and direct Side Palette storage operate on the complete selection. Selected Canvas text keeps the same collection routes in its editor context menu.
 - The selected-node Canvas toolbar can create Palette Tags, Label, and Caption before collection. Existing Label, Tag, and Caption values can then be edited in place by double-clicking their visible overlay; Enter or focus loss saves, Escape cancels, and the automatic date remains read-only. The overlay preserves the native Canvas card and scales with the resized node.
 - Floating Mini Palette mounted over the active Canvas, with a hover trigger, drag movement, resize, pin/close controls, and direct Canvas drag-and-drop.
@@ -46,7 +48,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
    Choose **Edit Palette Metadata** first if you want to attach Tags, a Label, or a Caption before collection. Afterward, double-click the visible Label, Tag, or Caption to edit it directly on the card. Those values are inherited by the collected Item.
 4. Hover the Mini Palette trigger at the upper-right of the Canvas, review items in the Inspector, and import them into a Workspace.
 5. Open Side Palette to organize Collections or Mini Palette Storage to search across Workspaces.
-6. Drag an item from either palette directly into a Canvas. Cards create linked text-node instances whose content and Palette metadata stay synchronized everywhere; Markdown and images remain source-linked file nodes, and Groups restore their subgraph.
+6. Drag an item from either palette directly into a Canvas. Cards create linked text-node instances whose content, Back, and Palette metadata stay synchronized everywhere; Markdown and images remain source-linked file nodes, and Groups restore their subgraph. Use the small flip icon to change only that location's visible face, and double-click a Back to edit it in native Live Preview.
 7. Ctrl/Cmd-click items for multi-selection. In Side Palette, double-click Card/Markdown items to edit them, double-click Image/Group items to preview them, or right-click and choose **Set tags / label** to change only those classifications. Use the mouse wheel to zoom an Image preview.
 
 ## Installation for development

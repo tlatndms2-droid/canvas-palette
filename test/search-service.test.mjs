@@ -16,7 +16,7 @@ async function loadSearch() {
 
 const item = (tags, label, title = "Planning note") => ({
   id: title, type: "card", displayTitle: title, tags, label, caption: "", createdAt: 1, modifiedAt: 1,
-  origin: { canvasPath: "Projects/Planning.canvas" }, canvasPlacements: [{ canvasPath: "Archive.canvas", nodeIds: ["one"], placedAt: 1 }], content: "Meeting details"
+  origin: { canvasPath: "Projects/Planning.canvas" }, canvasPlacements: [{ canvasPath: "Archive.canvas", nodeIds: ["one"], placedAt: 1 }], content: "Meeting details", backContent: "Private synthesis"
 });
 
 test("Obsidian-like tag, label, AND, OR, and parentheses filter palette items", async () => {
@@ -34,6 +34,7 @@ test("Obsidian-like tag, label, AND, OR, and parentheses filter palette items", 
   assert.equal(search.matches(work, "type:card"), true);
   assert.equal(search.matches(work, 'space:"Projects/Planning.canvas"'), true);
   assert.equal(search.matches(work, 'space:"Other.canvas"'), false);
+  assert.equal(search.matches(work, "synthesis"), true);
 
   await cleanup();
 });

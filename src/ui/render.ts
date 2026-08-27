@@ -1,6 +1,6 @@
 import { setIcon } from "obsidian";
 import type CanvasPalettePlugin from "../main";
-import type { PaletteItem, PaletteItemType } from "../core/types";
+import type { CardFace, PaletteItem, PaletteItemType } from "../core/types";
 import type { PreviewService } from "../preview/preview-service";
 
 export const TYPE_ICON: Record<PaletteItemType, string> = {
@@ -17,7 +17,7 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
   return button;
 }
 
-export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
+export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; currentFace?: CardFace; onToggleFace?: (face: CardFace) => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
 
 export function renderItem(parent: HTMLElement, item: PaletteItem, options: ItemRenderOptions): HTMLElement {
   const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${options.selected ? " is-selected" : ""}${options.compact ? " is-compact" : ""}` });
@@ -28,12 +28,22 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   const icon = header.createSpan({ cls: "cp-item__icon" });
   setIcon(icon, TYPE_ICON[item.type]);
   header.createSpan({ cls: "cp-item__title", text: item.displayTitle || "Untitled" });
+  const face = options.currentFace ?? "front";
+  if (options.onToggleFace) {
+    const flip = header.createEl("button", { cls: "clickable-icon cp-face-toggle", attr: { type: "button", "aria-label": face === "front" ? "Show back" : "Show front", title: face === "front" ? "Show back" : "Show front" } });
+    setIcon(flip, "refresh-cw");
+    flip.addEventListener("pointerdown", (event) => event.stopPropagation());
+    flip.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); options.onToggleFace?.(face === "front" ? "back" : "front"); });
+    flip.addEventListener("dblclick", (event) => event.stopPropagation());
+  }
   if (item.label) {
     const label = header.createSpan({ cls: "cp-label", text: item.label });
     if (item.labelColor) label.style.setProperty("--cp-label-color", item.labelColor);
   }
   const body = card.createDiv({ cls: "cp-item__body" });
-  if (item.type === "image" && item.origin.filePath) body.createDiv({ cls: "cp-image-placeholder", text: item.origin.filePath });
+  body.dataset.face = face;
+  if (face === "back") body.setText(item.backContent || "Write on the back…");
+  else if (item.type === "image" && item.origin.filePath) body.createDiv({ cls: "cp-image-placeholder", text: item.origin.filePath });
   else if (item.type === "group") body.createDiv({ text: `${item.group?.nodes.length ?? 0} nodes · ${item.group?.edges.length ?? 0} edges` });
   else body.setText((item.content ?? item.origin.filePath ?? "No preview").slice(0, 240));
   const canvasPaths = [...new Set([item.origin.canvasPath, ...item.canvasPlacements.map((placement) => placement.canvasPath)].filter((path): path is string => Boolean(path)))];

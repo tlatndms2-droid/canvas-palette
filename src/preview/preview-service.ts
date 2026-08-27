@@ -1,14 +1,20 @@
 import { App, Component, MarkdownRenderer, TFile } from "obsidian";
-import type { PaletteItem } from "../core/types";
+import type { CardFace, PaletteItem } from "../core/types";
 
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 
 export class PreviewService {
   constructor(private readonly app: App, private readonly component: Component) {}
 
-  async render(parent: HTMLElement, item: PaletteItem, compact = false, compactLimit = 360): Promise<void> {
+  async render(parent: HTMLElement, item: PaletteItem, compact = false, compactLimit = 360, face: CardFace = "front"): Promise<void> {
     parent.empty();
     parent.addClass("cp-preview-content", `cp-preview-content--${item.type}`);
+    if (face === "back") {
+      parent.addClass("cp-preview-content--back");
+      await MarkdownRenderer.render(this.app, compact ? item.backContent.slice(0, compactLimit) : item.backContent, parent, item.origin.filePath ?? "", this.component);
+      if (!item.backContent) parent.createDiv({ cls: "cp-empty cp-back-empty", text: "Write on the back…" });
+      return;
+    }
     if (item.type === "image" && item.origin.filePath) {
       const file = this.app.vault.getAbstractFileByPath(item.origin.filePath);
       if (file instanceof TFile) parent.createEl("img", { attr: { src: this.app.vault.getResourcePath(file), alt: item.displayTitle, draggable: "false" } });
