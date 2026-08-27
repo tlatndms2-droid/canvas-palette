@@ -14,14 +14,22 @@ import { PreviewService } from "./preview/preview-service";
 import { SearchService } from "./search/search-service";
 import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
-import { ItemEditorModal, MetadataEditorModal } from "./ui/modal";
+import { ConfirmCanvasReplacementModal, ItemEditorModal, MetadataEditorModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 
 export default class CanvasPalettePlugin extends Plugin {
   private readonly canvasSyncTimers = new Map<string, number>();
   store = new PaletteStore(this);
   search = new SearchService();
-  canvas = new CanvasAdapter(this.app, (itemId, canvasPath, nodeIds) => this.store.recordCanvasPlacement(itemId, canvasPath, nodeIds), (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId), (canvasPath, nodeId, backContent) => this.store.setCanvasNodeBack(canvasPath, nodeId, backContent));
+  canvas = new CanvasAdapter(
+    this.app,
+    (itemId, canvasPath, nodeIds) => this.store.recordCanvasPlacement(itemId, canvasPath, nodeIds),
+    (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId),
+    (canvasPath, nodeId, backContent) => this.store.setCanvasNodeBack(canvasPath, nodeId, backContent),
+    (item, canvasPath) => this.store.linkedCanvasNodes(item).filter((location) => location.canvasPath === canvasPath).map((location) => location.nodeId),
+    () => new Promise<boolean>((resolve) => new ConfirmCanvasReplacementModal(this.app, resolve).open()),
+    (itemId, canvasPath, removedNodeIds, newNodeIds, existingNodeIds) => this.store.replaceCanvasPlacement(itemId, canvasPath, removedNodeIds, newNodeIds, existingNodeIds)
+  );
   canvasMetadata = new CanvasMetadataController(this, this.canvas);
   canvasToolbar = new CanvasNodeToolbarController(this.canvas, {
     editMetadata: (nodes) => this.editCanvasNodesMetadata(nodes),

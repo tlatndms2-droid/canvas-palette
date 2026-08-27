@@ -376,6 +376,34 @@ export class PaletteStore {
     }
   }
 
+  replaceCanvasPlacement(itemId: string, canvasPath: string, removedNodeIds: string[], newNodeIds: string[], existingNodeIds: Set<string>): void {
+    const item = this.data.items[itemId];
+    if (!item) return;
+    const removed = new Set(removedNodeIds);
+    const replacedOrigin = item.origin.canvasPath === canvasPath && Boolean(item.origin.canvasNodeId && removed.has(item.origin.canvasNodeId));
+    if (replacedOrigin) {
+      item.origin.canvasPath = canvasPath;
+      item.origin.canvasNodeId = newNodeIds[0];
+    }
+    for (const placement of item.canvasPlacements) {
+      if (placement.canvasPath === canvasPath) placement.nodeIds = placement.nodeIds.filter((nodeId) => !removed.has(nodeId));
+    }
+    item.canvasPlacements = item.canvasPlacements.filter((placement) => placement.nodeIds.length > 0);
+    const placementIds = replacedOrigin ? newNodeIds.slice(1) : newNodeIds;
+    if (placementIds.length > 0) {
+      const placement = item.canvasPlacements.find((candidate) => candidate.canvasPath === canvasPath);
+      if (placement) {
+        placement.nodeIds = [...new Set([...placement.nodeIds, ...placementIds])];
+        placement.placedAt = Date.now();
+      } else item.canvasPlacements.push({ canvasPath, nodeIds: [...new Set(placementIds)], placedAt: Date.now() });
+    }
+    this.reconcileCanvasLinks(canvasPath, existingNodeIds);
+    this.applyItemMetadataToLinkedNodes(item);
+    const workspaceId = item.origin.workspaceId;
+    if (workspaceId) this.associateCanvas(workspaceId, canvasPath);
+    else this.changed();
+  }
+
   private canvasNodeState(canvasPath: string, nodeId: string): PaletteMetadata {
     return this.data.canvasNodeMetadata[canvasPath]?.[nodeId] ?? { tags: [], label: "", labelColor: "", caption: "", backContent: "", currentFace: "front", facesEnabled: false, modifiedAt: Date.now() };
   }

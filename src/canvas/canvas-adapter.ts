@@ -35,7 +35,7 @@ const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "b
 export class CanvasAdapter {
   private readonly restoreQueue = new SerialTaskQueue();
 
-  constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined, private readonly restoreNodeBack: (canvasPath: string, nodeId: string, backContent: string) => void) {}
+  constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined, private readonly restoreNodeBack: (canvasPath: string, nodeId: string, backContent: string) => void, private readonly linkedNodes: (item: PaletteItem, canvasPath: string) => string[] = () => [], private readonly confirmReplacement: () => Promise<boolean> = async () => true, private readonly onReplaced: (itemId: string, canvasPath: string, removedNodeIds: string[], newNodeIds: string[], existingNodeIds: Set<string>) => void = () => {}) {}
 
   activeContext(): CanvasContext | null {
     const leaf = this.app.workspace.activeLeaf;
@@ -415,6 +415,14 @@ export class CanvasAdapter {
     const current = context.runtime.getData?.();
     if (!current || typeof current !== "object" || !context.runtime.setData) { new Notice("This Canvas runtime cannot accept dropped items."); return false; }
     const document = this.parse(JSON.stringify(current));
+    const linkedRootIds = this.linkedNodes(item, context.file.path).filter((nodeId) => document.nodes.some((node) => node.id === nodeId));
+    if (linkedRootIds.length > 0 && !(await this.confirmReplacement())) return false;
+    const removedNodes = linkedRootIds.length > 0 ? this.expandGroupNodes(document.nodes, linkedRootIds) : [];
+    const removedNodeIds = new Set(removedNodes.map((node) => node.id));
+    if (removedNodeIds.size > 0) {
+      document.nodes = document.nodes.filter((node) => !removedNodeIds.has(node.id));
+      document.edges = document.edges.filter((edge) => !removedNodeIds.has(edge.fromNode) && !removedNodeIds.has(edge.toNode));
+    }
     let restoredNodeIds: string[];
     if (item.type === "group") {
       if (!item.group) { new Notice(`Stored group data for ${item.displayTitle} is unavailable.`); return false; }
@@ -440,9 +448,10 @@ export class CanvasAdapter {
       new Notice(`Unable to add ${item.displayTitle} to Canvas.`);
       return false;
     }
-    this.onRestored(item.id, context.file.path, restoredNodeIds);
+    if (linkedRootIds.length > 0) this.onReplaced(item.id, context.file.path, linkedRootIds, restoredNodeIds, new Set(document.nodes.map((node) => node.id)));
+    else this.onRestored(item.id, context.file.path, restoredNodeIds);
     context.runtime.requestSave?.();
-    new Notice(`${item.displayTitle} added to Canvas`);
+    new Notice(linkedRootIds.length > 0 ? `${item.displayTitle} moved to the new position` : `${item.displayTitle} added to Canvas`);
     return true;
   }
 

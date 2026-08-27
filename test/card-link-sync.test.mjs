@@ -75,6 +75,25 @@ test("Palette edits propagate metadata to every linked Card node", async () => {
   await cleanup();
 });
 
+test("replacing a linked Card on the same Canvas keeps one link and all shared metadata", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.data.items.card.backContent = "Shared back";
+  store.data.items.card.facesEnabled = true;
+
+  store.replaceCanvasPlacement("card", "A.canvas", ["origin"], ["new-position"], new Set(["new-position"]));
+
+  assert.deepEqual(store.linkedCanvasNodes(store.data.items.card), [{ canvasPath: "A.canvas", nodeId: "new-position" }]);
+  assert.equal(store.data.items.card.origin.canvasNodeId, "new-position");
+  assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin"), undefined);
+  assert.equal(store.getCanvasNodeMetadata("A.canvas", "new-position")?.caption, "Caption");
+  assert.equal(store.getCanvasNodeMetadata("A.canvas", "new-position")?.backContent, "Shared back");
+  assert.equal(store.getCanvasNodeMetadata("A.canvas", "new-position")?.facesEnabled, true);
+  await cleanup();
+});
+
 test("Back content synchronizes while each placement keeps its own current face", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };

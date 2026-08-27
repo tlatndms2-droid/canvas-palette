@@ -51,6 +51,29 @@ export class ConfirmDeleteModal extends Modal {
   onClose(): void { this.contentEl.empty(); }
 }
 
+export class ConfirmCanvasReplacementModal extends Modal {
+  private resolved = false;
+  constructor(app: App, private readonly onResolve: (confirmed: boolean) => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-confirm-modal");
+    this.contentEl.createEl("h2", { text: "같은 카드가 이미 있습니다" });
+    this.contentEl.createEl("p", { text: "현재 캔버스에 같은 카드가 이미 있습니다. 계속하면 기존 카드를 삭제하고 지금 지정한 위치에 다시 배치합니다." });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "취소" }).addEventListener("click", () => this.finish(false));
+    actions.createEl("button", { text: "새 위치에 배치", cls: "mod-cta" }).addEventListener("click", () => this.finish(true));
+  }
+  onClose(): void {
+    if (!this.resolved) { this.resolved = true; this.onResolve(false); }
+    this.contentEl.empty();
+  }
+  private finish(confirmed: boolean): void {
+    if (this.resolved) return;
+    this.resolved = true;
+    this.onResolve(confirmed);
+    this.close();
+  }
+}
+
 export class TagLabelModal extends Modal {
   constructor(app: App, private readonly plugin: CanvasPalettePlugin, private readonly itemIds: string[]) { super(app); }
 

@@ -2,13 +2,13 @@
 
 ## Current state
 
-- Version: `0.2.27`.
+- Version: `0.2.28`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.27`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.27`.
-- Latest runtime change: `0.2.27`; the Side Palette item menu now exposes focused `Edit tags & label`, `Move to…`, `Open original`, and `Delete` actions instead of a full details editor, one menu row per Collection, and a separate Canvas locator. `Move to…` opens a searchable hierarchical destination picker. `Open original` locates, selects, and zooms to the recorded node in an already-open Canvas before falling back to the source Vault file.
-- Automated baseline: 20 Node tests (including focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
+- Latest release: `0.2.28`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.28`.
+- Latest runtime change: `0.2.28`; dropping the same linked Palette item onto the same Canvas now asks for confirmation. `새 위치에 배치` removes the existing linked placement and its attached edges, recreates the same item at the requested position, and preserves Front, Back, metadata, and Palette linkage. `취소` leaves the Canvas unchanged.
+- Automated baseline: 21 Node tests (including same-Canvas linked-card replacement and metadata preservation, focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
 
@@ -162,6 +162,7 @@
   - Runtime validation used the same existing real-Vault Group read-only. At a measured preview scale of `0.5873`, the node font changed from the Canvas base `16px` to approximately `9.4px`. A screenshot confirmed the Group title and three text cards stayed within the original node layout instead of rendering at unscaled UI text size. No Vault or Palette content was changed.
 - `0.2.27` simplifies the Side Palette item context menu. `Edit tags & label` opens a focused batch-capable tool without the previous details/content editor or Caption field. `Move to…` replaces the Workspace-root and per-Collection menu rows with one searchable hierarchical picker. `Open original` absorbs the old separate Canvas locator: it reuses an already-open Canvas, selects the recorded node, and zooms to it; only items without an available Canvas origin fall back to opening their source Vault file.
   - Runtime validation used the real Vault without changing Palette or Vault content. The menu showed exactly `Edit tags & label`, `Move to…`, `Open original`, and `Delete` for the tested Group. The move picker listed Workspace root and both Collections, and filtering for `2` left only Collection 2. The focused editor contained Tags and Label but no Caption. `Open original` kept the Canvas leaf count at one and selected the recorded node inside the already-open Canvas.
+- `0.2.28` prevents silent duplicate linked placements on the same Canvas. A repeated Side or Mini Palette drop shows a confirmation dialog with `취소` and `새 위치에 배치`. Confirming removes the existing linked placement and attached edges, restores the item at the new drop point, and retains Front, Back, Tags, Label, Caption, and shared Palette identity; cancelling changes nothing.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
