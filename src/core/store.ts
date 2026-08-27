@@ -89,6 +89,7 @@ export class PaletteStore {
     const item = this.data.items[id];
     if (!item) return;
     Object.assign(item, changes, { modifiedAt: Date.now() });
+    this.applyItemMetadataToLinkedNodes(item);
     this.changed();
     void this.plugin.syncPaletteItemToCanvas(item);
   }
@@ -105,22 +106,14 @@ export class PaletteStore {
       labelColor: metadata.label ? metadata.labelColor ?? "" : "",
       caption: metadata.caption
     };
-    const isEmpty = metadata.tags.length === 0 && !metadata.label && !metadata.caption;
-    if (isEmpty) {
-      const canvas = this.data.canvasNodeMetadata[canvasPath];
-      if (canvas) {
-        delete canvas[nodeId];
-        if (Object.keys(canvas).length === 0) delete this.data.canvasNodeMetadata[canvasPath];
-      }
-    } else {
-      const canvas = this.data.canvasNodeMetadata[canvasPath] ??= {};
-      canvas[nodeId] = { ...normalized, modifiedAt };
-    }
-    for (const item of Object.values(this.data.items)) {
-      if (item.origin.canvasPath !== canvasPath || item.origin.canvasNodeId !== nodeId) continue;
+    this.setMetadataRecord(canvasPath, nodeId, normalized, modifiedAt);
+    const linkedItems = Object.values(this.data.items).filter((item) => this.itemHasLinkedNode(item, canvasPath, nodeId));
+    for (const item of linkedItems) {
       Object.assign(item, normalized, { modifiedAt });
+      this.applyItemMetadataToLinkedNodes(item);
     }
     this.changed();
+    for (const item of linkedItems) void this.plugin.syncPaletteItemToCanvas(item);
   }
 
   addLabelColorPreset(color: string): void {
@@ -194,9 +187,41 @@ export class PaletteStore {
       placement.nodeIds = [...new Set([...placement.nodeIds, ...nodeIds])];
       placement.placedAt = Date.now();
     } else item.canvasPlacements.push({ canvasPath, nodeIds: [...new Set(nodeIds)], placedAt: Date.now() });
+    this.applyItemMetadataToLinkedNodes(item);
     const workspaceId = item.origin.workspaceId;
     if (workspaceId) this.associateCanvas(workspaceId, canvasPath);
     else this.changed();
+  }
+
+  linkedCanvasNodes(item: PaletteItem): Array<{ canvasPath: string; nodeId: string }> {
+    const locations: Array<{ canvasPath: string; nodeId: string }> = [];
+    if (item.origin.canvasPath && item.origin.canvasNodeId) locations.push({ canvasPath: item.origin.canvasPath, nodeId: item.origin.canvasNodeId });
+    if (item.type !== "group") {
+      for (const placement of item.canvasPlacements) for (const nodeId of placement.nodeIds) locations.push({ canvasPath: placement.canvasPath, nodeId });
+    }
+    return locations.filter((location, index, all) => all.findIndex((candidate) => candidate.canvasPath === location.canvasPath && candidate.nodeId === location.nodeId) === index);
+  }
+
+  private itemHasLinkedNode(item: PaletteItem, canvasPath: string, nodeId: string): boolean {
+    return this.linkedCanvasNodes(item).some((location) => location.canvasPath === canvasPath && location.nodeId === nodeId);
+  }
+
+  private applyItemMetadataToLinkedNodes(item: PaletteItem): void {
+    const normalized = { tags: [...new Set(item.tags)], label: item.label, labelColor: item.label ? item.labelColor ?? "" : "", caption: item.caption };
+    for (const location of this.linkedCanvasNodes(item)) this.setMetadataRecord(location.canvasPath, location.nodeId, normalized, item.modifiedAt);
+  }
+
+  private setMetadataRecord(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">, modifiedAt: number): void {
+    const isEmpty = metadata.tags.length === 0 && !metadata.label && !metadata.caption;
+    if (isEmpty) {
+      const canvas = this.data.canvasNodeMetadata[canvasPath];
+      if (!canvas) return;
+      delete canvas[nodeId];
+      if (Object.keys(canvas).length === 0) delete this.data.canvasNodeMetadata[canvasPath];
+      return;
+    }
+    const canvas = this.data.canvasNodeMetadata[canvasPath] ??= {};
+    canvas[nodeId] = { ...metadata, modifiedAt };
   }
 
   itemsForWorkspace(workspaceId: string | null, includeCollections = true): PaletteItem[] {

@@ -226,12 +226,10 @@ export default class CanvasPalettePlugin extends Plugin {
   }
 
   async syncPaletteItemToCanvas(item: PaletteItem): Promise<void> {
-    const canvasPath = item.origin.canvasPath;
-    const nodeId = item.origin.canvasNodeId;
-    if (!canvasPath || !nodeId) return;
-    this.store.setCanvasNodeMetadata(canvasPath, nodeId, { tags: item.tags, label: item.label, labelColor: item.labelColor ?? "", caption: item.caption });
-    try { await this.canvas.syncItemToOrigin(item); }
-    catch (error) { console.error("Canvas Palette failed to synchronize an item to its original Canvas node", error); }
+    const locations = this.store.linkedCanvasNodes(item);
+    if (locations.length === 0) return;
+    try { await this.canvas.syncItemToCanvases(item, locations); }
+    catch (error) { console.error("Canvas Palette failed to synchronize an item to its linked Canvas nodes", error); }
   }
 
   async locateItemOnCanvas(item: PaletteItem): Promise<void> {
@@ -251,7 +249,11 @@ export default class CanvasPalettePlugin extends Plugin {
 
   private async syncCanvasFileToPalette(file: TFile): Promise<void> {
     try {
-      if (await this.canvas.syncItemsFromCanvas(file, this.store.allItems()) > 0) this.store.changed();
+      const changedItems = await this.canvas.syncItemsFromCanvas(file, this.store.allItems());
+      if (changedItems > 0) {
+        this.store.changed();
+        for (const item of this.store.allItems()) if (item.type === "card") void this.syncPaletteItemToCanvas(item);
+      }
     } catch (error) { console.error("Canvas Palette failed to synchronize original Canvas items", error); }
   }
 

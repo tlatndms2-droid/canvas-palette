@@ -94,18 +94,23 @@ export class CanvasAdapter {
     return items;
   }
 
-  async syncItemToOrigin(item: PaletteItem): Promise<void> {
-    const canvasPath = item.origin.canvasPath;
-    const nodeId = item.origin.canvasNodeId;
-    if (item.type !== "card" || !canvasPath || !nodeId) return;
+  async syncItemToCanvases(item: PaletteItem, locations: Array<{ canvasPath: string; nodeId: string }>): Promise<void> {
+    if (item.type !== "card") return;
+    const byCanvas = new Map<string, string[]>();
+    for (const location of locations) byCanvas.set(location.canvasPath, [...(byCanvas.get(location.canvasPath) ?? []), location.nodeId]);
+    for (const [canvasPath, nodeIds] of byCanvas) await this.syncCardToCanvas(item, canvasPath, nodeIds);
+  }
+
+  private async syncCardToCanvas(item: PaletteItem, canvasPath: string, nodeIds: string[]): Promise<void> {
     const open = this.openContexts().find((context) => context.file.path === canvasPath);
     if (open?.runtime.getData && open.runtime.setData) {
       const current = open.runtime.getData();
       if (!current || typeof current !== "object") return;
       const document = this.parse(JSON.stringify(current));
-      const node = document.nodes.find((candidate) => candidate.id === nodeId && candidate.type === "text");
-      if (!node || node.text === (item.content ?? "")) return;
-      node.text = item.content ?? "";
+      const nodes = document.nodes.filter((candidate) => nodeIds.includes(candidate.id) && candidate.type === "text");
+      const changed = nodes.some((node) => node.text !== (item.content ?? ""));
+      if (!changed) return;
+      for (const node of nodes) node.text = item.content ?? "";
       await open.runtime.setData(document);
       open.runtime.requestSave?.();
       return;
@@ -113,9 +118,10 @@ export class CanvasAdapter {
     const file = this.app.vault.getAbstractFileByPath(canvasPath);
     if (!(file instanceof TFile)) return;
     const document = await this.read(file);
-    const node = document.nodes.find((candidate) => candidate.id === nodeId && candidate.type === "text");
-    if (!node || node.text === (item.content ?? "")) return;
-    node.text = item.content ?? "";
+    const nodes = document.nodes.filter((candidate) => nodeIds.includes(candidate.id) && candidate.type === "text");
+    const changed = nodes.some((node) => node.text !== (item.content ?? ""));
+    if (!changed) return;
+    for (const node of nodes) node.text = item.content ?? "";
     await this.app.vault.modify(file, JSON.stringify(document, null, 2));
   }
 
@@ -123,8 +129,15 @@ export class CanvasAdapter {
     const document = await this.read(file);
     let changed = 0;
     for (const item of items) {
-      if (item.origin.canvasPath !== file.path || !item.origin.canvasNodeId) continue;
-      const node = document.nodes.find((candidate) => candidate.id === item.origin.canvasNodeId);
+      const linkedNodeIds = [
+        ...(item.origin.canvasPath === file.path && item.origin.canvasNodeId ? [item.origin.canvasNodeId] : []),
+        ...item.canvasPlacements.filter((placement) => placement.canvasPath === file.path).flatMap((placement) => placement.nodeIds)
+      ];
+      if (linkedNodeIds.length === 0) continue;
+      const linkedNodes = document.nodes.filter((candidate) => linkedNodeIds.includes(candidate.id) && candidate.type === (item.type === "card" ? "text" : "group"));
+      const node = item.type === "card"
+        ? linkedNodes.find((candidate) => (candidate.text ?? "") !== (item.content ?? "")) ?? linkedNodes[0]
+        : linkedNodes[0];
       if (!node) continue;
       if (item.type === "card" && node.type === "text") {
         const content = node.text ?? "";

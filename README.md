@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.1.19**
+Current version: **0.1.20**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
@@ -16,13 +16,13 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - PDF-aligned docked three-pane Storage layout with independent left/right toggle and divider resize.
 - Side Palette with representative workspaces, search, Card/List Viewport, Outliner, nested collections, Tag Index, Label Index, and independent scroll regions.
 - Three independent persisted Side Palette splitters resize Viewport/Outliner width, Upper/Lower height, and Tag/Label width without coupling the two vertical ratios.
-- Side Palette drag-and-drop resolves the stored Palette Item by ID and restores Card content, Markdown/Image file references, or complete Group subgraphs through the target Canvas runtime at the real drop position.
+- Side Palette drag-and-drop resolves the stored Palette Item by ID and restores Card content, Markdown/Image file references, or complete Group subgraphs through the target Canvas runtime at the real drop position. Every dropped Card remains another linked instance of the same Palette Item: editing any linked Canvas Card or the Palette content updates all other instances.
 - Item/collection organization: collection creation, nesting, rename, Canvas drag drop, Viewport reorder, multi-selection, batch tag editing, deletion, and move-to-collection actions.
 - Type-specific Card, Markdown, Image, and Group rendering; rendered Markdown, source image preview, and subgraph preview with content-first card layouts.
 - Side Palette double-click opens the existing native editor for Card/Markdown items and a large preview for Image/Group items. Image previews support mouse-wheel zoom from 20% to 500%.
 - Mini and Side Palette use the same stored Item metadata. Their focused metadata editors support Tags, Label, and Caption without changing the title, content, original file, or Canvas node.
-- Canvas placement history per asset, recorded after drag/drop or export and displayed in Side/Mini Palette cards and the detail popup.
-- Collected items remain linked to their original Canvas node by Canvas path and Node ID. Card content and Palette metadata synchronize in both directions, and the linked-Canvas row or context menu locates and zooms to the original node.
+- Canvas placement history per asset, recorded after drag/drop or export and displayed in Side/Mini Palette cards and the detail popup. Card placement records also participate in synchronization instead of serving as display-only history.
+- Collected Cards remain linked to their original and every subsequently placed Canvas node by Canvas path and Node ID. Card content plus Tags, Label, Label color, and Caption synchronize in both directions across the Palette and all linked Canvas Cards. The linked-Canvas row or context menu still locates and zooms to the original node.
 - Multiple ordinary Canvas nodes are collected as separate Card/Markdown/Image assets. A Group asset is created only when an actual Canvas Group is selected; selecting its boundary automatically captures all contained nodes, internal edges, nested parent references, dimensions, and relative positions.
 - Collection-to-Canvas mind-map export.
 - Follow Obsidian, Light, and Dark themes with a shared design system; use the Obsidian accent or a custom accent color.
@@ -42,7 +42,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
    Choose **Edit Palette Metadata** first if you want to attach Tags, a Label, or a Caption before collection. Afterward, double-click the visible Label, Tag, or Caption to edit it directly on the card. Those values are inherited by the collected Item.
 4. Hover the Mini Palette trigger at the upper-right of the Canvas, review items in the Inspector, and import them into a Workspace.
 5. Open Side Palette to organize Collections or Mini Palette Storage to search across Workspaces.
-6. Drag an item from either palette directly into a Canvas. Cards create text nodes, Markdown and images remain source-linked file nodes, and Groups restore their subgraph.
+6. Drag an item from either palette directly into a Canvas. Cards create linked text-node instances whose content and Palette metadata stay synchronized everywhere; Markdown and images remain source-linked file nodes, and Groups restore their subgraph.
 7. Ctrl/Cmd-click items for multi-selection. In Side Palette, double-click Card/Markdown items to edit them, double-click Image/Group items to preview them, or right-click and choose **Set tags / label** to change only those classifications. Use the mouse wheel to zoom an Image preview.
 
 ## Installation for development

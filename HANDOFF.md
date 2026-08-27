@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.1.19`
+- Version: `0.1.20`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.19`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.19.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.19`.
+- Latest release: `0.1.20`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.20.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.20`.
 
 ## Start here on another PC
 
@@ -114,6 +114,8 @@
   - Validation ran only in `Obsidian Sandbox`. A disposable Canvas verified preserved Canvas path/Node ID, open-Canvas and closed-file Palette→Canvas Card updates, Canvas→Palette Card title/content updates, Group-child snapshot refresh, metadata synchronization in both directions, plugin-reload persistence, and actual linked-row click selection of the original node. The captured error log was empty and the disposable files and Palette data were removed afterward.
 - `0.1.19` consolidates the user's cross-machine development rules in this HANDOFF: authorization boundaries, investigation-first implementation, scope control, architecture preservation, Sandbox-only runtime testing, honest test reporting, cleanup, sequential `0.1.x` release policy, BRAT asset/SHA verification, and completion-report requirements. It also removes the obsolete pre-`0.1.18` prohibition on bidirectional Card synchronization. No plugin runtime behavior changes in this release.
   - Documentation-release validation covered TypeScript no-emit, production bundling, generated-bundle syntax, JSON parsing, and installation/reload as version `0.1.19` in `Obsidian Sandbox`. The plugin loaded successfully and the captured error log was empty. Feature-level runtime regressions were not re-run because no runtime source changed.
+- `0.1.20` extends linked Card identity from the original Canvas node to every Canvas placement created by Palette drag-and-drop. A placement now receives the Item's metadata immediately, participates in Palette-to-Canvas and Canvas-to-Palette content synchronization, and propagates Tags, Label, Label color, and Caption to the original and every other linked Card. Markdown/Image file-reference behavior and Group snapshot behavior remain unchanged.
+  - Validation ran only in an isolated `Obsidian Sandbox`. A real DOM drag-and-drop from Side Palette created a second linked text node and persisted its Canvas path/Node ID. Editing the dropped node updated the Palette Item and original node; editing the Palette updated both Canvas nodes; editing metadata on the dropped node updated the Item, both metadata records, and both Canvas overlays. All content, placements, metadata, and overlays survived an Obsidian restart. The captured error log was empty and disposable fixtures were removed afterward.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
@@ -134,7 +136,7 @@
 - Side Palette three-way independent divider resize, per-Pane scrolling, content-first type-aware Card/List Viewport, nested Outliner, Tag/Label indexes, item move/reorder, multi-selection, batch tags, guarded deletion, and type-preserving Canvas export.
 - Preview service for rendered Card/Markdown content, images, and subgraph visualizations; Side Palette Card/Markdown double-click uses the native Quick Editor, while Image/Group opens the large preview and Image supports wheel zoom.
 - Canvas Node and selected-text context-menu integration: `Collect to Mini Palette` or `Save directly to Side Palette — <Workspace>`. Vault File Explorer and active-file collection actions remain excluded because collection is Canvas-native.
-- Canvas Node metadata integration: `Edit Palette Metadata` stores values under Canvas path and Node ID, decorates the runtime node without changing Canvas JSON/content, and synchronizes Tags, Label, Label color, and Caption with every collected Item linked to that node. Linked Card content also synchronizes between the Canvas text node and Palette Item.
+- Canvas Node metadata integration: `Edit Palette Metadata` stores values under Canvas path and Node ID, decorates the runtime node without changing Canvas JSON/content, and synchronizes Tags, Label, Label color, and Caption across the shared Palette Item and all linked Canvas nodes. Linked Card content also synchronizes across the Palette Item, its origin, and every recorded placement.
 
 ## Architecture
 
