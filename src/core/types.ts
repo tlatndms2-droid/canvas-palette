@@ -70,7 +70,7 @@ export interface PaletteSettings {
   accentMode: AccentMode;
   accentColor: string;
   labelColorPresets: string[];
-  cardSize: number;
+  cardHeight: number;
   fontSize: number;
   columns: number;
 }

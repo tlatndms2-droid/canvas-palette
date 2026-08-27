@@ -13,6 +13,7 @@ export class SidePaletteView extends ItemView {
   private selectionAnchorId: string | null = null;
   private visibleItemIds: string[] = [];
   private suppressBlankClick = false;
+  private viewSettingsOpen = false;
   private readonly scrollSelectors = [".cp-viewport", ".cp-outliner", ".cp-tag-index", ".cp-label-index"] as const;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: CanvasPalettePlugin) { super(leaf); }
@@ -37,7 +38,7 @@ export class SidePaletteView extends ItemView {
     const exportButton = header.createEl("button", { text: "Export" }); exportButton.addEventListener("click", () => void this.plugin.exportActiveWorkspace());
     const collectButton = header.createEl("button", { text: "Send to Mini Palette" }); collectButton.addEventListener("click", () => void this.plugin.collectCanvasSelection());
     const selectorRow = root.createDiv({ cls: "cp-workspace-row" }); selectorRow.createSpan({ text: "Current workspace" });
-    workspaceSelect(this.plugin, selectorRow, workspace.id, (id) => { this.plugin.store.data.uiState.activeWorkspaceId = id; this.plugin.store.changed(); });
+    workspaceSelect(this.plugin, selectorRow, workspace.id, (id) => { this.query = ""; this.plugin.store.data.uiState.activeWorkspaceId = id; this.plugin.store.changed(); });
     const searchWrap = root.createDiv({ cls: "cp-search-wrap" });
     const search = searchWrap.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search cards, files, tags, labels…" }, value: this.query });
     search.addEventListener("input", () => { this.query = search.value; this.render(); requestAnimationFrame(() => this.contentEl.querySelector<HTMLInputElement>(".cp-search")?.focus()); });
@@ -55,13 +56,13 @@ export class SidePaletteView extends ItemView {
       workspace.sideLayout.topRatio = this.verticalRatio(top, indexes, hDivider, y);
       this.applyLayoutVariables(root, workspace.sideLayout);
     }, () => this.plugin.store.changed());
-    const tags = indexes.createDiv({ cls: "cp-panel cp-tag-index" }); this.renderIndex(tags, "Tag index", this.items(workspace.id).flatMap((item) => item.tags), "#");
+    const tags = indexes.createDiv({ cls: "cp-panel cp-tag-index" }); this.renderIndex(tags, "Tag index", this.items(workspace.id).flatMap((item) => item.tags), "tag");
     const iDivider = indexes.createDiv({ cls: "cp-divider cp-divider--vertical" });
     makeHorizontalDivider(iDivider, (x) => {
       workspace.sideLayout.indexRatio = this.horizontalRatio(indexes, iDivider, x, 130, 130);
       this.applyLayoutVariables(root, workspace.sideLayout);
     }, () => this.plugin.store.changed());
-    const labels = indexes.createDiv({ cls: "cp-panel cp-label-index" }); this.renderIndex(labels, "Label index", this.items(workspace.id).map((item) => item.label).filter(Boolean), "");
+    const labels = indexes.createDiv({ cls: "cp-panel cp-label-index" }); this.renderIndex(labels, "Label index", this.items(workspace.id).map((item) => item.label).filter(Boolean), "label");
     if (previousWorkspaceId === workspace.id) {
       for (const [selector, scrollTop] of scrollPositions) {
         const panel = root.querySelector<HTMLElement>(selector);
@@ -82,14 +83,17 @@ export class SidePaletteView extends ItemView {
       const batch = batchOverlay.createDiv({ cls: "cp-batch-bar" }); batch.createSpan({ cls: "cp-selection-count", text: `Selected ${selectedIds.length}` });
       const remove = batch.createEl("button", { text: "Delete", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmDelete(selectedIds));
     }
-    const options = parent.createEl("details", { cls: "cp-view-options" }); options.createEl("summary", { text: "View settings" });
+    const options = parent.createEl("details", { cls: "cp-view-options" });
+    options.open = this.viewSettingsOpen;
+    options.addEventListener("toggle", () => { this.viewSettingsOpen = options.open; });
+    options.createEl("summary", { text: "View settings" });
     const controls = options.createDiv({ cls: "cp-view-options__controls" });
     const listEl = parent.createDiv({ cls: `cp-grid cp-grid--${this.plugin.activeWorkspace()?.sideLayout.viewMode ?? "grid"}` });
     const applyViewSettings = (): void => {
-      listEl.style.setProperty("--cp-card-size", `${this.plugin.store.data.settings.cardSize}px`);
+      listEl.style.setProperty("--cp-card-height", `${this.plugin.store.data.settings.cardHeight}px`);
       listEl.style.setProperty("--cp-font-size", `${this.plugin.store.data.settings.fontSize}px`);
     };
-    const rangeControl = (label: string, key: "cardSize" | "fontSize", minimum: number, maximum: number, defaultValue: number): void => {
+    const rangeControl = (label: string, key: "cardHeight" | "fontSize", minimum: number, maximum: number, defaultValue: number): void => {
       const row = controls.createDiv({ cls: "cp-view-option" });
       const heading = row.createDiv({ cls: "cp-view-option__heading" });
       const name = heading.createEl("label", { text: label });
@@ -107,8 +111,8 @@ export class SidePaletteView extends ItemView {
       input.addEventListener("change", () => this.plugin.store.changed());
       reset.addEventListener("click", () => { input.value = String(defaultValue); update(); this.plugin.store.changed(); });
     };
-    rangeControl("Card width", "cardSize", 160, 360, 220);
-    rangeControl("Preview font size", "fontSize", 11, 20, 14);
+    rangeControl("Card height", "cardHeight", 72, 220, 220);
+    rangeControl("Preview font size", "fontSize", 8, 14, 14);
     applyViewSettings();
     listEl.addEventListener("dragover", (event) => { if (event.dataTransfer?.types.includes("application/x-canvas-palette-item")) event.preventDefault(); });
     listEl.addEventListener("drop", (event) => {
@@ -155,9 +159,15 @@ export class SidePaletteView extends ItemView {
     row.addEventListener("dblclick", () => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; void this.plugin.openSideItemPreview(item.id); });
   }
 
-  private renderIndex(parent: HTMLElement, title: string, values: string[], prefix: string): void {
+  private renderIndex(parent: HTMLElement, title: string, values: string[], kind: "tag" | "label"): void {
     parent.createEl("h4", { text: title }); const counts = new Map<string, number>(); for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
-    for (const [value, count] of [...counts].sort((a, b) => b[1] - a[1])) { const row = parent.createDiv({ cls: "cp-index-row" }); row.createSpan({ cls: "cp-chip", text: `${prefix}${value}` }); row.createSpan({ text: String(count) }); }
+    for (const [value, count] of [...counts].sort((a, b) => b[1] - a[1])) {
+      const token = kind === "tag" ? `#${value}` : `label:"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+      const row = parent.createDiv({ cls: "cp-index-row" });
+      const chip = row.createEl("button", { cls: `cp-chip cp-index-filter${this.plugin.search.hasToken(this.query, token) ? " is-active" : ""}`, text: kind === "tag" ? `#${value}` : value, attr: { "aria-pressed": String(this.plugin.search.hasToken(this.query, token)) } });
+      chip.addEventListener("click", () => { this.query = this.plugin.search.toggleToken(this.query, token); this.render(); requestAnimationFrame(() => this.contentEl.querySelector<HTMLInputElement>(".cp-search")?.focus()); });
+      row.createSpan({ text: String(count) });
+    }
   }
 
   private items(workspaceId: string): PaletteItem[] { return this.plugin.store.itemsForWorkspace(workspaceId); }

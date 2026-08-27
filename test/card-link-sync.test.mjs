@@ -19,7 +19,7 @@ async function loadStore() {
 function fixture() {
   return {
     schemaVersion: 6,
-    settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardSize: 220, fontSize: 14, columns: 4 },
+    settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
     items: {
       card: {
         id: "card", type: "card", displayTitle: "Card", tags: ["one"], label: "Shared", labelColor: "#7c3aed", caption: "Caption",

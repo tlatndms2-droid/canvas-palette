@@ -4,7 +4,7 @@ export const DEFAULT_SIDE_LAYOUT: SideLayoutState = { viewportRatio: 0.52, topRa
 
 export const DEFAULT_DATA: PaletteData = {
   schemaVersion: 6,
-  settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardSize: 220, fontSize: 14, columns: 4 },
+  settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
   collections: {},
@@ -19,6 +19,8 @@ export const DEFAULT_DATA: PaletteData = {
 
 export function migrateData(raw: Partial<PaletteData> | null | undefined): PaletteData {
   if (!raw) return structuredClone(DEFAULT_DATA);
+  const rawSettings = raw.settings as (Partial<PaletteData["settings"]> & { cardSize?: number }) | undefined;
+  const { cardSize: _legacyCardSize, ...migratedSettings } = rawSettings ?? {};
   const legacyUi = raw.uiState as Partial<PaletteData["uiState"]> & { miniTab?: "collect" | "storage"; leftPaneOpen?: boolean; rightPaneOpen?: boolean; leftPaneWidth?: number; rightPaneWidth?: number };
   const workspaces = Object.fromEntries(Object.entries(raw.workspaces ?? {}).map(([id, workspace]) => [id, {
     ...workspace,
@@ -28,7 +30,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
   return {
     ...structuredClone(DEFAULT_DATA),
     ...raw,
-    settings: { ...DEFAULT_DATA.settings, ...raw.settings, labelColorPresets: [...new Set(raw.settings?.labelColorPresets ?? [])] },
+    settings: { ...DEFAULT_DATA.settings, ...migratedSettings, labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
     schemaVersion: 6,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => [id, { ...item, labelColor: item.labelColor ?? "", canvasPlacements: item.canvasPlacements ?? [] }])),
     workspaces,
