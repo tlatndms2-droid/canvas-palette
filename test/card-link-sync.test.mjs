@@ -23,7 +23,7 @@ function fixture() {
     items: {
       card: {
         id: "card", type: "card", displayTitle: "Card", tags: ["one"], label: "Shared", labelColor: "#7c3aed", caption: "Caption",
-        createdAt: 1, modifiedAt: 1, origin: { canvasPath: "A.canvas", canvasNodeId: "origin", workspaceId: "workspace" }, canvasPlacements: [], content: "Body"
+        createdAt: 1, modifiedAt: 1, origin: { canvasPath: "A.canvas", canvasNodeId: "origin", workspaceId: "workspace" }, canvasPlacements: [], content: "Body", backContent: "", facesEnabled: false
       }
     },
     workspaces: {
@@ -92,7 +92,8 @@ test("Back content synchronizes while each placement keeps its own current face"
   assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.currentFace, "back");
   assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.facesEnabled, true);
   assert.equal(store.getCanvasNodeMetadata("B.canvas", "drop")?.currentFace, "front");
-  assert.equal(store.getCanvasNodeMetadata("B.canvas", "drop")?.facesEnabled, false);
+  assert.equal(store.getCanvasNodeMetadata("B.canvas", "drop")?.facesEnabled, true);
+  assert.equal(store.data.items.card.facesEnabled, true);
   await cleanup();
 });
 

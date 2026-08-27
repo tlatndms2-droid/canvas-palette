@@ -2,12 +2,12 @@
 
 ## Current state
 
-- Version: `0.2.17`.
+- Version: `0.2.18`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.17`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.17`.
-- Latest runtime change: `0.2.17`; Canvas Front/Back is opt-in per selected node from the native node toolbar instead of appearing on every Canvas node. Linked nodes expose the one-shot `Unlink from Palette` action in the same toolbar rather than a node context menu. Unlink preserves Front, Back, Metadata, enabled state, and current face while permanently detaching that node.
+- Latest release: `0.2.18`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.18`.
+- Latest runtime change: `0.2.18`; Front/Back opt-in belongs to the linked material, so only enabled materials show flip controls across Canvas, Side, and Mini. Palette-to-Canvas drag carries the complete linked state. Canvas Back is edited in place with an embedded native Live Preview, and the original Canvas border remains visible on the Back. Toolbar unlink remains one-shot and preserves Front, Back, Metadata, enabled state, and current face.
 - Automated baseline: 10 Node tests (including Back synchronization, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
@@ -142,6 +142,8 @@
   - Direct read-only DOM inspection of the user's demonstrated view measured the player at `400×225` inside a `306×220` body before the rule. A temporary non-persistent style application measured it at approximately `306×172` afterward and showed the complete player frame inside the Card. No Vault files or Palette records were changed. An isolated Sandbox Vault was not available, so installation/reload validation of the packaged build was not performed in this task.
 - `0.2.16` adds persisted Front/Back content across Palette Items and linked Canvas placements, native Live Preview Back editing, location-local current-face state, and one-shot unlink preservation.
 - `0.2.17` makes Canvas Front/Back explicitly opt-in per node. Selecting one Canvas node shows `Enable Front / Back` in the native node toolbar; only after activation does that node receive its small flip control. A linked node shows `Unlink from Palette` in the same toolbar, and the old node context-menu interception is removed. Existing nodes with actual Back content or a saved Back face migrate as enabled, while ordinary nodes remain unchanged.
+- `0.2.18` corrects the incomplete `0.2.17` behavior. Front/Back enabled state now follows the linked material and controls visibility in Canvas, Side Palette, and Mini Palette, so unrelated items have no flip button. Real Palette-to-Canvas drag restores the linked state and toolbar unlink. Canvas Back double-click embeds the native Live Preview directly inside the node; outside click or Escape saves without opening the floating editor. Back display leaves the native Canvas container visible so its border and selection outline remain intact.
+  - Runtime validation ran in `Obsidian Sandbox` through Obsidian CLI/CDP without controlling the user's mouse. One enabled and one ordinary Canvas node verified opt-in toolbar activation and conditional Palette controls. A real DOM drag produced a linked Canvas placement with Front/Back state and Metadata, plus toolbar unlink. Inline Live Preview accepted `## Inline Back`, saved on outside click, synchronized to the Palette Item, retained the native selected border, and opened no floating editor. One-shot unlink preserved the detached Back/current face/enabled state, blocked later Palette Back changes, and survived plugin reload. The captured error log was empty and all disposable Items, metadata, and Canvas files were removed.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 

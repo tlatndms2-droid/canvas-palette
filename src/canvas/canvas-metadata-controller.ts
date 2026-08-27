@@ -1,12 +1,14 @@
 import { MarkdownRenderer, setIcon } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { PaletteMetadata } from "../core/types";
+import { NativeMarkdownEditor } from "../editor/native-markdown-editor";
 import type { CanvasAdapter, CanvasRuntimeNodeLike } from "./canvas-adapter";
 
 export class CanvasMetadataController {
   private timer: number | null = null;
   private readonly nodesByElement = new WeakMap<Element, CanvasRuntimeNodeLike>();
   private readonly activeEditors = new WeakSet<HTMLElement>();
+  private activeBackEditor: { nodeEl: HTMLElement; close: (save: boolean) => Promise<void> } | null = null;
   private readonly resizeObserver = new ResizeObserver((entries) => {
     for (const entry of entries) {
       const node = this.nodesByElement.get(entry.target);
@@ -32,6 +34,7 @@ export class CanvasMetadataController {
   destroy(): void {
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.resizeObserver.disconnect();
+    void this.activeBackEditor?.close(true);
     for (const context of this.adapter.openContexts()) {
       const nodes = context.runtime.nodes;
       if (!(nodes instanceof Map)) continue;
@@ -42,6 +45,7 @@ export class CanvasMetadataController {
   private decorate(node: CanvasRuntimeNodeLike, canvasPath: string, nodeId: string, metadata: PaletteMetadata | undefined): void {
     const nodeEl = node.nodeEl;
     if (!(nodeEl instanceof HTMLElement)) return;
+    if (this.activeBackEditor?.nodeEl === nodeEl) return;
     const activeEditor = nodeEl.querySelector<HTMLElement>(":scope > .cp-canvas-metadata .cp-canvas-metadata__editor");
     if (activeEditor && this.activeEditors.has(activeEditor)) return;
     this.remove(node);
@@ -60,10 +64,10 @@ export class CanvasMetadataController {
       nodeEl.addClass("cp-canvas-showing-back");
       const back = layer.createDiv({ cls: "cp-canvas-back markdown-rendered", attr: { title: "Double-click to edit the back" } });
       void MarkdownRenderer.render(this.plugin.app, state.backContent, back, canvasPath, this.plugin).then(() => {
-        if (!state.backContent) back.createDiv({ cls: "cp-empty", text: "Write on the back…" });
+        if (!state.backContent && !back.hasClass("is-editing")) back.createDiv({ cls: "cp-empty", text: "Write on the back…" });
       });
       back.addEventListener("pointerdown", (event) => event.stopPropagation());
-      back.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); void this.plugin.editorManager.openCanvasBack(canvasPath, nodeId, data?.label ?? data?.text?.split(/\r?\n/, 1)[0] ?? "Canvas node"); });
+      back.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); void this.openInlineBackEditor(back, nodeEl, canvasPath, nodeId, state.backContent, data?.label ?? data?.text?.split(/\r?\n/, 1)[0] ?? "Canvas node"); });
     }
     if (state.label) {
       const header = layer.createDiv({ cls: "cp-canvas-metadata__header" });
@@ -99,6 +103,47 @@ export class CanvasMetadataController {
     this.nodesByElement.set(nodeEl, node);
     this.resizeObserver.observe(nodeEl);
     this.updateScale(node);
+  }
+
+  private async openInlineBackEditor(back: HTMLElement, nodeEl: HTMLElement, canvasPath: string, nodeId: string, initialText: string, title: string): Promise<void> {
+    if (this.activeBackEditor?.nodeEl === nodeEl) return;
+    await this.activeBackEditor?.close(true);
+    back.empty();
+    back.addClass("is-editing");
+    const host = back.createDiv({ cls: "cp-canvas-back-editor cp-native-editor-host", attr: { "aria-label": `Edit ${title} back` } });
+    const editor = new NativeMarkdownEditor(this.plugin.app, { itemId: `${canvasPath}:${nodeId}`, kind: "card", file: null, title: `${title} — Back`, initialText });
+    let finishing = false;
+    const doc = back.ownerDocument;
+    const onOutsidePointer = (event: PointerEvent): void => {
+      if (!back.contains(event.target as Node)) void close(true);
+    };
+    const onKeyDown = (event: KeyboardEvent): void => {
+      event.stopPropagation();
+      if (event.key === "Escape") { event.preventDefault(); void close(true); }
+      else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); this.plugin.store.setCanvasNodeBack(canvasPath, nodeId, editor.getText()); }
+    };
+    const close = async (save: boolean): Promise<void> => {
+      if (finishing) return;
+      finishing = true;
+      doc.removeEventListener("pointerdown", onOutsidePointer, true);
+      host.removeEventListener("keydown", onKeyDown, true);
+      const text = editor.getText();
+      editor.detach();
+      if (this.activeBackEditor?.nodeEl === nodeEl) this.activeBackEditor = null;
+      if (save) this.plugin.store.setCanvasNodeBack(canvasPath, nodeId, text);
+      else this.refreshSoon();
+    };
+    this.activeBackEditor = { nodeEl, close };
+    host.addEventListener("pointerdown", (event) => event.stopPropagation());
+    host.addEventListener("dblclick", (event) => event.stopPropagation());
+    host.addEventListener("keydown", onKeyDown, true);
+    try {
+      await editor.mount(host, false);
+      window.setTimeout(() => doc.addEventListener("pointerdown", onOutsidePointer, true), 0);
+    } catch (error) {
+      await close(false);
+      console.error("Canvas Palette could not mount the inline Back editor", error);
+    }
   }
 
   private makeInlineEditable(element: HTMLElement, label: string, value: string, onCommit: (value: string) => void): void {

@@ -2,15 +2,15 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.2.17**
+Current version: **0.2.18**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
 - Schema-versioned persistent model for items, workspaces, collections, pending imports, and UI state.
-- Every Palette Card, Markdown, Image, and Group has a shared Front/Back data pair. On Canvas, Front/Back is opt-in per selected node through `Enable Front / Back` in the native node toolbar, so ordinary Canvas nodes do not receive a flip control. Once enabled, the chosen node gets the tiny 22px local flip control and its Back is edited through Obsidian's native Live Preview.
-- Back content and Metadata synchronize across the Palette Item and every linked Canvas placement, while each enabled Canvas node, Side card, and Mini card keeps its own current face. Linked Canvas nodes expose `Unlink from Palette` in the native node toolbar; this one-shot command preserves Front, Back, Metadata, enabled state, and current face while stopping all later synchronization.
+- Front/Back is opt-in per material. Selecting a Canvas node and running `Enable Front / Back` from the native node toolbar enables the same linked material across Canvas, Side Palette, and Mini Palette; unrelated materials show no flip control. The chosen material gets a tiny 22px local flip control, and Canvas Back editing happens in place inside the card through Obsidian's native Live Preview rather than a separate floating window.
+- Back content, Front/Back enabled state, and Metadata synchronize across the Palette Item and every linked Canvas placement, while each enabled Canvas node, Side card, and Mini card keeps its own current face. Palette-to-Canvas drag restores that complete linked state. Linked Canvas nodes expose `Unlink from Palette` in the native node toolbar; this one-shot command preserves Front, Back, Metadata, enabled state, current face, and the native Canvas border while stopping all later synchronization.
 - The native selected-node Canvas toolbar remains available for both single and multiple Card/MD/Image/Group selections. Metadata editing applies one edit to every selected node, while Mini Palette collection and direct Side Palette storage operate on the complete selection. Selected Canvas text keeps the same collection routes in its editor context menu.
 - The selected-node Canvas toolbar can create Palette Tags, Label, and Caption before collection. Existing Label, Tag, and Caption values can then be edited in place by double-clicking their visible overlay; Enter or focus loss saves, Escape cancels, and the automatic date remains read-only. The overlay preserves the native Canvas card and scales with the resized node.
 - Floating Mini Palette mounted over the active Canvas, with a hover trigger, drag movement, resize, pin/close controls, and direct Canvas drag-and-drop.

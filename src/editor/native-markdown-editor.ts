@@ -20,7 +20,7 @@ export class NativeMarkdownEditor {
 
   constructor(private readonly app: App, private readonly target: PaletteEditorTarget) {}
 
-  async mount(containerEl: HTMLElement): Promise<void> {
+  async mount(containerEl: HTMLElement, activateLeaf = true): Promise<void> {
     const Split = WorkspaceSplit as unknown as WorkspaceSplitConstructor;
     const split = new Split(this.app.workspace, "vertical");
     split.getRoot = () => this.app.workspace.rootSplit;
@@ -45,8 +45,9 @@ export class NativeMarkdownEditor {
       view.setViewData(this.target.initialText, true);
       this.view = view;
     }
-    this.app.workspace.setActiveLeaf(leaf, { focus: true });
+    if (activateLeaf) this.app.workspace.setActiveLeaf(leaf, { focus: true });
     this.remeasure();
+    if (!activateLeaf) window.requestAnimationFrame(() => containerEl.querySelector<HTMLElement>(".cm-content")?.focus());
   }
 
   getText(): string { return this.view?.getViewData() ?? this.target.initialText; }

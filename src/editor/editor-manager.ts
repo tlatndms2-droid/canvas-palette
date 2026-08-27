@@ -23,11 +23,6 @@ export class PaletteEditorManager {
     return this.openTarget({ itemId, kind: "card", file: null, title: `${item.displayTitle} — Back`, initialText: item.backContent }, (text) => this.plugin.store.setItemBack(itemId, text));
   }
 
-  async openCanvasBack(canvasPath: string, nodeId: string, title: string): Promise<boolean> {
-    const state = this.plugin.store.getCanvasNodeMetadata(canvasPath, nodeId);
-    return this.openTarget({ itemId: `${canvasPath}:${nodeId}`, kind: "card", file: null, title: `${title} — Back`, initialText: state?.backContent ?? "" }, (text) => this.plugin.store.setCanvasNodeBack(canvasPath, nodeId, text));
-  }
-
   private async openTarget(target: PaletteEditorTarget, onSave: (text: string) => void): Promise<boolean> {
     if (this.activeEditor) await this.activeEditor.close(true);
     const editor = new FloatingEditor(

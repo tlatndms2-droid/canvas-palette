@@ -51,6 +51,7 @@ export interface PaletteItem {
   canvasPlacements: CanvasPlacement[];
   content?: string;
   backContent: string;
+  facesEnabled: boolean;
   group?: GroupSnapshot;
 }
 

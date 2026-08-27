@@ -97,6 +97,7 @@ export class PaletteStore {
   setItemBack(id: string, backContent: string): void {
     const item = this.data.items[id];
     if (!item || item.backContent === backContent) return;
+    item.facesEnabled = true;
     this.updateItem(id, { displayTitle: item.displayTitle, tags: item.tags, label: item.label, labelColor: item.labelColor, caption: item.caption, backContent });
   }
 
@@ -134,10 +135,11 @@ export class PaletteStore {
   setCanvasNodeBack(canvasPath: string, nodeId: string, backContent: string): void {
     const current = this.canvasNodeState(canvasPath, nodeId);
     const modifiedAt = Date.now();
-    this.setMetadataRecord(canvasPath, nodeId, { ...current, backContent }, modifiedAt);
+    this.setMetadataRecord(canvasPath, nodeId, { ...current, backContent, facesEnabled: true }, modifiedAt);
     const linkedItems = Object.values(this.data.items).filter((item) => this.itemHasLinkedNode(item, canvasPath, nodeId));
     for (const item of linkedItems) {
       item.backContent = backContent;
+      item.facesEnabled = true;
       item.modifiedAt = modifiedAt;
       this.applyItemMetadataToLinkedNodes(item);
     }
@@ -152,8 +154,13 @@ export class PaletteStore {
 
   enableCanvasNodeFaces(canvasPath: string, nodeId: string): void {
     const current = this.canvasNodeState(canvasPath, nodeId);
-    if (current.facesEnabled) return;
+    const linkedItems = Object.values(this.data.items).filter((item) => this.itemHasLinkedNode(item, canvasPath, nodeId));
+    if (current.facesEnabled && linkedItems.every((item) => item.facesEnabled)) return;
     this.setMetadataRecord(canvasPath, nodeId, { ...current, facesEnabled: true }, current.modifiedAt);
+    for (const item of linkedItems) {
+      item.facesEnabled = true;
+      this.applyItemMetadataToLinkedNodes(item);
+    }
     this.changed();
   }
 
@@ -161,7 +168,7 @@ export class PaletteStore {
     const item = this.allItems().find((candidate) => this.itemHasLinkedNode(candidate, canvasPath, nodeId));
     if (!item) return false;
     const current = this.canvasNodeState(canvasPath, nodeId);
-    this.setMetadataRecord(canvasPath, nodeId, { ...current, tags: [...item.tags], label: item.label, labelColor: item.labelColor ?? "", caption: item.caption, backContent: item.backContent }, item.modifiedAt);
+    this.setMetadataRecord(canvasPath, nodeId, { ...current, tags: [...item.tags], label: item.label, labelColor: item.labelColor ?? "", caption: item.caption, backContent: item.backContent, facesEnabled: item.facesEnabled }, item.modifiedAt);
     if (item.origin.canvasPath === canvasPath && item.origin.canvasNodeId === nodeId) { delete item.origin.canvasPath; delete item.origin.canvasNodeId; }
     for (const placement of item.canvasPlacements) if (placement.canvasPath === canvasPath) placement.nodeIds = placement.nodeIds.filter((id) => id !== nodeId);
     item.canvasPlacements = item.canvasPlacements.filter((placement) => placement.nodeIds.length > 0);
@@ -318,7 +325,7 @@ export class PaletteStore {
   }
 
   private applyItemMetadataToLinkedNodes(item: PaletteItem): void {
-    const normalized = { tags: [...new Set(item.tags)], label: item.label, labelColor: item.label ? item.labelColor ?? "" : "", caption: item.caption, backContent: item.backContent };
+    const normalized = { tags: [...new Set(item.tags)], label: item.label, labelColor: item.label ? item.labelColor ?? "" : "", caption: item.caption, backContent: item.backContent, facesEnabled: item.facesEnabled };
     for (const location of this.linkedCanvasNodes(item)) {
       const currentFace = this.data.canvasNodeMetadata[location.canvasPath]?.[location.nodeId]?.currentFace ?? "front";
       this.setMetadataRecord(location.canvasPath, location.nodeId, { ...normalized, currentFace }, item.modifiedAt);
