@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.2.2**
+Current version: **0.2.14**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
@@ -73,7 +73,7 @@ Copy `main.js`, `manifest.json`, and `styles.css` into:
 - Canvas integration is implemented through Canvas document JSON plus guarded runtime selection access. It must be exercised against the user's installed Obsidian Canvas version before depending on it for production canvases.
 - Collection entry points deliberately exist only inside Canvas node and Canvas text-selection context menus; File Explorer and active-file collection shortcuts are not provided.
 - Text scraps preserve source origin/range and are highlighted in the editor; clicking the highlight selects the linked Palette Card and opens Side Palette.
-- `More`, exact copy semantics, final filter-combination rules, and final pane min/max values remain deliberately undecided.
+- `More` and final pane min/max values remain deliberately undecided. Copy uses shared linked-item identity, and filters use the visible Obsidian-like Search query described in `HANDOFF.md`.
 
 ## Next work
 

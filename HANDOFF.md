@@ -2,11 +2,13 @@
 
 ## Current state
 
-- Version: `0.2.2`
+- Version: `0.2.14` (documentation handoff; runtime behavior through `0.2.13`).
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.2`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.2.2.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.2`.
+- Latest release: `0.2.14`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.14`.
+- Latest runtime change: `0.2.13`; selected Card/Markdown previews render the full source, support internal drag/wheel browsing, and constrain embedded images/videos to the thumbnail bounds.
+- Automated baseline: 7 Node tests (Card link synchronization, link reconciliation/unlinking, viewport reorder, and Obsidian-like search). `0.2.10`-`0.2.13` passed these tests plus TypeScript no-emit and production bundling, but the exact image/video sizing still needs user-side Obsidian runtime confirmation.
 
 ## Start here on another PC
 
@@ -39,7 +41,7 @@
 - Implement state, events, persistence, and cleanup as a complete behavior. Do not stop at CSS decoration or a mocked interaction.
 - Preserve original Vault data. Palette display-title changes and Palette deletion must not rename, duplicate, or delete original Markdown/Image files or existing Canvas nodes.
 - Keep current product decisions intact unless the user changes them explicitly: Collect and Storage remain separate, Mini Palette remains Canvas-hosted, Storage panes remain docked and responsive, and Light/Dark layouts retain the same geometry.
-- Do not define unresolved behavior such as the More menu, final Copy semantics, filter composition, or final pane limits without user direction.
+- Do not invent new behavior for the unresolved More menu or final pane limits. Copy/link identity and search composition are now decided below and must be preserved.
 - Keep source text, JSON, and Korean content UTF-8 safe. Use literal paths for Windows paths containing spaces or Korean characters.
 
 ### Verification and Sandbox safety
@@ -55,8 +57,8 @@
 
 - Keep `manifest.json`, `package.json`, `versions.json`, README, HANDOFF, Git tag, and GitHub Release version aligned.
 - Publish from `main` as a public, non-draft, non-prerelease GitHub Release suitable for BRAT.
-- Attach `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-<version>.zip` as separate release assets.
-- Verify local HEAD, remote `main`, and the release tag resolve to the same commit. Re-fetch the public release and confirm all four asset names, sizes, and SHA-256 digests.
+- Attach `main.js`, `manifest.json`, and `styles.css` as separate release assets. A zip is optional unless the user requests it.
+- Verify local HEAD, remote `main`, and the release tag resolve to the same commit. Re-fetch the public release and confirm all required asset names.
 - Do not report release completion from a locally created tag or draft page. The public release and downloadable assets must already exist.
 
 ### Completion report
@@ -75,8 +77,10 @@
 - Side Palette is the persistent Workspace/Collection manager. One Canvas can be associated with multiple Workspaces, and a Workspace can be associated with multiple Canvas files.
 - Card, Markdown, Image, and Group are the four stored asset types. Text scraps and Side memos are Card variants, not additional asset types.
 - Markdown and Image items retain references to their original Vault files. Changing a Palette display title must never rename or duplicate those files.
+- Final Copy/link meaning: moving or dropping a Canvas Card/Markdown/Image through Mini Palette, Side Palette, another Workspace, or another Canvas does not create an independent copy. Every placement represents the same linked Palette Item. Card content and common metadata must propagate to all linked Card nodes; Markdown/Image retain one original Vault file reference; deleting or unlinking one placement must not silently delete the source file or unrelated placements.
+- Search follows an Obsidian-like visible query model. Clicking a Tag/Label/type/linked-space filter writes a visible token into the Search field; deleting that text clears the filter. The parser supports implicit AND, explicit `OR`, parentheses, and facets such as `tag:`, `label:`, `type:`, and `space:` rather than hard-coded hidden Tag-OR/Label-AND rules.
 - Theme choices are Follow Obsidian, Light, and Dark. Layout and component language remain consistent across themes, and Accent can use Obsidian's value or a user-selected custom color.
-- The agreed delivery method is to implement the confirmed plan as an integrated build, then let the user demonstrate it in Obsidian and report concrete failures for sequential `0.1.x` fixes.
+- The agreed delivery method is to let the user demonstrate the current build in Obsidian and report concrete failures for sequential patch releases.
 - While the user is listing or demonstrating problems, only inspect, compare with the plan, and brief the findings. Once the user explicitly requests a modification, complete the next sequential patch build and BRAT release without requiring a separate release command, unless the user asks for local-only work.
 
 ## Conversation and release progression
@@ -122,6 +126,18 @@
   - Validation ran only in an isolated `Obsidian Sandbox` with 20 disposable Card fixtures. In both Light and Dark plugin themes, the count used the same computed foreground color as the panel text, remained visibly sized, and sat on the intended 14% Accent tint instead of a solid Accent fill. The selected state kept a 43-pixel slot, Delete remained visible, batch `Edit metadata` remained absent, and a 420-pixel then 310-pixel Viewport offset survived selection and theme rerenders exactly. The captured error log was empty and all fixtures and the Sandbox vault were removed afterward.
 - `0.2.2` adopts Windows File Explorer selection behavior in the Side Palette Viewport. Plain click selects one Card, Ctrl/Cmd-click toggles individual Cards, Shift-click selects the visible range from the anchor, blank-space click clears selection, and a pointer drag beginning only on blank grid space draws a live selection rectangle; Ctrl/Cmd-drag adds its hits to the existing selection. Single selection uses border emphasis without a check marker, while multi-selection shows markers on every selected Card and matching Outliner rows. Card-origin drag continues to use the existing Canvas payload path. Grid Caption layout now reserves 24 pixels below the Card and centers the Caption there instead of collapsing that space with a negative margin.
   - Validation ran only in an isolated `Obsidian Sandbox` with 16 disposable captioned Card fixtures. Real click events produced one selected Card with zero markers, Ctrl-click produced two Cards with two markers, Shift-click selected the four-Card visible range from the Ctrl-updated anchor, and blank-grid click cleared all selection while the 380-pixel Viewport offset remained exact. A real pointer sequence showed a visible selection rectangle and three live-highlighted Cards before pointer-up; release persisted those three, and Ctrl-pointer-drag added two more. Outliner check counts matched multi-selection. Caption and Card centers were identical, the Card reserved a 24-pixel bottom margin, and the rendered Caption ended 13 pixels before the next Card. A real Card dragstart still wrote the Card ID/type Palette payload and did not invoke marquee selection. The captured error log was empty and all fixtures and the Sandbox vault were removed afterward.
+- `0.2.3` repairs Viewport controls: Grid/List and View settings interactions work again, selection status no longer overlaps View settings, and the settings panel only collapses from its own toggle.
+- `0.2.4` replaces hidden Tag/Label filtering with an Obsidian-like query parser and visible Search tokens. It supports `tag:`, `label:`, implicit AND, `OR`, and parentheses; index-chip state is derived from the visible query.
+- `0.2.5` removes Card-width adjustment, keeps width responsive, extends Card-height and preview-font settings to both Grid and List, and allows a smaller height range.
+- `0.2.6` adds Viewport type toggles (`All`, `Image`, `MD`, `Card`, `Group`), `type:` and `space:` search facets, and a responsive Linked spaces dialog. Lower preview font sizes render a larger source slice for unselected thumbnails.
+- `0.2.7` reconciles stored Canvas links against current Canvas documents, removes stale placement records, promotes a surviving placement when the origin disappears, and adds guarded per-space Unlink. Unlink removes only that Canvas relationship/nodes; it does not delete the Palette Item, Vault source, or other placements.
+- `0.2.8` introduces the visible Viewport reorder insertion marker and restricts Card/Markdown internal wheel scrolling to selected items. Unselected thumbnails leave wheel events to the Viewport.
+- `0.2.9` stabilizes selection, scrolling, and reorder: blank Viewport clicks clear selection, drag measurements are cached, the insertion indicator is a fixed overlay rather than an in-flow element, and selected text previews alone consume internal scrolling.
+- `0.2.10` compacts Card/Markdown thumbnail typography (paragraph, heading, list, quote, table, and code-block spacing) in Grid/List only. It does not change source documents, editors, or large previews.
+- `0.2.11` fixes the real full-body limitation. A selected Card/Markdown renders the complete source instead of the compact character slice, and vertical pointer dragging or the wheel browses its internal body. Body panning temporarily disables native Card drag so it does not reorder or drop the Card accidentally.
+- `0.2.12` constrains embedded images in Card/Markdown thumbnails to the available Card width/height, preserves aspect ratio, and centers them instead of cropping or stretching.
+- `0.2.13` applies the same containment intent to embedded `iframe`/`video` content using a centered 16:9 frame bounded by the configured Card height. Automated checks passed, but the user's exact Obsidian embed/theme combination still needs visual confirmation.
+- `0.2.14` updates this cross-PC handoff and README/version metadata only. It introduces no runtime behavior change.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
@@ -139,8 +155,8 @@
 - Schema version 6 migration, pre-collection Canvas-node metadata, custom Label-color presets, Workspace Canvas association, per-item Canvas placement history, per-workspace Side layout, Mini Palette geometry, themes, and custom Accent persistence.
 - Canvas Adapter for guarded active Canvas selection, Canvas JSON capture, file/text/group creation, Group ID remapping, and Collection mind-map export.
 - Floating Canvas-hosted Mini Palette with hover trigger, window move/resize, Collect Inspector, Storage filters/sort/view modes, docked panes, previews, and Canvas drag/drop.
-- Side Palette three-way independent divider resize, per-Pane scrolling, content-first type-aware Card/List Viewport, nested Outliner, Tag/Label indexes, item move/reorder, multi-selection, batch tags, guarded deletion, and type-preserving Canvas export.
-- Preview service for rendered Card/Markdown content, images, and subgraph visualizations; Side Palette Card/Markdown double-click uses the native Quick Editor, while Image/Group opens the large preview and Image supports wheel zoom.
+- Side Palette three-way independent divider resize, per-Pane scrolling, content-first type-aware Grid/List Viewport, nested Outliner, searchable Tag/Label indexes, type/linked-space filters, item move/reorder, Windows-style multi-selection, guarded deletion/unlinking, and type-preserving Canvas export.
+- Preview service for rendered Card/Markdown content, contained images/videos, and subgraph visualizations. Selected Card/Markdown thumbnails render and browse their complete source; unselected thumbnails remain compact. Side Palette Card/Markdown double-click uses the native Quick Editor, while Image/Group opens the large preview and Image supports wheel zoom.
 - Canvas Node and selected-text context-menu integration: `Collect to Mini Palette` or `Save directly to Side Palette — <Workspace>`. Vault File Explorer and active-file collection actions remain excluded because collection is Canvas-native.
 - Canvas Node metadata integration: `Edit Palette Metadata` stores values under Canvas path and Node ID, decorates the runtime node without changing Canvas JSON/content, and synchronizes Tags, Label, Label color, and Caption across the shared Palette Item and all linked Canvas nodes. Linked Card content also synchronizes across the Palette Item, its origin, and every recorded placement.
 
@@ -181,11 +197,15 @@ Focused release checks are recorded above, but a future change touching shared i
 ## Safety and unresolved behavior
 
 - Do not rename MD/image files when changing display titles.
+- Preserve shared identity. A Palette Item and all of its Canvas/Workspace placements are linked views of the same asset, not independent copies. Card content/common metadata synchronization has automated coverage; do not regress it while changing drag/drop, deletion, or Workspace organization.
+- Palette deletion and Canvas unlink/delete semantics still need a final user-approved popup flow. The desired direction is explicit choice when deleting a linked Canvas Card (remove only this placement versus also remove linked Palette/Canvas placements). Palette-side deletion must not delete the original Vault file. Do not silently guess destructive scope.
+- The latest embedded image/video containment (`0.2.12`/`0.2.13`) passed static tests/build but was not runtime-verified in this task. First follow-up on another PC should visually check embedded images, local videos, and iframe/video embeds at Card heights 32-220px in both Grid and List.
+- Mini Palette link/content/metadata consistency should be rechecked before declaring synchronization complete; the user previously reported that Palette-to-Canvas drag could lose metadata or shared content.
 - Keep Collect and Storage separate, and keep Mini Palette Canvas-hosted rather than as a regular Obsidian tab.
 - Keep the Storage panes docked, the grid responsive, and Light/Dark layouts geometrically identical.
-- Do not define the More menu, final Copy semantics, filter composition, or final pane limits without user direction.
+- Do not define the More menu or final pane limits without user direction. Copy/link and search semantics are already fixed above.
 - Do not advance to `0.3.0` without explicit user instruction.
 
 ## Release checklist
 
-Use the complete release and GitHub verification rules in `Development operating instructions`. The short form is: build, Sandbox-test the affected paths, bump the next sequential patch version unless the user requested a minor bump, update README/HANDOFF, commit, push, publish all four BRAT assets, and verify the public release and matching SHAs.
+Use the complete release and GitHub verification rules in `Development operating instructions`. The short form is: build, Sandbox-test the affected paths when possible, bump the next sequential patch version unless the user requested a minor bump, update README/HANDOFF, commit, push, publish `main.js`, `manifest.json`, and `styles.css`, and verify the public release and matching Git refs. The user explicitly requires a release after every implemented modification.
