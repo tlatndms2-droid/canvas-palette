@@ -1,5 +1,6 @@
 import { Editor, EventRef, Menu, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { CanvasAdapter } from "./canvas/canvas-adapter";
+import { mergeCanvasNodeIds } from "./core/canvas-node-presence";
 import { CanvasMetadataController } from "./canvas/canvas-metadata-controller";
 import { CanvasNodeToolbarController } from "./canvas/canvas-node-toolbar-controller";
 import { PaletteDropController } from "./canvas/palette-drop-controller";
@@ -265,7 +266,8 @@ export default class CanvasPalettePlugin extends Plugin {
   private async syncCanvasFileToPalette(file: TFile): Promise<void> {
     try {
       const result = await this.canvas.syncItemsFromCanvas(file, this.store.allItems());
-      const linksChanged = this.store.reconcileCanvasLinks(file.path, result.nodeIds);
+      const existingNodeIds = mergeCanvasNodeIds(result.nodeIds, this.canvas.openNodeIds(file.path));
+      const linksChanged = this.store.reconcileCanvasLinks(file.path, existingNodeIds);
       if (result.changedItems > 0 || linksChanged) {
         this.store.changed();
         for (const item of this.store.allItems()) if (item.type === "card") void this.syncPaletteItemToCanvas(item);

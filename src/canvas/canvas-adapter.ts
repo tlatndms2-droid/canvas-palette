@@ -69,6 +69,15 @@ export class CanvasAdapter {
     return context ? { canvasPath: context.file.path, nodeId } : null;
   }
 
+  openNodeIds(canvasPath: string): Set<string> {
+    const ids = new Set<string>();
+    for (const context of this.openContexts()) {
+      if (context.file.path !== canvasPath || !(context.runtime.nodes instanceof Map)) continue;
+      for (const nodeId of context.runtime.nodes.keys()) ids.add(nodeId);
+    }
+    return ids;
+  }
+
   supportsFrontBack(node: CanvasRuntimeNodeLike): boolean {
     const data = node.getData?.();
     if (data?.type === "text") return true;

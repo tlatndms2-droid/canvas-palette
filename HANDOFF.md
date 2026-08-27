@@ -2,13 +2,13 @@
 
 ## Current state
 
-- Version: `0.2.23`.
+- Version: `0.2.24`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.23`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.23`.
-- Latest runtime change: `0.2.23`; Palette-to-Canvas restores are serialized per Canvas file so rapid repeated drops cannot overwrite one another from stale Canvas snapshots. A restored node is registered as a linked placement, including its Metadata and Front/Back state, before the Canvas save request is emitted.
-- Automated baseline: 17 Node tests (including serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
+- Latest release: `0.2.24`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.24`.
+- Latest runtime change: `0.2.24`; Canvas link reconciliation now treats nodes already present in an open Canvas runtime as existing even if Obsidian has not written them to the `.canvas` file yet. This closes the remaining save-before-reconcile race that could strip a newly dropped node's link, Metadata, and Front/Back state.
+- Automated baseline: 18 Node tests (including pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
 
@@ -154,6 +154,8 @@
   - Runtime validation used only `Obsidian Sandbox` through Obsidian CLI/CDP, without controlling the user's mouse. A linked Back-facing Side Palette Card mounted one in-card native editor, opened zero floating popups, disabled card dragging, accepted text, saved it to both the Palette Item and linked Canvas metadata, then returned to rendered Back preview. Switching the same Item to Front opened one floating editor and zero in-card Back editors. Captured errors were empty and the disposable Item and Canvas file were removed.
 - `0.2.23` fixes intermittent Metadata and Front/Back loss during rapid repeated Palette-to-Canvas drops. Restores targeting the same Canvas now finish one at a time instead of reading and overwriting the same stale Canvas snapshot concurrently. Each new node is registered as a linked placement before its Canvas save request, so the first synchronization pass can already resolve its shared Metadata and Back state.
   - Runtime validation used only `Obsidian Sandbox` through Obsidian CLI/CDP, without controlling the user's mouse. Eight concurrent restores of one Front/Back-enabled Card produced eight native Canvas nodes and eight linked metadata records. After plugin reload, all eight nodes retained their flip control, Back content, Label, Tags, and Caption. Captured errors were empty, and the disposable Palette Item and Canvas file were removed.
+- `0.2.24` closes the second, separately observed race in the real Vault: a newly restored node can exist in the open Canvas before the `.canvas` file save completes, while a previously scheduled reconciliation reads the older file and removes that node's freshly registered link and Metadata. Reconciliation now combines saved node IDs with the open Canvas runtime IDs, so it cannot classify a visible unsaved node as deleted.
+  - The real Vault was inspected read-only to identify one visible but unlinked dropped node whose content exactly matched the demonstrated Palette Card. After installing `0.2.24`, only that confirmed node was relinked; Metadata, Front/Back, Back content, and the flip control survived plugin reload. A separate Sandbox test deliberately suppressed the Canvas save, ran reconciliation against the older disk file, and confirmed the open runtime node retained its link and complete metadata. Sandbox fixtures were removed and no Canvas Palette errors were captured.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
