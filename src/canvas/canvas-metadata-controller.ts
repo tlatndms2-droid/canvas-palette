@@ -67,7 +67,11 @@ export class CanvasMetadataController {
       void MarkdownRenderer.render(this.plugin.app, state.backContent, back, canvasPath, this.plugin).then(() => {
         if (!state.backContent && !back.hasClass("is-editing")) back.createDiv({ cls: "cp-empty", text: "Write on the back…" });
       });
-      back.addEventListener("pointerdown", (event) => event.stopPropagation());
+      back.addEventListener("pointerdown", (event) => {
+        if (back.hasClass("is-editing") || !this.adapter.beginBackDrag(node, event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+      });
       back.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); void this.openInlineBackEditor(back, nodeEl, canvasPath, nodeId, state.backContent, data?.label ?? data?.text?.split(/\r?\n/, 1)[0] ?? "Canvas node"); });
     }
     if (state.label) {

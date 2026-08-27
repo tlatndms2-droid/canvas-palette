@@ -10,13 +10,22 @@ interface CanvasRuntimeLike {
   requestSave?: () => void;
   posFromEvt?: (event: MouseEvent) => { x: number; y: number };
   posFromClient?: (point: { x: number; y: number }) => { x: number; y: number };
-  selection?: unknown;
+  selection?: Set<CanvasRuntimeNodeLike>;
   selectedNodes?: unknown;
   nodes?: Map<string, CanvasRuntimeNodeLike>;
   selectOnly?: (node: CanvasRuntimeNodeLike) => void;
   zoomToSelection?: () => void;
 }
-export interface CanvasRuntimeNodeLike { id?: string; nodeEl?: HTMLElement; getData?: () => CanvasNodeSnapshot; }
+export interface CanvasRuntimeNodeLike {
+  id?: string;
+  nodeEl?: HTMLElement;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  getData?: () => CanvasNodeSnapshot;
+  moveTo?: (bounds: { x: number; y: number; width: number; height: number }) => void;
+}
 interface CanvasViewLike { getViewType?: () => string; file?: TFile; containerEl?: HTMLElement; canvas?: CanvasRuntimeLike; }
 export interface CanvasContext { file: TFile; view: CanvasViewLike; runtime: CanvasRuntimeLike; }
 
@@ -61,6 +70,54 @@ export class CanvasAdapter {
     const data = node.getData?.();
     if (data?.type === "text") return true;
     return data?.type === "file" && Boolean(data.file);
+  }
+
+  beginBackDrag(node: CanvasRuntimeNodeLike, event: PointerEvent): boolean {
+    if (event.button !== 0 || !event.isPrimary || !node.nodeEl) return false;
+    const context = this.openContexts().find((candidate) => candidate.runtime.nodes?.get(node.id ?? "") === node);
+    const posFromEvt = context?.runtime.posFromEvt;
+    if (!context || !posFromEvt || !node.moveTo) return false;
+    const runtime = context.runtime;
+    const pointFromEvent = (pointerEvent: PointerEvent): { x: number; y: number } => posFromEvt.call(runtime, pointerEvent as unknown as MouseEvent);
+    const selected = runtime.selection instanceof Set && runtime.selection.has(node)
+      ? [...runtime.selection].filter((candidate) => candidate.moveTo)
+      : [node];
+    if (!(runtime.selection instanceof Set) || !runtime.selection.has(node)) runtime.selectOnly?.(node);
+    const startPoint = pointFromEvent(event);
+    const starts = selected.map((candidate) => ({
+      node: candidate,
+      x: candidate.x ?? candidate.getData?.().x ?? 0,
+      y: candidate.y ?? candidate.getData?.().y ?? 0,
+      width: candidate.width ?? candidate.getData?.().width ?? 0,
+      height: candidate.height ?? candidate.getData?.().height ?? 0
+    }));
+    const win = node.nodeEl.ownerDocument.defaultView;
+    if (!win) return false;
+    let moved = false;
+    const move = (moveEvent: PointerEvent): void => {
+      if (moveEvent.pointerId !== event.pointerId) return;
+      const point = pointFromEvent(moveEvent);
+      const delta = { x: point.x - startPoint.x, y: point.y - startPoint.y };
+      if (!moved && Math.hypot(delta.x, delta.y) < 3) return;
+      moved = true;
+      moveEvent.preventDefault();
+      for (const start of starts) {
+        start.node.nodeEl?.addClass("is-dragging");
+        start.node.moveTo?.({ x: start.x + delta.x, y: start.y + delta.y, width: start.width, height: start.height });
+      }
+    };
+    const finish = (finishEvent: PointerEvent): void => {
+      if (finishEvent.pointerId !== event.pointerId) return;
+      win.removeEventListener("pointermove", move, true);
+      win.removeEventListener("pointerup", finish, true);
+      win.removeEventListener("pointercancel", finish, true);
+      for (const start of starts) start.node.nodeEl?.removeClass("is-dragging");
+      if (moved) runtime.requestSave?.();
+    };
+    win.addEventListener("pointermove", move, true);
+    win.addEventListener("pointerup", finish, true);
+    win.addEventListener("pointercancel", finish, true);
+    return true;
   }
 
   async collectSelection(): Promise<PaletteItem[]> {

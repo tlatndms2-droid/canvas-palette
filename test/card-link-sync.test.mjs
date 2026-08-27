@@ -142,6 +142,37 @@ test("removing Front Back disables the linked material without deleting its Back
   await cleanup();
 });
 
+test("Palette Front Back commands update every linked Canvas placement", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.data.items.card.backContent = "Preserved palette back";
+  store.recordCanvasPlacement("card", "B.canvas", ["drop"]);
+
+  store.enableItemFaces("card");
+  assert.equal(store.data.items.card.facesEnabled, true);
+  assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.facesEnabled, true);
+  assert.equal(store.getCanvasNodeMetadata("B.canvas", "drop")?.facesEnabled, true);
+
+  store.setCanvasNodeFace("B.canvas", "drop", "back");
+  store.setPaletteFace("side", "card", "back");
+  store.setPaletteFace("mini", "card", "back");
+  store.disableItemFaces("card");
+
+  assert.equal(store.data.items.card.facesEnabled, false);
+  assert.equal(store.data.items.card.backContent, "Preserved palette back");
+  assert.equal(store.data.uiState.sideItemFaces.card, undefined);
+  assert.equal(store.data.uiState.miniItemFaces.card, undefined);
+  for (const [canvasPath, nodeId] of [["A.canvas", "origin"], ["B.canvas", "drop"]]) {
+    const state = store.getCanvasNodeMetadata(canvasPath, nodeId);
+    assert.equal(state?.facesEnabled, false);
+    assert.equal(state?.currentFace, "front");
+    assert.equal(state?.backContent, "Preserved palette back");
+  }
+  await cleanup();
+});
+
 test("deleted Canvas nodes are removed from links and another placement becomes the origin", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };

@@ -102,7 +102,32 @@ export class PaletteStore {
   }
 
   setPaletteFace(location: "side" | "mini", itemId: string, face: CardFace): void {
-    (location === "side" ? this.data.uiState.sideItemFaces : this.data.uiState.miniItemFaces)[itemId] = face;
+    if (location === "side") (this.data.uiState.sideItemFaces ??= {})[itemId] = face;
+    else (this.data.uiState.miniItemFaces ??= {})[itemId] = face;
+    this.changed();
+  }
+
+  enableItemFaces(itemId: string): void {
+    const item = this.data.items[itemId];
+    if (!item || item.type === "group" || item.facesEnabled) return;
+    item.facesEnabled = true;
+    item.modifiedAt = Date.now();
+    this.applyItemMetadataToLinkedNodes(item);
+    this.changed();
+  }
+
+  disableItemFaces(itemId: string): void {
+    const item = this.data.items[itemId];
+    if (!item || item.type === "group" || !item.facesEnabled) return;
+    const modifiedAt = Date.now();
+    item.facesEnabled = false;
+    item.modifiedAt = modifiedAt;
+    delete (this.data.uiState.sideItemFaces ??= {})[item.id];
+    delete (this.data.uiState.miniItemFaces ??= {})[item.id];
+    for (const location of this.linkedCanvasNodes(item)) {
+      const linkedState = this.canvasNodeState(location.canvasPath, location.nodeId);
+      this.setMetadataRecord(location.canvasPath, location.nodeId, { ...linkedState, currentFace: "front", facesEnabled: false }, modifiedAt);
+    }
     this.changed();
   }
 
