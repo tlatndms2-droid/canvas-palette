@@ -2,13 +2,13 @@
 
 ## Current state
 
-- Version: `0.2.14` (documentation handoff; runtime behavior through `0.2.13`).
+- Version: `0.2.15`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.14`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.14`.
-- Latest runtime change: `0.2.13`; selected Card/Markdown previews render the full source, support internal drag/wheel browsing, and constrain embedded images/videos to the thumbnail bounds.
-- Automated baseline: 7 Node tests (Card link synchronization, link reconciliation/unlinking, viewport reorder, and Obsidian-like search). `0.2.10`-`0.2.13` passed these tests plus TypeScript no-emit and production bundling, but the exact image/video sizing still needs user-side Obsidian runtime confirmation.
+- Latest release: `0.2.15`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.15`.
+- Latest runtime change: `0.2.15`; selected Card/Markdown previews constrain both standard iframe/video embeds and MX-style Shadow DOM players to the actual Viewport width as complete 16:9 media blocks, with media scroll snapping.
+- Automated baseline: 8 Node tests (Card link synchronization, link reconciliation/unlinking, viewport reorder, Obsidian-like search, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
 
@@ -138,6 +138,8 @@
 - `0.2.12` constrains embedded images in Card/Markdown thumbnails to the available Card width/height, preserves aspect ratio, and centers them instead of cropping or stretching.
 - `0.2.13` applies the same containment intent to embedded `iframe`/`video` content using a centered 16:9 frame bounded by the configured Card height. Automated checks passed, but the user's exact Obsidian embed/theme combination still needs visual confirmation.
 - `0.2.14` updates this cross-PC handoff and README/version metadata only. It introduces no runtime behavior change.
+- `0.2.15` fixes the remaining embedded-video clipping. The affected video was rendered by an MX-style `.mx-video-view` Shadow DOM player rather than a direct `iframe`/`video`, so the `0.2.13` child-element rule never constrained its 400-pixel minimum width inside a 306-pixel Card body. Canvas Palette now removes that minimum width, fits the player host and its Shadow DOM mount to the real Card width as a complete 16:9 block, and adds media-block scroll snapping for selected Card/Markdown previews.
+  - Direct read-only DOM inspection of the user's demonstrated view measured the player at `400×225` inside a `306×220` body before the rule. A temporary non-persistent style application measured it at approximately `306×172` afterward and showed the complete player frame inside the Card. No Vault files or Palette records were changed. An isolated Sandbox Vault was not available, so installation/reload validation of the packaged build was not performed in this task.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
@@ -199,7 +201,7 @@ Focused release checks are recorded above, but a future change touching shared i
 - Do not rename MD/image files when changing display titles.
 - Preserve shared identity. A Palette Item and all of its Canvas/Workspace placements are linked views of the same asset, not independent copies. Card content/common metadata synchronization has automated coverage; do not regress it while changing drag/drop, deletion, or Workspace organization.
 - Palette deletion and Canvas unlink/delete semantics still need a final user-approved popup flow. The desired direction is explicit choice when deleting a linked Canvas Card (remove only this placement versus also remove linked Palette/Canvas placements). Palette-side deletion must not delete the original Vault file. Do not silently guess destructive scope.
-- The latest embedded image/video containment (`0.2.12`/`0.2.13`) passed static tests/build but was not runtime-verified in this task. First follow-up on another PC should visually check embedded images, local videos, and iframe/video embeds at Card heights 32-220px in both Grid and List.
+- The `0.2.15` MX-style Shadow DOM player fix was measured with a temporary non-persistent rule in the user's demonstrated view, but the packaged build was not installed into an isolated Sandbox because no Sandbox Vault was available. A future shared-media change should repeat Grid/List checks at Card heights 32-220px for standard iframe/video embeds, local videos, and `.mx-video-view` players.
 - Mini Palette link/content/metadata consistency should be rechecked before declaring synchronization complete; the user previously reported that Palette-to-Canvas drag could lose metadata or shared content.
 - Keep Collect and Storage separate, and keep Mini Palette Canvas-hosted rather than as a regular Obsidian tab.
 - Keep the Storage panes docked, the grid responsive, and Light/Dark layouts geometrically identical.
