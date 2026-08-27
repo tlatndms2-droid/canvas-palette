@@ -10,6 +10,7 @@ export const SIDE_PALETTE_VIEW = "canvas-palette-side";
 export class SidePaletteView extends ItemView {
   private unsubscribe?: () => void;
   private query = "";
+  private readonly scrollSelectors = [".cp-viewport", ".cp-outliner", ".cp-tag-index", ".cp-label-index"] as const;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: CanvasPalettePlugin) { super(leaf); }
   getViewType(): string { return SIDE_PALETTE_VIEW; }
@@ -20,10 +21,13 @@ export class SidePaletteView extends ItemView {
 
   private render(): void {
     const root = this.contentEl;
+    const previousWorkspaceId = root.dataset.cpWorkspaceId;
+    const scrollPositions = new Map(this.scrollSelectors.map((selector) => [selector, root.querySelector<HTMLElement>(selector)?.scrollTop ?? 0]));
     root.empty(); root.addClass("canvas-palette", "cp-side", `cp-theme-${this.plugin.store.data.settings.theme}`);
     if (this.plugin.store.data.settings.accentMode === "custom") root.style.setProperty("--cp-accent", this.plugin.store.data.settings.accentColor);
     const workspace = this.plugin.activeWorkspace();
     if (!workspace) return;
+    root.dataset.cpWorkspaceId = workspace.id;
     this.applyLayoutVariables(root, workspace.sideLayout);
     const header = root.createDiv({ cls: "cp-side__header" });
     header.createDiv({ cls: "cp-brand", text: "Canvas Palette" });
@@ -55,6 +59,12 @@ export class SidePaletteView extends ItemView {
       this.applyLayoutVariables(root, workspace.sideLayout);
     }, () => this.plugin.store.changed());
     const labels = indexes.createDiv({ cls: "cp-panel cp-label-index" }); this.renderIndex(labels, "Label index", this.items(workspace.id).map((item) => item.label).filter(Boolean), "");
+    if (previousWorkspaceId === workspace.id) {
+      for (const [selector, scrollTop] of scrollPositions) {
+        const panel = root.querySelector<HTMLElement>(selector);
+        if (panel) panel.scrollTop = scrollTop;
+      }
+    }
   }
 
   private renderViewport(parent: HTMLElement, workspaceId: string): void {
@@ -64,9 +74,9 @@ export class SidePaletteView extends ItemView {
     const grid = header.createEl("button", { text: "Grid", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "grid" ? "is-active" : "" });
     const list = header.createEl("button", { text: "List", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "list" ? "is-active" : "" });
     grid.addEventListener("click", () => this.setSideView("grid")); list.addEventListener("click", () => this.setSideView("list"));
+    const batchSlot = parent.createDiv({ cls: `cp-batch-slot${selectedIds.length > 0 ? " is-active" : ""}` });
     if (selectedIds.length > 0) {
-      const batch = parent.createDiv({ cls: "cp-batch-bar" }); batch.createSpan({ cls: "cp-selection-count", text: `Selected ${selectedIds.length}` });
-      const tags = batch.createEl("button", { text: "Edit metadata" }); tags.addEventListener("click", () => new TagLabelModal(this.app, this.plugin, selectedIds).open());
+      const batch = batchSlot.createDiv({ cls: "cp-batch-bar" }); batch.createSpan({ cls: "cp-selection-count", text: `Selected ${selectedIds.length}` });
       const remove = batch.createEl("button", { text: "Delete", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmDelete(selectedIds));
     }
     const options = parent.createEl("details", { cls: "cp-view-options" }); options.createEl("summary", { text: "View settings" });

@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Version: `0.1.20`
+- Version: `0.2.0`
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.1.20`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.1.20.zip`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.1.20`.
+- Latest release: `0.2.0`, with BRAT assets `main.js`, `manifest.json`, `styles.css`, and `canvas-palette-0.2.0.zip`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.0`.
 
 ## Start here on another PC
 
@@ -21,8 +21,8 @@
 ### Authorization and scope
 
 - When the user is demonstrating a problem, supplying images/video/text, or asking for a briefing, inspect and explain only. Do not modify code or publish a release until the user explicitly says to modify, implement, proceed, or update.
-- After an explicit modification request, finish the requested scope rather than leaving knowingly incomplete behavior. Do not wait for a second release command: build, verify, bump the next sequential `0.1.x`, update project documentation, commit, push, and publish the BRAT release unless the user explicitly requests local-only work.
-- Never advance to `0.2.0` without explicit user permission.
+- After an explicit modification request, finish the requested scope rather than leaving knowingly incomplete behavior. Do not wait for a second release command: build, verify, bump the next sequential patch version, update project documentation, commit, push, and publish the BRAT release unless the user explicitly requests local-only work.
+- Never advance to a new minor version such as `0.3.0` without explicit user permission.
 - Do not expand the scope with unrelated UI redesigns, libraries, controls, buttons, or behaviors. Preserve working behavior outside the requested area and avoid touching excluded components.
 - Existing user changes in a dirty worktree are not disposable. Inspect them, preserve unrelated edits, and do not use destructive Git commands to erase them.
 
@@ -77,7 +77,7 @@
 - Markdown and Image items retain references to their original Vault files. Changing a Palette display title must never rename or duplicate those files.
 - Theme choices are Follow Obsidian, Light, and Dark. Layout and component language remain consistent across themes, and Accent can use Obsidian's value or a user-selected custom color.
 - The agreed delivery method is to implement the confirmed plan as an integrated build, then let the user demonstrate it in Obsidian and report concrete failures for sequential `0.1.x` fixes.
-- While the user is listing or demonstrating problems, only inspect, compare with the plan, and brief the findings. Once the user explicitly requests a modification, complete the next sequential `0.1.x` build and BRAT release without requiring a separate release command, unless the user asks for local-only work.
+- While the user is listing or demonstrating problems, only inspect, compare with the plan, and brief the findings. Once the user explicitly requests a modification, complete the next sequential patch build and BRAT release without requiring a separate release command, unless the user asks for local-only work.
 
 ## Conversation and release progression
 
@@ -116,6 +116,8 @@
   - Documentation-release validation covered TypeScript no-emit, production bundling, generated-bundle syntax, JSON parsing, and installation/reload as version `0.1.19` in `Obsidian Sandbox`. The plugin loaded successfully and the captured error log was empty. Feature-level runtime regressions were not re-run because no runtime source changed.
 - `0.1.20` extends linked Card identity from the original Canvas node to every Canvas placement created by Palette drag-and-drop. A placement now receives the Item's metadata immediately, participates in Palette-to-Canvas and Canvas-to-Palette content synchronization, and propagates Tags, Label, Label color, and Caption to the original and every other linked Card. Markdown/Image file-reference behavior and Group snapshot behavior remain unchanged.
   - Validation ran only in an isolated `Obsidian Sandbox`. A real DOM drag-and-drop from Side Palette created a second linked text node and persisted its Canvas path/Node ID. Editing the dropped node updated the Palette Item and original node; editing the Palette updated both Canvas nodes; editing metadata on the dropped node updated the Item, both metadata records, and both Canvas overlays. All content, placements, metadata, and overlays survived an Obsidian restart. The captured error log was empty and disposable fixtures were removed afterward.
+- `0.2.0` prevents Side Palette selection from resetting or visibly shifting its scrollable panels. Full view rebuilds capture and restore the Viewport, Outliner, Tag Index, and Label Index scroll offsets for the current Workspace. The selection count and Delete action use an always-reserved status slot so the item grid keeps the same vertical origin before and after selection, and the batch `Edit metadata` action is removed from that slot.
+  - Validation ran only in an isolated `Obsidian Sandbox` with 36 disposable Card fixtures. After setting Viewport, Outliner, and Tag Index offsets to 620, 430, and 65 pixels, real DOM single selection, Ctrl multi-selection, and Outliner selection all preserved those exact offsets. The status slot remained 43 pixels before and after selection, `Selected 1/2`, Delete, and Card check markers updated correctly, batch `Edit metadata` was absent, and the captured error log was empty. All disposable Items, selections, collections, pending data, plugin data, and the Sandbox vault were removed afterward.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
@@ -178,8 +180,8 @@ Focused release checks are recorded above, but a future change touching shared i
 - Keep Collect and Storage separate, and keep Mini Palette Canvas-hosted rather than as a regular Obsidian tab.
 - Keep the Storage panes docked, the grid responsive, and Light/Dark layouts geometrically identical.
 - Do not define the More menu, final Copy semantics, filter composition, or final pane limits without user direction.
-- Do not advance to `0.2.0` without explicit user instruction.
+- Do not advance to `0.3.0` without explicit user instruction.
 
 ## Release checklist
 
-Use the complete release and GitHub verification rules in `Development operating instructions`. The short form is: build, Sandbox-test the affected paths, bump the next sequential `0.1.x`, update README/HANDOFF, commit, push, publish all four BRAT assets, and verify the public release and matching SHAs.
+Use the complete release and GitHub verification rules in `Development operating instructions`. The short form is: build, Sandbox-test the affected paths, bump the next sequential patch version unless the user requested a minor bump, update README/HANDOFF, commit, push, publish all four BRAT assets, and verify the public release and matching SHAs.
