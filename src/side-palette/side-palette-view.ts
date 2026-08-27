@@ -77,17 +77,39 @@ export class SidePaletteView extends ItemView {
     const grid = header.createEl("button", { text: "Grid", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "grid" ? "is-active" : "" });
     const list = header.createEl("button", { text: "List", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "list" ? "is-active" : "" });
     grid.addEventListener("click", () => this.setSideView("grid")); list.addEventListener("click", () => this.setSideView("list"));
-    const batchSlot = parent.createDiv({ cls: "cp-batch-slot" });
     if (selectedIds.length > 0) {
-      const batch = batchSlot.createDiv({ cls: "cp-batch-bar" }); batch.createSpan({ cls: "cp-selection-count", text: `Selected ${selectedIds.length}` });
+      const batchOverlay = parent.createDiv({ cls: "cp-batch-overlay" });
+      const batch = batchOverlay.createDiv({ cls: "cp-batch-bar" }); batch.createSpan({ cls: "cp-selection-count", text: `Selected ${selectedIds.length}` });
       const remove = batch.createEl("button", { text: "Delete", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmDelete(selectedIds));
     }
     const options = parent.createEl("details", { cls: "cp-view-options" }); options.createEl("summary", { text: "View settings" });
-    const cardSize = options.createEl("input", { attr: { type: "range", min: "160", max: "360", value: String(this.plugin.store.data.settings.cardSize) } });
-    cardSize.addEventListener("input", () => { this.plugin.store.data.settings.cardSize = Number(cardSize.value); this.plugin.store.changed(); });
-    const fontSize = options.createEl("input", { attr: { type: "range", min: "11", max: "20", value: String(this.plugin.store.data.settings.fontSize) } });
-    fontSize.addEventListener("input", () => { this.plugin.store.data.settings.fontSize = Number(fontSize.value); this.plugin.store.changed(); });
-    const listEl = parent.createDiv({ cls: `cp-grid cp-grid--${this.plugin.activeWorkspace()?.sideLayout.viewMode ?? "grid"}` }); listEl.style.setProperty("--cp-card-size", `${this.plugin.store.data.settings.cardSize}px`);
+    const controls = options.createDiv({ cls: "cp-view-options__controls" });
+    const listEl = parent.createDiv({ cls: `cp-grid cp-grid--${this.plugin.activeWorkspace()?.sideLayout.viewMode ?? "grid"}` });
+    const applyViewSettings = (): void => {
+      listEl.style.setProperty("--cp-card-size", `${this.plugin.store.data.settings.cardSize}px`);
+      listEl.style.setProperty("--cp-font-size", `${this.plugin.store.data.settings.fontSize}px`);
+    };
+    const rangeControl = (label: string, key: "cardSize" | "fontSize", minimum: number, maximum: number, defaultValue: number): void => {
+      const row = controls.createDiv({ cls: "cp-view-option" });
+      const heading = row.createDiv({ cls: "cp-view-option__heading" });
+      const name = heading.createEl("label", { text: label });
+      const value = heading.createSpan({ cls: "cp-view-option__value" });
+      const reset = heading.createEl("button", { text: "Reset", cls: "cp-view-option__reset" });
+      const input = row.createEl("input", { attr: { type: "range", min: String(minimum), max: String(maximum), value: String(this.plugin.store.data.settings[key]), "aria-label": label } });
+      name.htmlFor = input.id = `cp-side-${key}`;
+      const update = (): void => {
+        this.plugin.store.data.settings[key] = Number(input.value);
+        value.setText(`${input.value}px`);
+        applyViewSettings();
+      };
+      update();
+      input.addEventListener("input", update);
+      input.addEventListener("change", () => this.plugin.store.changed());
+      reset.addEventListener("click", () => { input.value = String(defaultValue); update(); this.plugin.store.changed(); });
+    };
+    rangeControl("Card width", "cardSize", 160, 360, 220);
+    rangeControl("Preview font size", "fontSize", 11, 20, 14);
+    applyViewSettings();
     listEl.addEventListener("dragover", (event) => { if (event.dataTransfer?.types.includes("application/x-canvas-palette-item")) event.preventDefault(); });
     listEl.addEventListener("drop", (event) => {
       const sourceId = event.dataTransfer?.getData("application/x-canvas-palette-item"); const target = (event.target as HTMLElement).closest<HTMLElement>(".cp-item"); const targetId = target?.dataset.itemId;
