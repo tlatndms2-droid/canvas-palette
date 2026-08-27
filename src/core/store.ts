@@ -150,6 +150,13 @@ export class PaletteStore {
     this.changed();
   }
 
+  enableCanvasNodeFaces(canvasPath: string, nodeId: string): void {
+    const current = this.canvasNodeState(canvasPath, nodeId);
+    if (current.facesEnabled) return;
+    this.setMetadataRecord(canvasPath, nodeId, { ...current, facesEnabled: true }, current.modifiedAt);
+    this.changed();
+  }
+
   unlinkCanvasNode(canvasPath: string, nodeId: string): boolean {
     const item = this.allItems().find((candidate) => this.itemHasLinkedNode(candidate, canvasPath, nodeId));
     if (!item) return false;
@@ -319,13 +326,13 @@ export class PaletteStore {
   }
 
   private canvasNodeState(canvasPath: string, nodeId: string): PaletteMetadata {
-    return this.data.canvasNodeMetadata[canvasPath]?.[nodeId] ?? { tags: [], label: "", labelColor: "", caption: "", backContent: "", currentFace: "front", modifiedAt: Date.now() };
+    return this.data.canvasNodeMetadata[canvasPath]?.[nodeId] ?? { tags: [], label: "", labelColor: "", caption: "", backContent: "", currentFace: "front", facesEnabled: false, modifiedAt: Date.now() };
   }
 
-  private setMetadataRecord(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption"> & Partial<Pick<PaletteMetadata, "backContent" | "currentFace">>, modifiedAt: number): void {
+  private setMetadataRecord(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption"> & Partial<Pick<PaletteMetadata, "backContent" | "currentFace" | "facesEnabled">>, modifiedAt: number): void {
     const previous = this.data.canvasNodeMetadata[canvasPath]?.[nodeId];
-    const record: PaletteMetadata = { tags: metadata.tags, label: metadata.label, labelColor: metadata.labelColor, caption: metadata.caption, backContent: metadata.backContent ?? previous?.backContent ?? "", currentFace: metadata.currentFace ?? previous?.currentFace ?? "front", modifiedAt };
-    const isEmpty = record.tags.length === 0 && !record.label && !record.caption && !record.backContent && record.currentFace === "front";
+    const record: PaletteMetadata = { tags: metadata.tags, label: metadata.label, labelColor: metadata.labelColor, caption: metadata.caption, backContent: metadata.backContent ?? previous?.backContent ?? "", currentFace: metadata.currentFace ?? previous?.currentFace ?? "front", facesEnabled: metadata.facesEnabled ?? previous?.facesEnabled ?? false, modifiedAt };
+    const isEmpty = record.tags.length === 0 && !record.label && !record.caption && !record.backContent && record.currentFace === "front" && !record.facesEnabled;
     if (isEmpty) {
       const canvas = this.data.canvasNodeMetadata[canvasPath];
       if (!canvas) return;

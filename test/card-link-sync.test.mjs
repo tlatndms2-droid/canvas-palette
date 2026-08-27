@@ -81,6 +81,8 @@ test("Back content synchronizes while each placement keeps its own current face"
   const store = new PaletteStore(plugin);
   store.data = fixture();
   store.recordCanvasPlacement("card", "B.canvas", ["drop"]);
+  assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.facesEnabled, false);
+  store.enableCanvasNodeFaces("A.canvas", "origin");
   store.setCanvasNodeFace("A.canvas", "origin", "back");
   store.setCanvasNodeBack("B.canvas", "drop", "## Shared back");
 
@@ -88,7 +90,9 @@ test("Back content synchronizes while each placement keeps its own current face"
   assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.backContent, "## Shared back");
   assert.equal(store.getCanvasNodeMetadata("B.canvas", "drop")?.backContent, "## Shared back");
   assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.currentFace, "back");
+  assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.facesEnabled, true);
   assert.equal(store.getCanvasNodeMetadata("B.canvas", "drop")?.currentFace, "front");
+  assert.equal(store.getCanvasNodeMetadata("B.canvas", "drop")?.facesEnabled, false);
   await cleanup();
 });
 
@@ -99,6 +103,7 @@ test("Unlink from Palette preserves the node snapshot and stops later synchroniz
   store.data = fixture();
   store.data.items.card.backContent = "Before unlink";
   store.recordCanvasPlacement("card", "B.canvas", ["drop"]);
+  store.enableCanvasNodeFaces("B.canvas", "drop");
   store.setCanvasNodeFace("B.canvas", "drop", "back");
 
   assert.equal(store.unlinkCanvasNode("B.canvas", "drop"), true);
@@ -106,6 +111,7 @@ test("Unlink from Palette preserves the node snapshot and stops later synchroniz
   const detached = store.getCanvasNodeMetadata("B.canvas", "drop");
   assert.equal(detached?.backContent, "Before unlink");
   assert.equal(detached?.currentFace, "back");
+  assert.equal(detached?.facesEnabled, true);
   assert.equal(store.linkedItemForNode("B.canvas", "drop"), undefined);
   await cleanup();
 });

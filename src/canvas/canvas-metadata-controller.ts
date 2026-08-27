@@ -1,4 +1,4 @@
-import { MarkdownRenderer, Menu, Notice, setIcon } from "obsidian";
+import { MarkdownRenderer, setIcon } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { PaletteMetadata } from "../core/types";
 import type { CanvasAdapter, CanvasRuntimeNodeLike } from "./canvas-adapter";
@@ -7,7 +7,6 @@ export class CanvasMetadataController {
   private timer: number | null = null;
   private readonly nodesByElement = new WeakMap<Element, CanvasRuntimeNodeLike>();
   private readonly activeEditors = new WeakSet<HTMLElement>();
-  private readonly contextBound = new WeakSet<HTMLElement>();
   private readonly resizeObserver = new ResizeObserver((entries) => {
     for (const entry of entries) {
       const node = this.nodesByElement.get(entry.target);
@@ -46,16 +45,18 @@ export class CanvasMetadataController {
     const activeEditor = nodeEl.querySelector<HTMLElement>(":scope > .cp-canvas-metadata .cp-canvas-metadata__editor");
     if (activeEditor && this.activeEditors.has(activeEditor)) return;
     this.remove(node);
-    const state = metadata ?? { tags: [], label: "", labelColor: "", caption: "", backContent: "", currentFace: "front" as const, modifiedAt: Date.now() };
+    const state = metadata ?? { tags: [], label: "", labelColor: "", caption: "", backContent: "", currentFace: "front" as const, facesEnabled: false, modifiedAt: Date.now() };
     const data = node.getData?.();
     const type = data?.type ?? "unknown";
     nodeEl.addClass("cp-canvas-has-metadata", `cp-canvas-has-metadata--${type}`);
     const layer = nodeEl.createDiv({ cls: `cp-canvas-metadata cp-canvas-metadata--${type}`, attr: { "aria-label": "Canvas Palette metadata" } });
-    const flip = layer.createEl("button", { cls: "clickable-icon cp-canvas-face-toggle", attr: { type: "button", "aria-label": state.currentFace === "front" ? "Show back" : "Show front", title: state.currentFace === "front" ? "Show back" : "Show front" } });
-    setIcon(flip, "refresh-cw");
-    flip.addEventListener("pointerdown", (event) => event.stopPropagation());
-    flip.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); this.plugin.store.setCanvasNodeFace(canvasPath, nodeId, state.currentFace === "front" ? "back" : "front"); });
-    if (state.currentFace === "back") {
+    if (state.facesEnabled) {
+      const flip = layer.createEl("button", { cls: "clickable-icon cp-canvas-face-toggle", attr: { type: "button", "aria-label": state.currentFace === "front" ? "Show back" : "Show front", title: state.currentFace === "front" ? "Show back" : "Show front" } });
+      setIcon(flip, "refresh-cw");
+      flip.addEventListener("pointerdown", (event) => event.stopPropagation());
+      flip.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); this.plugin.store.setCanvasNodeFace(canvasPath, nodeId, state.currentFace === "front" ? "back" : "front"); });
+    }
+    if (state.facesEnabled && state.currentFace === "back") {
       nodeEl.addClass("cp-canvas-showing-back");
       const back = layer.createDiv({ cls: "cp-canvas-back markdown-rendered", attr: { title: "Double-click to edit the back" } });
       void MarkdownRenderer.render(this.plugin.app, state.backContent, back, canvasPath, this.plugin).then(() => {
@@ -98,19 +99,6 @@ export class CanvasMetadataController {
     this.nodesByElement.set(nodeEl, node);
     this.resizeObserver.observe(nodeEl);
     this.updateScale(node);
-    if (!this.contextBound.has(nodeEl)) {
-      this.contextBound.add(nodeEl);
-      nodeEl.addEventListener("contextmenu", (event) => {
-        if (!this.plugin.store.linkedItemForNode(canvasPath, nodeId)) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const menu = new Menu();
-        menu.addItem((item) => item.setTitle("Unlink from Palette").setIcon("unlink").onClick(() => {
-          if (this.plugin.store.unlinkCanvasNode(canvasPath, nodeId)) new Notice("Canvas node unlinked from Palette. Its Front, Back, and Metadata were preserved.");
-        }));
-        menu.showAtMouseEvent(event);
-      });
-    }
   }
 
   private makeInlineEditable(element: HTMLElement, label: string, value: string, onCommit: (value: string) => void): void {

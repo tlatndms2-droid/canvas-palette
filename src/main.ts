@@ -25,7 +25,16 @@ export default class CanvasPalettePlugin extends Plugin {
   canvasToolbar = new CanvasNodeToolbarController(this.canvas, {
     editMetadata: (nodes) => this.editCanvasNodesMetadata(nodes),
     collectToMini: () => void this.collectCanvasSelection(),
-    saveToSide: (anchor) => this.saveCanvasSelectionFromToolbar(anchor)
+    saveToSide: (anchor) => this.saveCanvasSelectionFromToolbar(anchor),
+    facesEnabled: (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId)?.facesEnabled ?? false,
+    enableFaces: (canvasPath, nodeId) => {
+      this.store.enableCanvasNodeFaces(canvasPath, nodeId);
+      new Notice("Front / Back enabled for this Canvas node.");
+    },
+    isLinked: (canvasPath, nodeId) => Boolean(this.store.linkedItemForNode(canvasPath, nodeId)),
+    unlink: (canvasPath, nodeId) => {
+      if (this.store.unlinkCanvasNode(canvasPath, nodeId)) new Notice("Canvas node unlinked from Palette. Its Front, Back, and Metadata were preserved.");
+    }
   });
   dropController = new PaletteDropController(this.store, this.canvas);
   textScrapHighlights = new TextScrapHighlights(this);
@@ -38,7 +47,7 @@ export default class CanvasPalettePlugin extends Plugin {
     this.register(this.dropController.mount(this.app.workspace.containerEl.ownerDocument));
     this.register(this.canvasToolbar.mount(this.app.workspace.containerEl.ownerDocument));
     this.registerEditorExtension(this.textScrapHighlights.extension());
-    this.register(this.store.subscribe(() => { this.textScrapHighlights.refreshVisibleEditors(); this.canvasMetadata.refreshSoon(); }));
+    this.register(this.store.subscribe(() => { this.textScrapHighlights.refreshVisibleEditors(); this.canvasMetadata.refreshSoon(); this.canvasToolbar.refreshSoon(); }));
     this.registerView(SIDE_PALETTE_VIEW, (leaf) => new SidePaletteView(leaf, this));
     this.addRibbonIcon("library-big", "Open Canvas Palette", () => void this.activateSidePalette());
     this.addRibbonIcon("panels-top-left", "Open Canvas Mini Palette", () => this.miniPalette.open());

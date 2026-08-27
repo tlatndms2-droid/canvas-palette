@@ -2,12 +2,12 @@
 
 ## Current state
 
-- Version: `0.2.16`.
+- Version: `0.2.17`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.16`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.16`.
-- Latest runtime change: `0.2.16`; Card/Markdown/Image/Group now share a persisted Back Markdown surface across every linked placement. Canvas, Side, and Mini use a 22px local flip control, native Live Preview editing, and location-local current-face state. Canvas `Unlink from Palette` preserves Front, Back, Metadata, and current face while permanently detaching that node.
+- Latest release: `0.2.17`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.17`.
+- Latest runtime change: `0.2.17`; Canvas Front/Back is opt-in per selected node from the native node toolbar instead of appearing on every Canvas node. Linked nodes expose the one-shot `Unlink from Palette` action in the same toolbar rather than a node context menu. Unlink preserves Front, Back, Metadata, enabled state, and current face while permanently detaching that node.
 - Automated baseline: 10 Node tests (including Back synchronization, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
@@ -140,6 +140,8 @@
 - `0.2.14` updates this cross-PC handoff and README/version metadata only. It introduces no runtime behavior change.
 - `0.2.15` fixes the remaining embedded-video clipping. The affected video was rendered by an MX-style `.mx-video-view` Shadow DOM player rather than a direct `iframe`/`video`, so the `0.2.13` child-element rule never constrained its 400-pixel minimum width inside a 306-pixel Card body. Canvas Palette now removes that minimum width, fits the player host and its Shadow DOM mount to the real Card width as a complete 16:9 block, and adds media-block scroll snapping for selected Card/Markdown previews.
   - Direct read-only DOM inspection of the user's demonstrated view measured the player at `400×225` inside a `306×220` body before the rule. A temporary non-persistent style application measured it at approximately `306×172` afterward and showed the complete player frame inside the Card. No Vault files or Palette records were changed. An isolated Sandbox Vault was not available, so installation/reload validation of the packaged build was not performed in this task.
+- `0.2.16` adds persisted Front/Back content across Palette Items and linked Canvas placements, native Live Preview Back editing, location-local current-face state, and one-shot unlink preservation.
+- `0.2.17` makes Canvas Front/Back explicitly opt-in per node. Selecting one Canvas node shows `Enable Front / Back` in the native node toolbar; only after activation does that node receive its small flip control. A linked node shows `Unlink from Palette` in the same toolbar, and the old node context-menu interception is removed. Existing nodes with actual Back content or a saved Back face migrate as enabled, while ordinary nodes remain unchanged.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 

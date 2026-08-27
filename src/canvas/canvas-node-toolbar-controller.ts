@@ -10,6 +10,10 @@ interface CanvasNodeToolbarActions {
   editMetadata: (nodes: CanvasRuntimeNodeLike[]) => void;
   collectToMini: () => void;
   saveToSide: (anchor: HTMLElement) => void;
+  facesEnabled: (canvasPath: string, nodeId: string) => boolean;
+  enableFaces: (canvasPath: string, nodeId: string) => void;
+  isLinked: (canvasPath: string, nodeId: string) => boolean;
+  unlink: (canvasPath: string, nodeId: string) => void;
 }
 
 export class CanvasNodeToolbarController {
@@ -76,17 +80,23 @@ export class CanvasNodeToolbarController {
     if (!(menuEl instanceof HTMLElement)) return;
     const selection = runtime.selection instanceof Set ? [...runtime.selection] as CanvasRuntimeNodeLike[] : [];
     const nodes = selection.filter((node) => Boolean(this.nodeId(node)));
-    const selectionKey = nodes.map((node) => this.nodeId(node)).sort().join("|");
+    const singleNodeId = nodes.length === 1 ? this.nodeId(nodes[0]) : "";
+    const facesEnabled = singleNodeId ? this.actions.facesEnabled(context.file.path, singleNodeId) : false;
+    const linked = singleNodeId ? this.actions.isLinked(context.file.path, singleNodeId) : false;
+    const selectionKey = `${nodes.map((node) => this.nodeId(node)).sort().join("|")}:${facesEnabled ? "faces" : "plain"}:${linked ? "linked" : "local"}`;
     const currentButtons = menuEl.querySelectorAll(":scope > .cp-canvas-toolbar-action");
     const separator = menuEl.querySelector(":scope > .cp-canvas-toolbar-separator");
-    if (!selectionKey) { this.clear(menuEl); return; }
-    if (menuEl.dataset.cpToolbarSelectionKey === selectionKey && currentButtons.length === 3 && separator) return;
+    const expectedButtons = 3 + (singleNodeId && !facesEnabled ? 1 : 0) + (linked ? 1 : 0);
+    if (nodes.length === 0) { this.clear(menuEl); return; }
+    if (menuEl.dataset.cpToolbarSelectionKey === selectionKey && currentButtons.length === expectedButtons && separator) return;
     this.clear(menuEl);
     menuEl.dataset.cpToolbarSelectionKey = selectionKey;
     menuEl.createSpan({ cls: "cp-canvas-toolbar-separator", attr: { "aria-hidden": "true" } });
     this.button(menuEl, "tags", "Edit Palette Metadata", () => this.actions.editMetadata(nodes));
     this.button(menuEl, "inbox", "Collect to Mini Palette", () => this.actions.collectToMini());
     this.button(menuEl, "panel-right", "Save directly to Side Palette", (button) => this.actions.saveToSide(button));
+    if (singleNodeId && !facesEnabled) this.button(menuEl, "refresh-cw", "Enable Front / Back", () => this.actions.enableFaces(context.file.path, singleNodeId));
+    if (linked) this.button(menuEl, "unlink", "Unlink from Palette", () => this.actions.unlink(context.file.path, singleNodeId));
   }
 
   private remove(context: CanvasContext): void {

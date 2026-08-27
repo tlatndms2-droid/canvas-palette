@@ -7,7 +7,7 @@ export type CardFace = "front" | "back";
 export interface TextSourceRange { from: { line: number; ch: number }; to: { line: number; ch: number }; }
 export interface ItemOrigin { canvasPath?: string; canvasNodeId?: string; workspaceId?: string; filePath?: string; textRange?: TextSourceRange; }
 export interface CanvasPlacement { canvasPath: string; nodeIds: string[]; placedAt: number; }
-export interface PaletteMetadata { tags: string[]; label: string; labelColor?: string; caption: string; backContent: string; currentFace: CardFace; modifiedAt: number; }
+export interface PaletteMetadata { tags: string[]; label: string; labelColor?: string; caption: string; backContent: string; currentFace: CardFace; facesEnabled: boolean; modifiedAt: number; }
 
 export interface CanvasNodeSnapshot {
   id: string;
