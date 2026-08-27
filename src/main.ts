@@ -230,12 +230,9 @@ export default class CanvasPalettePlugin extends Plugin {
   }
 
   async openOriginal(item: PaletteItem): Promise<void> {
+    if (item.origin.canvasPath && item.origin.canvasNodeId && await this.canvas.revealNode(item.origin.canvasPath, item.origin.canvasNodeId)) return;
     if (item.origin.filePath) {
       const file = this.app.vault.getAbstractFileByPath(item.origin.filePath);
-      if (file instanceof TFile) { await this.app.workspace.getLeaf("tab").openFile(file); return; }
-    }
-    if (item.origin.canvasPath) {
-      const file = this.app.vault.getAbstractFileByPath(item.origin.canvasPath);
       if (file instanceof TFile) { await this.app.workspace.getLeaf("tab").openFile(file); return; }
     }
     new Notice("The original item is unavailable.");

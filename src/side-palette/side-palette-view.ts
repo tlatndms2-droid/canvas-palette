@@ -1,7 +1,7 @@
 import { ItemView, Menu, WorkspaceLeaf } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { Collection, PaletteItem, SideLayoutState } from "../core/types";
-import { ConfirmDeleteModal, TagLabelModal, TextPromptModal } from "../ui/modal";
+import { ConfirmDeleteModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
 import { LinkedSpacesModal } from "../ui/linked-spaces-modal";
@@ -325,17 +325,15 @@ export class SidePaletteView extends ItemView {
     event.preventDefault(); const menu = new Menu(); const workspace = this.plugin.activeWorkspace();
     const selected = this.sideSelectedIds(); const targetIds = selected.includes(item.id) ? selected : [item.id];
     if (!selected.includes(item.id)) this.selectSideItem(item.id);
-    menu.addItem((entry) => entry.setTitle("Edit metadata").setIcon("tags").onClick(() => new TagLabelModal(this.app, this.plugin, targetIds).open()));
+    menu.addItem((entry) => entry.setTitle("Edit tags & label").setIcon("tags").onClick(() => new TagLabelModal(this.app, this.plugin, targetIds).open()));
     if (supportsFrontBack(item)) {
       menu.addItem((entry) => entry
         .setTitle(item.facesEnabled ? "Remove Front / Back" : "Enable Front / Back")
         .setIcon(item.facesEnabled ? "circle-off" : "refresh-cw")
         .onClick(() => item.facesEnabled ? this.plugin.store.disableItemFaces(item.id) : this.plugin.store.enableItemFaces(item.id)));
     }
-    menu.addItem((entry) => entry.setTitle(`Move ${targetIds.length > 1 ? `${targetIds.length} items` : "to workspace root"}`).setIcon("folder-root").onClick(() => workspace && this.plugin.store.assignItemsToCollection(workspace.id, targetIds, null)));
-    if (workspace) for (const collection of Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id)) menu.addItem((entry) => entry.setTitle(`Move to ${collection.name}`).setIcon("folder-input").onClick(() => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collection.id)));
+    if (workspace) menu.addItem((entry) => entry.setTitle("Move to…").setIcon("folder-input").onClick(() => new MoveItemsModal(this.app, workspace.name, Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id), targetIds.length, (collectionId) => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collectionId)).open()));
     menu.addItem((entry) => entry.setTitle("Open original").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
-    if (item.origin.canvasPath && item.origin.canvasNodeId) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => void this.plugin.locateItemOnCanvas(item)));
     menu.addSeparator(); menu.addItem((entry) => entry.setTitle(`Delete${targetIds.length > 1 ? ` ${targetIds.length} items` : ""}`).setIcon("trash").onClick(() => this.confirmDelete(targetIds)));
     menu.showAtMouseEvent(event);
   }

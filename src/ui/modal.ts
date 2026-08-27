@@ -1,6 +1,6 @@
 import { App, Modal, Setting } from "obsidian";
 import type CanvasPalettePlugin from "../main";
-import type { PaletteItem, PaletteMetadata } from "../core/types";
+import type { Collection, PaletteItem, PaletteMetadata } from "../core/types";
 import { createLabelColorPicker } from "./label-color-picker";
 
 export class MetadataEditorModal extends Modal {
@@ -61,7 +61,7 @@ export class TagLabelModal extends Modal {
     const knownTags = [...new Set([...workspaceItems.flatMap((item) => item.tags), ...items.flatMap((item) => item.tags)])].sort((a, b) => a.localeCompare(b));
     const knownLabels = [...new Set([...workspaceItems.map((item) => item.label), ...items.map((item) => item.label)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
     this.contentEl.addClass("canvas-palette", "cp-tag-label-modal");
-    this.contentEl.createEl("h2", { text: items.length === 1 ? "Metadata" : `Metadata · ${items.length} items` });
+    this.contentEl.createEl("h2", { text: items.length === 1 ? "Tags & label" : `Tags & label · ${items.length} items` });
     this.contentEl.createEl("h3", { text: "Tags" });
     const tagControls = new Map<string, HTMLInputElement>();
     const tagList = this.contentEl.createDiv({ cls: "cp-toggle-list" });
@@ -92,11 +92,6 @@ export class TagLabelModal extends Modal {
     labelColor.value = sharedColors.size === 1 && items[0].labelColor ? items[0].labelColor : "#8b5cf6";
     let colorTouched = false;
     labelColor.addEventListener("input", () => { colorTouched = true; });
-    this.contentEl.createEl("h3", { text: "Caption" });
-    const currentCaptions = new Set(items.map((item) => item.caption));
-    const caption = this.contentEl.createEl("textarea", { text: currentCaptions.size === 1 ? items[0].caption : "", attr: { placeholder: currentCaptions.size > 1 ? "Keep current captions unless edited" : "Short description" } });
-    let captionTouched = false;
-    caption.addEventListener("input", () => { captionTouched = true; });
     const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
     actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
     actions.createEl("button", { text: "Apply", cls: "mod-cta" }).addEventListener("click", () => {
@@ -112,7 +107,7 @@ export class TagLabelModal extends Modal {
         const label = explicitLabel || (selectedLabel === "__keep__" ? item.label : selectedLabel);
         const labelChanged = explicitLabel.length > 0 || selectedLabel !== "__keep__";
         const labelColorValue = !label ? "" : colorTouched || labelChanged ? labelColor.value : item.labelColor ?? "";
-        this.plugin.store.updateItem(item.id, { displayTitle: item.displayTitle, tags: [...tags], label, labelColor: labelColorValue, caption: captionTouched || currentCaptions.size === 1 ? caption.value.trim() : item.caption, ...(item.type === "card" ? { content: item.content ?? "" } : {}) });
+        this.plugin.store.updateItem(item.id, { displayTitle: item.displayTitle, tags: [...tags], label, labelColor: labelColorValue, caption: item.caption, ...(item.type === "card" ? { content: item.content ?? "" } : {}) });
       }
       this.close();
     });
@@ -126,6 +121,54 @@ export class TagLabelModal extends Modal {
     input.checked = checked;
     input.addEventListener("change", () => { if (input.checked) onSelect(value); });
     row.createSpan({ text: title });
+  }
+}
+
+export class MoveItemsModal extends Modal {
+  private query = "";
+
+  constructor(app: App, private readonly workspaceName: string, private readonly collections: Collection[], private readonly count: number, private readonly onMove: (collectionId: string | null) => void) { super(app); }
+
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-move-items-modal");
+    this.contentEl.createEl("h2", { text: this.count === 1 ? "Move to…" : `Move ${this.count} items to…` });
+    const search = this.contentEl.createEl("input", { cls: "cp-move-items-search", attr: { type: "search", placeholder: "Search collections…", "aria-label": "Search collections" } });
+    const list = this.contentEl.createDiv({ cls: "cp-move-items-list" });
+    const paths = this.collectionPaths();
+    const render = (): void => {
+      list.empty();
+      const needle = this.query.trim().toLocaleLowerCase();
+      const destinations = [{ id: null, name: `${this.workspaceName} / Workspace root`, depth: 0 }, ...paths]
+        .filter((destination) => !needle || destination.name.toLocaleLowerCase().includes(needle));
+      for (const destination of destinations) {
+        const row = list.createEl("button", { cls: "cp-move-items-row", attr: { type: "button" } });
+        row.style.setProperty("--cp-depth", String(destination.depth));
+        row.createSpan({ cls: "cp-move-items-row__icon", text: destination.id ? "▸" : "⌂" });
+        row.createSpan({ cls: "cp-move-items-row__name", text: destination.name });
+        row.addEventListener("click", () => { this.onMove(destination.id); this.close(); });
+      }
+      if (destinations.length === 0) list.createDiv({ cls: "cp-empty", text: "No matching collections." });
+    };
+    search.addEventListener("input", () => { this.query = search.value; render(); });
+    render();
+    window.requestAnimationFrame(() => search.focus());
+  }
+
+  onClose(): void { this.contentEl.empty(); }
+
+  private collectionPaths(): Array<{ id: string; name: string; depth: number }> {
+    const byParent = new Map<string | null, Collection[]>();
+    for (const collection of this.collections) byParent.set(collection.parentId, [...(byParent.get(collection.parentId) ?? []), collection]);
+    const rows: Array<{ id: string; name: string; depth: number }> = [];
+    const walk = (parentId: string | null, parents: string[], depth: number): void => {
+      for (const collection of byParent.get(parentId) ?? []) {
+        const path = [...parents, collection.name];
+        rows.push({ id: collection.id, name: path.join(" / "), depth });
+        walk(collection.id, path, depth + 1);
+      }
+    };
+    walk(null, [], 0);
+    return rows;
   }
 }
 

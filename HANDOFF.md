@@ -2,13 +2,13 @@
 
 ## Current state
 
-- Version: `0.2.26`.
+- Version: `0.2.27`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.26`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.26`.
-- Latest runtime change: `0.2.26`; Canvas-style Group previews now measure their actual displayed scale and apply it to text, padding, borders, corner radii, shadows, and Group labels. Text therefore shrinks with its Canvas node instead of remaining at preview UI size and clipping inside the node.
-- Automated baseline: 19 Node tests (including Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
+- Latest release: `0.2.27`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.27`.
+- Latest runtime change: `0.2.27`; the Side Palette item menu now exposes focused `Edit tags & label`, `Move to…`, `Open original`, and `Delete` actions instead of a full details editor, one menu row per Collection, and a separate Canvas locator. `Move to…` opens a searchable hierarchical destination picker. `Open original` locates, selects, and zooms to the recorded node in an already-open Canvas before falling back to the source Vault file.
+- Automated baseline: 20 Node tests (including focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
 
@@ -160,6 +160,8 @@
   - Runtime validation used an existing real-Vault Group read-only after installing the development build. The large preview rendered one Group frame, five child nodes, two images, and one edge at the exact stored `1661:487` ratio (`3.4108`). The Side Palette card used the same renderer and contained the same Group structure. No Vault or Palette content was changed during this visual verification.
 - `0.2.26` fixes oversized and clipped text inside the new Canvas-style Group preview. Each preview observes its rendered size, derives the scale from the stored Canvas bounds, and applies that scale to node typography and spacing in both the Side Palette thumbnail and large double-click preview.
   - Runtime validation used the same existing real-Vault Group read-only. At a measured preview scale of `0.5873`, the node font changed from the Canvas base `16px` to approximately `9.4px`. A screenshot confirmed the Group title and three text cards stayed within the original node layout instead of rendering at unscaled UI text size. No Vault or Palette content was changed.
+- `0.2.27` simplifies the Side Palette item context menu. `Edit tags & label` opens a focused batch-capable tool without the previous details/content editor or Caption field. `Move to…` replaces the Workspace-root and per-Collection menu rows with one searchable hierarchical picker. `Open original` absorbs the old separate Canvas locator: it reuses an already-open Canvas, selects the recorded node, and zooms to it; only items without an available Canvas origin fall back to opening their source Vault file.
+  - Runtime validation used the real Vault without changing Palette or Vault content. The menu showed exactly `Edit tags & label`, `Move to…`, `Open original`, and `Delete` for the tested Group. The move picker listed Workspace root and both Collections, and filtering for `2` left only Collection 2. The focused editor contained Tags and Label but no Caption. `Open original` kept the Canvas leaf count at one and selected the recorded node inside the already-open Canvas.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
