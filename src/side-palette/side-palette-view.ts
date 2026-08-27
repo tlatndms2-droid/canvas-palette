@@ -4,6 +4,7 @@ import type { Collection, PaletteItem, SideLayoutState } from "../core/types";
 import { ConfirmDeleteModal, TagLabelModal, TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, workspaceSelect } from "../ui/render";
+import { LinkedSpacesModal } from "../ui/linked-spaces-modal";
 
 export const SIDE_PALETTE_VIEW = "canvas-palette-side";
 
@@ -83,6 +84,16 @@ export class SidePaletteView extends ItemView {
       const list = header.createEl("button", { text: "List", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "list" ? "is-active" : "" });
       grid.addEventListener("click", () => this.setSideView("grid")); list.addEventListener("click", () => this.setSideView("list"));
     }
+    const filters = parent.createDiv({ cls: "cp-viewport-filters" });
+    const typeFilters = [["All", null], ["Image", "image"], ["MD", "markdown"], ["Card", "card"], ["Group", "group"]] as const;
+    for (const [label, type] of typeFilters) {
+      const token = type ? `type:${type}` : null;
+      const active = token ? this.plugin.search.hasToken(this.query, token) : !/\btype:/i.test(this.query);
+      const button = filters.createEl("button", { text: label, cls: active ? "is-active" : "", attr: { "aria-pressed": String(active) } });
+      button.addEventListener("click", () => { this.query = this.plugin.search.setFacet(this.query, "type", active ? null : token); this.render(); });
+    }
+    const spaces = filters.createEl("button", { text: "Linked spaces", cls: /\bspace:/i.test(this.query) ? "is-active cp-linked-spaces-button" : "cp-linked-spaces-button" });
+    spaces.addEventListener("click", () => new LinkedSpacesModal(this.app, this.items(workspaceId), this.query, (token) => this.plugin.search.hasToken(this.query, token), (token) => { this.query = this.plugin.search.setFacet(this.query, "space", token); this.render(); }).open());
     const options = parent.createEl("details", { cls: "cp-view-options" });
     options.open = this.viewSettingsOpen;
     options.addEventListener("toggle", () => { this.viewSettingsOpen = options.open; });
@@ -92,6 +103,7 @@ export class SidePaletteView extends ItemView {
     const applyViewSettings = (): void => {
       listEl.style.setProperty("--cp-card-height", `${this.plugin.store.data.settings.cardHeight}px`);
       listEl.style.setProperty("--cp-font-size", `${this.plugin.store.data.settings.fontSize}px`);
+      listEl.style.setProperty("--font-text-size", `${this.plugin.store.data.settings.fontSize}px`);
     };
     const rangeControl = (label: string, key: "cardHeight" | "fontSize", minimum: number, maximum: number, defaultValue: number): void => {
       const row = controls.createDiv({ cls: "cp-view-option" });
@@ -123,7 +135,11 @@ export class SidePaletteView extends ItemView {
     this.visibleItemIds = visibleItems.map((item) => item.id);
     for (const item of visibleItems) {
       const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, onSelect: (event) => this.selectSideItem(item.id, event), onOpen: () => void this.plugin.openSideItemPreview(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
-      const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body) void this.plugin.preview.render(body, item, true);
+      const body = card.querySelector<HTMLElement>(".cp-item__body");
+      if (body) {
+        const compactLimit = Math.round(360 * 14 / this.plugin.store.data.settings.fontSize);
+        void this.plugin.preview.render(body, item, true, compactLimit);
+      }
     }
     if (listEl.childElementCount === 0) listEl.createDiv({ cls: "cp-empty", text: "No matching items." });
     this.mountViewportSelection(listEl);

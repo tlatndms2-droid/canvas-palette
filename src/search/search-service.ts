@@ -55,13 +55,25 @@ export class SearchService {
     return tokens.join(" ").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")").trim();
   }
 
+  setFacet(query: string, facet: "type" | "space", token: string | null): string {
+    const prefix = `${facet}:`;
+    const tokens = this.tokens(query).filter((candidate) => !candidate.toLocaleLowerCase().startsWith(prefix));
+    if (token) tokens.push(token);
+    return tokens.join(" ").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")").trim();
+  }
+
   private tokens(query: string): string[] {
-    return query.match(/label:"(?:\\.|[^"])*"|tag:#[^\s()]+|"(?:\\.|[^"])*"|\(|\)|\bOR\b|[^\s()]+/gi) ?? [];
+    return query.match(/(?:label|space):"(?:\\.|[^"])*"|tag:#[^\s()]+|"(?:\\.|[^"])*"|\(|\)|\bOR\b|[^\s()]+/gi) ?? [];
   }
 
   private matchesToken(item: PaletteItem, token: string): boolean {
     const lower = token.toLocaleLowerCase();
     if (lower.startsWith("label:")) return item.label.toLocaleLowerCase() === this.unquote(token.slice(6)).toLocaleLowerCase();
+    if (lower.startsWith("type:")) return item.type === lower.slice(5);
+    if (lower.startsWith("space:")) {
+      const space = this.unquote(token.slice(6)).toLocaleLowerCase();
+      return [item.origin.canvasPath, ...item.canvasPlacements.map((placement) => placement.canvasPath)].some((path) => path?.toLocaleLowerCase() === space);
+    }
     const tag = lower.startsWith("tag:#") ? token.slice(5) : token.startsWith("#") ? token.slice(1) : null;
     if (tag !== null) return item.tags.some((value) => value.toLocaleLowerCase() === tag.toLocaleLowerCase());
     const needle = this.unquote(token).toLocaleLowerCase();

@@ -6,7 +6,7 @@ const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "b
 export class PreviewService {
   constructor(private readonly app: App, private readonly component: Component) {}
 
-  async render(parent: HTMLElement, item: PaletteItem, compact = false): Promise<void> {
+  async render(parent: HTMLElement, item: PaletteItem, compact = false, compactLimit = 360): Promise<void> {
     parent.empty();
     parent.addClass("cp-preview-content", `cp-preview-content--${item.type}`);
     if (item.type === "image" && item.origin.filePath) {
@@ -52,7 +52,7 @@ export class PreviewService {
     }
     const source = item.content ?? item.origin.filePath ?? "No preview available.";
     if (item.type === "markdown" || item.type === "card") {
-      await MarkdownRenderer.render(this.app, compact ? source.slice(0, 360) : source, parent, item.origin.filePath ?? "", this.component);
+      await MarkdownRenderer.render(this.app, compact ? source.slice(0, compactLimit) : source, parent, item.origin.filePath ?? "", this.component);
       return;
     }
     parent.setText(compact ? source.slice(0, 180) : source);

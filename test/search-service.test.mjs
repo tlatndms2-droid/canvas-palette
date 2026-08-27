@@ -16,7 +16,7 @@ async function loadSearch() {
 
 const item = (tags, label, title = "Planning note") => ({
   id: title, type: "card", displayTitle: title, tags, label, caption: "", createdAt: 1, modifiedAt: 1,
-  origin: {}, canvasPlacements: [], content: "Meeting details"
+  origin: { canvasPath: "Projects/Planning.canvas" }, canvasPlacements: [{ canvasPath: "Archive.canvas", nodeIds: ["one"], placedAt: 1 }], content: "Meeting details"
 });
 
 test("Obsidian-like tag, label, AND, OR, and parentheses filter palette items", async () => {
@@ -31,6 +31,9 @@ test("Obsidian-like tag, label, AND, OR, and parentheses filter palette items", 
   assert.equal(search.matches(work, '(#작업 OR #중요) label:"진행 중"'), true);
   assert.equal(search.matches(important, '(#작업 OR #중요) label:"진행 중"'), false);
   assert.equal(search.matches(work, "Meeting #작업"), true);
+  assert.equal(search.matches(work, "type:card"), true);
+  assert.equal(search.matches(work, 'space:"Projects/Planning.canvas"'), true);
+  assert.equal(search.matches(work, 'space:"Other.canvas"'), false);
 
   await cleanup();
 });
@@ -42,6 +45,8 @@ test("index tokens are added to and removed from the visible search query", asyn
   assert.equal(withTag, "meeting #작업");
   assert.equal(search.hasToken(withTag, "#작업"), true);
   assert.equal(search.toggleToken(withTag, "#작업"), "meeting");
+  assert.equal(search.setFacet("meeting type:image", "type", "type:card"), "meeting type:card");
+  assert.equal(search.setFacet('meeting space:"Archive.canvas"', "space", null), "meeting");
 
   await cleanup();
 });
