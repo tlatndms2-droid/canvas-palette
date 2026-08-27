@@ -126,33 +126,7 @@ export class SidePaletteView extends ItemView {
     rangeControl("Card height", "cardHeight", 32, 220, 220);
     rangeControl("Preview font size", "fontSize", 8, 14, 14);
     applyViewSettings();
-    const dropIndicator = document.createElement("div"); dropIndicator.className = "cp-drop-indicator";
-    let dropTargetId: string | null = null; let dropAfter = false;
-    const clearDropIndicator = (): void => { dropIndicator.remove(); dropTargetId = null; dropAfter = false; };
-    listEl.addEventListener("dragover", (event) => {
-      if (!event.dataTransfer?.types.includes("application/x-canvas-palette-item")) return;
-      event.preventDefault();
-      if (event.target === dropIndicator) return;
-      const sourceId = event.dataTransfer.getData("application/x-canvas-palette-item");
-      const target = (event.target as HTMLElement).closest<HTMLElement>(".cp-item:not(.is-dragging)");
-      if (target?.dataset.itemId && target.dataset.itemId !== sourceId) {
-        const rect = target.getBoundingClientRect();
-        dropAfter = event.clientY > rect.top + rect.height / 2;
-        dropTargetId = target.dataset.itemId;
-        target.insertAdjacentElement(dropAfter ? "afterend" : "beforebegin", dropIndicator);
-      } else if (event.target === listEl) {
-        const cards = Array.from(listEl.querySelectorAll<HTMLElement>(".cp-item:not(.is-dragging)"));
-        const last = cards.at(-1);
-        if (last?.dataset.itemId) { dropTargetId = last.dataset.itemId; dropAfter = true; last.insertAdjacentElement("afterend", dropIndicator); }
-      }
-    });
-    listEl.addEventListener("dragleave", (event) => { if (!(event.relatedTarget instanceof Node) || !listEl.contains(event.relatedTarget)) clearDropIndicator(); });
-    listEl.addEventListener("dragend", clearDropIndicator);
-    listEl.addEventListener("drop", (event) => {
-      const sourceId = event.dataTransfer?.getData("application/x-canvas-palette-item");
-      if (sourceId && dropTargetId) { event.preventDefault(); const targetId = dropTargetId; const after = dropAfter; clearDropIndicator(); this.plugin.store.reorderItems(workspaceId, sourceId, targetId, after); }
-      else clearDropIndicator();
-    });
+    this.mountViewportReorder(parent, listEl, workspaceId);
     const visibleItems = this.plugin.search.filter(this.items(workspaceId), this.query);
     this.visibleItemIds = visibleItems.map((item) => item.id);
     for (const item of visibleItems) {
@@ -163,12 +137,12 @@ export class SidePaletteView extends ItemView {
         void this.plugin.preview.render(body, item, true, compactLimit);
       }
       card.addEventListener("wheel", (event) => {
-        event.preventDefault(); event.stopPropagation();
-        if (selectedIds.includes(item.id) && (item.type === "card" || item.type === "markdown") && body?.contains(event.target as Node)) body.scrollTop += event.deltaY;
+        if (!selectedIds.includes(item.id) || (item.type !== "card" && item.type !== "markdown") || !body?.contains(event.target as Node)) return;
+        event.preventDefault(); event.stopPropagation(); body.scrollTop += event.deltaY;
       }, { passive: false });
     }
     if (listEl.childElementCount === 0) listEl.createDiv({ cls: "cp-empty", text: "No matching items." });
-    this.mountViewportSelection(listEl);
+    this.mountViewportSelection(parent, listEl);
   }
 
   private renderOutliner(parent: HTMLElement, workspaceId: string): void {
@@ -283,10 +257,55 @@ export class SidePaletteView extends ItemView {
     this.plugin.store.data.uiState.selectedItemId = null;
     this.plugin.store.changed();
   }
-  private mountViewportSelection(listEl: HTMLElement): void {
-    listEl.addEventListener("click", (event) => {
+  private mountViewportReorder(viewport: HTMLElement, listEl: HTMLElement, workspaceId: string): void {
+    const overlay = document.createElement("div"); overlay.className = "cp-drop-overlay";
+    let cards: Array<{ id: string; rect: DOMRect }> = [];
+    let point: { x: number; y: number } | null = null;
+    let frame = 0; let targetId: string | null = null; let insertAfter = false;
+    const hide = (): void => { overlay.remove(); targetId = null; };
+    const measure = (): void => { cards = Array.from(listEl.querySelectorAll<HTMLElement>(".cp-item:not(.is-dragging)")).flatMap((card) => card.dataset.itemId ? [{ id: card.dataset.itemId, rect: card.getBoundingClientRect() }] : []); };
+    const draw = (): void => {
+      frame = 0;
+      if (!point) return;
+      if (cards.length === 0) measure();
+      const visible = cards.filter(({ rect }) => rect.bottom >= viewport.getBoundingClientRect().top && rect.top <= viewport.getBoundingClientRect().bottom);
+      const nearest = visible.reduce<{ id: string; rect: DOMRect; distance: number } | null>((best, card) => {
+        const dx = point!.x - (card.rect.left + card.rect.width / 2); const dy = point!.y - (card.rect.top + card.rect.height / 2);
+        const distance = dx * dx + dy * dy;
+        return !best || distance < best.distance ? { ...card, distance } : best;
+      }, null);
+      if (!nearest) { hide(); return; }
+      const multiColumn = cards.some((card, index) => index > 0 && Math.abs(card.rect.top - cards[index - 1].rect.top) < 6);
+      insertAfter = multiColumn ? point.x > nearest.rect.left + nearest.rect.width / 2 : point.y > nearest.rect.top + nearest.rect.height / 2;
+      targetId = nearest.id;
+      const style = multiColumn
+        ? { left: `${insertAfter ? nearest.rect.right + 2 : nearest.rect.left - 6}px`, top: `${nearest.rect.top}px`, width: "4px", height: `${nearest.rect.height}px` }
+        : { left: `${nearest.rect.left}px`, top: `${insertAfter ? nearest.rect.bottom + 2 : nearest.rect.top - 6}px`, width: `${nearest.rect.width}px`, height: "4px" };
+      Object.assign(overlay.style, style);
+      if (!overlay.isConnected) document.body.appendChild(overlay);
+    };
+    const schedule = (): void => { if (!frame) frame = requestAnimationFrame(draw); };
+    const clear = (): void => { if (frame) cancelAnimationFrame(frame); frame = 0; point = null; cards = []; hide(); window.removeEventListener("keydown", onKeyDown, true); };
+    const onKeyDown = (event: KeyboardEvent): void => { if (event.key === "Escape") clear(); };
+    listEl.addEventListener("dragstart", () => { cards = []; window.addEventListener("keydown", onKeyDown, true); });
+    listEl.addEventListener("dragover", (event) => { if (!event.dataTransfer?.types.includes("application/x-canvas-palette-item")) return; event.preventDefault(); point = { x: event.clientX, y: event.clientY }; schedule(); });
+    listEl.addEventListener("dragleave", (event) => { if (!(event.relatedTarget instanceof Node) || !listEl.contains(event.relatedTarget)) hide(); });
+    listEl.addEventListener("dragend", clear);
+    listEl.addEventListener("drop", (event) => {
+      const sourceId = event.dataTransfer?.getData("application/x-canvas-palette-item");
+      if (sourceId && targetId) { event.preventDefault(); const id = targetId; const after = insertAfter; clear(); this.plugin.store.reorderItems(workspaceId, sourceId, id, after); }
+      else clear();
+    });
+    viewport.addEventListener("scroll", () => { cards = []; if (point) schedule(); }, { passive: true });
+  }
+  private mountViewportSelection(viewport: HTMLElement, listEl: HTMLElement): void {
+    viewport.addEventListener("click", (event) => {
       if (this.suppressBlankClick) { this.suppressBlankClick = false; return; }
-      if (event.target === listEl) this.clearSideSelection();
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.closest(".cp-item,button,input,select,textarea,summary,a,.cp-view-options")) return;
+      if (target === viewport) { const rect = viewport.getBoundingClientRect(); if (event.clientX >= rect.left + viewport.clientWidth) return; }
+      this.clearSideSelection();
     });
     listEl.addEventListener("pointerdown", (event) => {
       if (event.button !== 0 || event.target !== listEl) return;
