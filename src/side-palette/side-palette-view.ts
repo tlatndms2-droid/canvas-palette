@@ -134,7 +134,9 @@ export class SidePaletteView extends ItemView {
       const body = card.querySelector<HTMLElement>(".cp-item__body");
       if (body) {
         const compactLimit = Math.round(360 * 14 / this.plugin.store.data.settings.fontSize);
-        void this.plugin.preview.render(body, item, true, compactLimit);
+        const canBrowseFullBody = selectedIds.includes(item.id) && (item.type === "card" || item.type === "markdown");
+        void this.plugin.preview.render(body, item, true, canBrowseFullBody ? Number.MAX_SAFE_INTEGER : compactLimit);
+        if (canBrowseFullBody) this.mountBodyDragScroll(card, body);
       }
       card.addEventListener("wheel", (event) => {
         if (!selectedIds.includes(item.id) || (item.type !== "card" && item.type !== "markdown") || !body?.contains(event.target as Node)) return;
@@ -143,6 +145,48 @@ export class SidePaletteView extends ItemView {
     }
     if (listEl.childElementCount === 0) listEl.createDiv({ cls: "cp-empty", text: "No matching items." });
     this.mountViewportSelection(parent, listEl);
+  }
+
+  private mountBodyDragScroll(card: HTMLElement, body: HTMLElement): void {
+    body.addClass("is-pan-enabled");
+    body.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      const startY = event.clientY;
+      const startScrollTop = body.scrollTop;
+      let moved = false;
+      card.draggable = false;
+      body.setPointerCapture(event.pointerId);
+
+      const move = (pointer: PointerEvent): void => {
+        const delta = pointer.clientY - startY;
+        if (!moved && Math.abs(delta) < 3) return;
+        moved = true;
+        pointer.preventDefault();
+        pointer.stopPropagation();
+        body.addClass("is-panning");
+        body.scrollTop = startScrollTop - delta;
+      };
+      const finish = (pointer: PointerEvent): void => {
+        if (body.hasPointerCapture(pointer.pointerId)) body.releasePointerCapture(pointer.pointerId);
+        body.removeClass("is-panning");
+        card.draggable = true;
+        body.removeEventListener("pointermove", move);
+        body.removeEventListener("pointerup", finish);
+        body.removeEventListener("pointercancel", finish);
+        if (moved) {
+          pointer.preventDefault();
+          pointer.stopPropagation();
+          body.addEventListener("click", (click) => {
+            click.preventDefault();
+            click.stopImmediatePropagation();
+          }, { capture: true, once: true });
+        }
+      };
+
+      body.addEventListener("pointermove", move);
+      body.addEventListener("pointerup", finish);
+      body.addEventListener("pointercancel", finish);
+    });
   }
 
   private renderOutliner(parent: HTMLElement, workspaceId: string): void {
