@@ -3,7 +3,7 @@ import type { PaletteData, SideLayoutState } from "./types";
 export const DEFAULT_SIDE_LAYOUT: SideLayoutState = { viewportRatio: 0.52, topRatio: 0.69, indexRatio: 0.5, viewMode: "grid" };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 10,
+  schemaVersion: 11,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
@@ -21,7 +21,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
   if (!raw) return structuredClone(DEFAULT_DATA);
   const rawSettings = raw.settings as (Partial<PaletteData["settings"]> & { cardSize?: number }) | undefined;
   const { cardSize: _legacyCardSize, ...migratedSettings } = rawSettings ?? {};
-  const legacyUi = raw.uiState as Partial<PaletteData["uiState"]> & { miniTab?: "collect" | "storage"; leftPaneOpen?: boolean; rightPaneOpen?: boolean; leftPaneWidth?: number; rightPaneWidth?: number };
+  const legacyUi = (raw.uiState ?? {}) as Partial<PaletteData["uiState"]> & { miniTab?: "collect" | "storage"; leftPaneOpen?: boolean; rightPaneOpen?: boolean; leftPaneWidth?: number; rightPaneWidth?: number };
   const workspaces = Object.fromEntries(Object.entries(raw.workspaces ?? {}).map(([id, workspace]) => [id, {
     ...workspace,
     representativeCanvasPath: workspace.representativeCanvasPath ?? null,
@@ -31,9 +31,9 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 10,
+    schemaVersion: 11,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
-      const supportsFaces = item.type === "card" || item.type === "markdown";
+      const supportsFaces = item.type !== "group";
       return [id, { ...item, backContent: supportsFaces ? item.backContent ?? "" : "", facesEnabled: supportsFaces && (item.facesEnabled ?? Boolean(item.backContent)), labelColor: item.labelColor ?? "", canvasPlacements: item.canvasPlacements ?? [] }];
     })),
     workspaces,

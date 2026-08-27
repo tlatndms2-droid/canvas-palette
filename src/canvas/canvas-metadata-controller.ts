@@ -140,6 +140,7 @@ export class CanvasMetadataController {
     host.addEventListener("keydown", onKeyDown, true);
     try {
       await editor.mount(host, false);
+      window.requestAnimationFrame(() => editor.remeasure());
       window.setTimeout(() => doc.addEventListener("pointerdown", onOutsidePointer, true), 0);
     } catch (error) {
       await close(false);

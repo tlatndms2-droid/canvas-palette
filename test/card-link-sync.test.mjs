@@ -117,7 +117,7 @@ test("Unlink from Palette preserves the node snapshot and stops later synchroniz
   await cleanup();
 });
 
-test("removing Front Back clears the linked material and every placement", async () => {
+test("removing Front Back disables the linked material without deleting its Back", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
   const store = new PaletteStore(plugin);
@@ -130,13 +130,15 @@ test("removing Front Back clears the linked material and every placement", async
   store.disableCanvasNodeFaces("B.canvas", "drop");
 
   assert.equal(store.data.items.card.facesEnabled, false);
-  assert.equal(store.data.items.card.backContent, "");
+  assert.equal(store.data.items.card.backContent, "Back to remove");
   for (const [canvasPath, nodeId] of [["A.canvas", "origin"], ["B.canvas", "drop"]]) {
     const state = store.getCanvasNodeMetadata(canvasPath, nodeId);
     assert.equal(state?.facesEnabled, false);
-    assert.equal(state?.backContent, "");
+    assert.equal(state?.backContent, "Back to remove");
     assert.equal(state?.currentFace, "front");
   }
+  store.enableCanvasNodeFaces("A.canvas", "origin");
+  assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.backContent, "Back to remove");
   await cleanup();
 });
 

@@ -19,7 +19,7 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
 
 export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; currentFace?: CardFace; onToggleFace?: (face: CardFace) => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
 
-export function supportsFrontBack(item: PaletteItem): boolean { return item.type === "card" || item.type === "markdown"; }
+export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group"; }
 
 export function renderItem(parent: HTMLElement, item: PaletteItem, options: ItemRenderOptions): HTMLElement {
   const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${options.selected ? " is-selected" : ""}${options.compact ? " is-compact" : ""}` });
