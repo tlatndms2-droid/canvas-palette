@@ -74,14 +74,14 @@ export class SidePaletteView extends ItemView {
   private renderViewport(parent: HTMLElement, workspaceId: string): void {
     const header = parent.createDiv({ cls: "cp-panel__header" }); header.createEl("h4", { text: "Viewport" });
     const selectedIds = this.sideSelectedIds().filter((id) => this.plugin.store.data.items[id]);
-    const memo = header.createEl("button", { text: "+ Memo" }); memo.addEventListener("click", () => void this.plugin.createMemo());
-    const grid = header.createEl("button", { text: "Grid", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "grid" ? "is-active" : "" });
-    const list = header.createEl("button", { text: "List", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "list" ? "is-active" : "" });
-    grid.addEventListener("click", () => this.setSideView("grid")); list.addEventListener("click", () => this.setSideView("list"));
     if (selectedIds.length > 0) {
-      const batchOverlay = parent.createDiv({ cls: "cp-batch-overlay" });
-      const batch = batchOverlay.createDiv({ cls: "cp-batch-bar" }); batch.createSpan({ cls: "cp-selection-count", text: `Selected ${selectedIds.length}` });
-      const remove = batch.createEl("button", { text: "Delete", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmDelete(selectedIds));
+      header.createSpan({ cls: "cp-selection-count", text: `Selected ${selectedIds.length}` });
+      const remove = header.createEl("button", { text: "Delete", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmDelete(selectedIds));
+    } else {
+      const memo = header.createEl("button", { text: "+ Memo" }); memo.addEventListener("click", () => void this.plugin.createMemo());
+      const grid = header.createEl("button", { text: "Grid", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "grid" ? "is-active" : "" });
+      const list = header.createEl("button", { text: "List", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "list" ? "is-active" : "" });
+      grid.addEventListener("click", () => this.setSideView("grid")); list.addEventListener("click", () => this.setSideView("list"));
     }
     const options = parent.createEl("details", { cls: "cp-view-options" });
     options.open = this.viewSettingsOpen;
@@ -111,7 +111,7 @@ export class SidePaletteView extends ItemView {
       input.addEventListener("change", () => this.plugin.store.changed());
       reset.addEventListener("click", () => { input.value = String(defaultValue); update(); this.plugin.store.changed(); });
     };
-    rangeControl("Card height", "cardHeight", 72, 220, 220);
+    rangeControl("Card height", "cardHeight", 32, 220, 220);
     rangeControl("Preview font size", "fontSize", 8, 14, 14);
     applyViewSettings();
     listEl.addEventListener("dragover", (event) => { if (event.dataTransfer?.types.includes("application/x-canvas-palette-item")) event.preventDefault(); });

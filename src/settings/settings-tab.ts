@@ -20,7 +20,7 @@ export class CanvasPaletteSettingTab extends PluginSettingTab {
       .setValue(this.plugin.store.data.settings.accentColor)
       .onChange((value) => { this.plugin.store.data.settings.accentColor = value; this.plugin.store.changed(); }));
     new Setting(containerEl).setName("Card height").setDesc("Reduce the vertical preview space without changing card width.").addSlider((slider) => slider
-      .setLimits(72, 220, 4).setDynamicTooltip().setValue(this.plugin.store.data.settings.cardHeight)
+      .setLimits(32, 220, 4).setDynamicTooltip().setValue(this.plugin.store.data.settings.cardHeight)
       .onChange((value) => { this.plugin.store.data.settings.cardHeight = value; this.plugin.store.changed(); }));
     new Setting(containerEl).setName("Font size").setDesc("Reduce preview text from the default size.").addSlider((slider) => slider
       .setLimits(8, 14, 1).setDynamicTooltip().setValue(this.plugin.store.data.settings.fontSize)
