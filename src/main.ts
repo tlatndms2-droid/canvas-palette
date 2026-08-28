@@ -261,9 +261,9 @@ export default class CanvasPalettePlugin extends Plugin {
     new Notice("The original item is unavailable.");
   }
 
-  async createMarkdownFromCard(itemId: string, requestedName: string, requestedFolder: string): Promise<boolean> {
+  async convertCardToMarkdown(itemId: string, requestedName: string, requestedFolder: string): Promise<boolean> {
     const item = this.store.data.items[itemId];
-    if (!item || item.type !== "card") { new Notice("Only Card items can create a Markdown file."); return false; }
+    if (!item || item.type !== "card") { new Notice("Only Card items can be converted to Markdown."); return false; }
     const baseName = requestedName.trim().replace(/\.md$/i, "");
     if (!baseName || /[\\/:*?"<>|]/.test(baseName)) { new Notice("Enter a valid Markdown file name."); return false; }
     const folder = requestedFolder.trim().replace(/^\/+|\/+$/g, "");
@@ -272,10 +272,12 @@ export default class CanvasPalettePlugin extends Plugin {
     try {
       await this.ensureVaultFolder(folder);
       await this.app.vault.create(path, item.content ?? "");
-      new Notice(`Created ${path}. The Palette and linked Canvas Cards were unchanged.`);
+      await this.canvas.convertLinkedCardsToMarkdown(this.store.linkedCanvasNodes(item), path);
+      if (!this.store.convertCardToMarkdown(item.id, path)) return false;
+      new Notice(`${item.displayTitle} converted to Markdown.`);
       return true;
     } catch (error) {
-      console.error("Canvas Palette failed to create Markdown from a Card", error);
+      console.error("Canvas Palette failed to convert a Card to Markdown", error);
       new Notice("Could not create the Markdown file.");
       return false;
     }
