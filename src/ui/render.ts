@@ -10,6 +10,13 @@ export const TYPE_ICON: Record<PaletteItemType, string> = {
   group: "boxes"
 };
 
+export const TYPE_LABEL: Record<PaletteItemType, string> = {
+  card: "CARD",
+  markdown: "MD",
+  image: "IMAGE",
+  group: "GROUP"
+};
+
 export function iconButton(parent: HTMLElement, icon: string, label: string, onClick: () => void): HTMLButtonElement {
   const button = parent.createEl("button", { cls: "clickable-icon cp-icon-button", attr: { "aria-label": label } });
   setIcon(button, icon);
@@ -34,10 +41,8 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   const header = card.createDiv({ cls: "cp-item__header" });
   const icon = header.createSpan({ cls: "cp-item__icon" });
   setIcon(icon, TYPE_ICON[item.type]);
-  if (item.type === "markdown") {
-    icon.addClass("cp-item__type-badge", "cp-item__type-badge--markdown");
-    icon.createSpan({ cls: "cp-item__type-badge-label", text: "MD" });
-  }
+  icon.addClass("cp-item__type-badge", `cp-item__type-badge--${item.type}`);
+  icon.createSpan({ cls: "cp-item__type-badge-label", text: TYPE_LABEL[item.type] });
   header.createSpan({ cls: "cp-item__title", text: item.displayTitle || "Untitled" });
   const face = options.currentFace ?? "front";
   if (item.label) {

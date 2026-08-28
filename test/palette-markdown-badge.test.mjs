@@ -6,11 +6,18 @@ const render = await readFile(new URL("../src/ui/render.ts", import.meta.url), "
 const canvas = await readFile(new URL("../src/canvas/canvas-metadata-controller.ts", import.meta.url), "utf8");
 const styles = await readFile(new URL("../styles.css", import.meta.url), "utf8");
 
-test("Palette Markdown items label their existing file icon with MD only in the Palette", () => {
-  assert.match(render, /if \(item\.type === "markdown"\)/);
-  assert.match(render, /cp-item__type-badge--markdown/);
-  assert.match(render, /cp-item__type-badge-label", text: "MD"/);
-  assert.match(styles, /\.cp-item__type-badge--markdown\{[^}]*display:inline-flex/);
+test("Palette item icons carry distinct Card, Markdown, Image, and Group type labels", () => {
+  assert.match(render, /card: "CARD"/);
+  assert.match(render, /markdown: "MD"/);
+  assert.match(render, /image: "IMAGE"/);
+  assert.match(render, /group: "GROUP"/);
+  assert.match(render, /`cp-item__type-badge--\$\{item\.type\}`/);
+  assert.match(render, /cp-item__type-badge-label", text: TYPE_LABEL\[item\.type\]/);
+  assert.match(styles, /\.cp-item__type-badge\{[^}]*display:inline-flex/);
+  assert.match(styles, /\.cp-item__type-badge--card\{--cp-type-color:#d99100\}/);
+  assert.match(styles, /\.cp-item__type-badge--markdown\{--cp-type-color:#22a55a\}/);
+  assert.match(styles, /\.cp-item__type-badge--image\{--cp-type-color:#f06445\}/);
+  assert.match(styles, /\.cp-item__type-badge--group\{--cp-type-color:#7657d6\}/);
   assert.doesNotMatch(canvas, /cp-canvas-markdown-badge/);
   assert.doesNotMatch(styles, /\.cp-canvas-markdown-badge/);
 });
