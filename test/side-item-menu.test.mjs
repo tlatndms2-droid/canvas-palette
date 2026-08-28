@@ -7,7 +7,7 @@ test("Side item menu uses focused metadata, move, and Find link actions", async 
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
   const modal = await readFile(new URL("../src/ui/modal.ts", import.meta.url), "utf8");
 
-  assert.match(source, /setTitle\("Edit tags & label"\)/);
+  assert.match(source, /setTitle\("Edit tags, label & caption"\)/);
   assert.match(source, /setTitle\("Move to…"\)/);
   assert.doesNotMatch(source, /setTitle\(`Move to \$\{collection\.name\}`\)/);
   assert.doesNotMatch(source, /setTitle\("Locate on Canvas"\)/);
@@ -19,4 +19,10 @@ test("Side item menu uses focused metadata, move, and Find link actions", async 
   assert.match(modal, /cls: "cp-tag-label-caption"/);
   assert.match(modal, /let captionTouched = false/);
   assert.match(modal, /caption: captionTouched \|\| sharedCaptions\.size === 1 \? caption\.value\.trim\(\) : item\.caption/);
+  assert.match(modal, /this\.virtualList<string>\(tagListHost/);
+  assert.match(modal, /this\.virtualList<string>\(labelListHost/);
+  assert.match(modal, /placeholder: "Search tags"/);
+  assert.match(modal, /placeholder: "Search labels"/);
+  assert.match(modal, /const rowHeight = 36/);
+  assert.match(modal, /const overscan = 4/);
 });

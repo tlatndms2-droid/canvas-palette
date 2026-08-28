@@ -75,6 +75,8 @@ export class ConfirmCanvasReplacementModal extends Modal {
 }
 
 export class TagLabelModal extends Modal {
+  private outsideClick: ((event: PointerEvent) => void) | null = null;
+
   constructor(app: App, private readonly plugin: CanvasPalettePlugin, private readonly itemIds: string[]) { super(app); }
 
   onOpen(): void {
@@ -83,38 +85,156 @@ export class TagLabelModal extends Modal {
     const workspaceItems = this.plugin.store.itemsForWorkspace(this.plugin.store.data.uiState.activeWorkspaceId);
     const knownTags = [...new Set([...workspaceItems.flatMap((item) => item.tags), ...items.flatMap((item) => item.tags)])].sort((a, b) => a.localeCompare(b));
     const knownLabels = [...new Set([...workspaceItems.map((item) => item.label), ...items.map((item) => item.label)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const labelColors = new Map<string, string>();
+    for (const item of [...workspaceItems, ...items]) if (item.label && item.labelColor && !labelColors.has(item.label)) labelColors.set(item.label, item.labelColor);
+    this.modalEl.addClass("cp-tag-label-shell");
     this.contentEl.addClass("canvas-palette", "cp-tag-label-modal");
     this.contentEl.createEl("h2", { text: items.length === 1 ? "Tags, label & caption" : `Tags, label & caption · ${items.length} items` });
-    this.contentEl.createEl("h3", { text: "Tags" });
-    const tagControls = new Map<string, HTMLInputElement>();
-    const tagList = this.contentEl.createDiv({ cls: "cp-toggle-list" });
+    const tagSection = this.contentEl.createDiv({ cls: "cp-metadata-picker-section" });
+    const tagHeading = tagSection.createDiv({ cls: "cp-metadata-picker-heading" });
+    tagHeading.createEl("h3", { text: "Tags" });
+    const tagCount = tagHeading.createSpan({ cls: "cp-metadata-picker-count" });
+    const tagPicker = tagSection.createDiv({ cls: "cp-metadata-picker" });
+    const tagSummary = tagPicker.createEl("button", { cls: "cp-metadata-picker-summary", attr: { type: "button", "aria-haspopup": "listbox", "aria-expanded": "false" } });
+    const tagPanel = tagPicker.createDiv({ cls: "cp-metadata-picker-panel" });
+    tagPanel.hidden = true;
+    const tagSearch = tagPanel.createEl("input", { cls: "cp-metadata-picker-search", attr: { type: "search", placeholder: "Search tags", "aria-label": "Search tags" } });
+    const tagStates = new Map<string, "all" | "mixed" | "none">();
+    const touchedTags = new Set<string>();
     for (const tag of knownTags) {
       const count = items.filter((item) => item.tags.includes(tag)).length;
-      const row = tagList.createEl("label", { cls: "cp-toggle-row" });
-      const checkbox = row.createEl("input", { attr: { type: "checkbox" } });
-      checkbox.checked = count === items.length;
-      checkbox.indeterminate = count > 0 && count < items.length;
-      checkbox.addEventListener("change", () => { checkbox.indeterminate = false; checkbox.dataset.touched = "true"; });
-      row.createSpan({ text: `#${tag}` });
-      tagControls.set(tag, checkbox);
+      tagStates.set(tag, count === items.length ? "all" : count > 0 ? "mixed" : "none");
     }
-    if (knownTags.length === 0) tagList.createDiv({ cls: "cp-empty", text: "No existing tags." });
-    const newTags = this.contentEl.createEl("input", { attr: { placeholder: "Add tags, separated by commas" } });
-    this.contentEl.createEl("h3", { text: "Label" });
+    const tagListHost = tagPanel.createDiv({ cls: "cp-metadata-picker-list" });
+    const updateTagSummary = (): void => {
+      const selected = knownTags.filter((tag) => tagStates.get(tag) !== "none");
+      tagCount.setText(`Selected ${selected.length} / Total ${knownTags.length}`);
+      tagSummary.empty();
+      const visible = selected.slice(0, 2);
+      for (const tag of visible) tagSummary.createSpan({ cls: "cp-metadata-picker-chip", text: `#${tag}` });
+      if (selected.length > visible.length) tagSummary.createSpan({ cls: "cp-metadata-picker-more", text: `+${selected.length - visible.length}` });
+      if (selected.length === 0) tagSummary.createSpan({ cls: "cp-metadata-picker-placeholder", text: "Select tags" });
+      tagSummary.createSpan({ cls: "cp-metadata-picker-chevron", text: "⌄" });
+    };
+    const renderTags = this.virtualList<string>(tagListHost, (tag) => {
+      const row = createDiv({ cls: "cp-metadata-picker-row" });
+      row.setAttribute("role", "option");
+      row.tabIndex = 0;
+      const checkbox = row.createEl("input", { attr: { type: "checkbox", tabindex: "-1" } });
+      const state = tagStates.get(tag) ?? "none";
+      checkbox.checked = state === "all";
+      checkbox.indeterminate = state === "mixed";
+      row.createSpan({ text: `#${tag}` });
+      const toggleTag = (): void => {
+        tagStates.set(tag, state === "all" ? "none" : "all");
+        touchedTags.add(tag);
+        updateTagSummary();
+        filterTags();
+      };
+      row.addEventListener("click", toggleTag);
+      row.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggleTag(); } });
+      return row;
+    });
+    const filterTags = (): void => {
+      const query = tagSearch.value.trim().toLocaleLowerCase();
+      renderTags(knownTags.filter((tag) => !query || tag.toLocaleLowerCase().includes(query)));
+    };
+    tagSearch.addEventListener("input", filterTags);
+    const newTagRow = tagPanel.createDiv({ cls: "cp-metadata-picker-create" });
+    const newTag = newTagRow.createEl("input", { attr: { placeholder: "New tag", "aria-label": "New tag" } });
+    const addTag = newTagRow.createEl("button", { text: "Add", attr: { type: "button" } });
+    const createTag = (): void => {
+      const tag = newTag.value.trim().replace(/^#/, "");
+      if (!tag) return;
+      if (!tagStates.has(tag)) { knownTags.push(tag); knownTags.sort((a, b) => a.localeCompare(b)); }
+      tagStates.set(tag, "all"); touchedTags.add(tag); newTag.value = ""; tagSearch.value = "";
+      updateTagSummary(); filterTags();
+    };
+    addTag.addEventListener("click", createTag);
+    newTag.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); createTag(); } });
+    updateTagSummary(); filterTags();
+
+    const labelSection = this.contentEl.createDiv({ cls: "cp-metadata-picker-section" });
+    labelSection.createEl("h3", { text: "Label" });
     const currentLabels = new Set(items.map((item) => item.label));
-    const radioName = `cp-label-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const labelList = this.contentEl.createDiv({ cls: "cp-toggle-list" });
     let selectedLabel = currentLabels.size === 1 ? items[0].label : "__keep__";
-    if (currentLabels.size > 1) this.radio(labelList, radioName, "__keep__", "Keep current labels", true, (value) => { selectedLabel = value; });
-    this.radio(labelList, radioName, "", "No label", currentLabels.size === 1 && items[0].label === "", (value) => { selectedLabel = value; });
-    for (const label of knownLabels) this.radio(labelList, radioName, label, label, currentLabels.size === 1 && items[0].label === label, (value) => { selectedLabel = value; });
-    const newLabel = this.contentEl.createEl("input", { attr: { placeholder: "New label" } });
-    this.contentEl.createEl("label", { text: "Label color" });
+    let labelTouched = false;
+    const labelPicker = labelSection.createDiv({ cls: "cp-metadata-picker" });
+    const labelSummary = labelPicker.createEl("button", { cls: "cp-metadata-picker-summary", attr: { type: "button", "aria-haspopup": "listbox", "aria-expanded": "false" } });
+    const labelPanel = labelPicker.createDiv({ cls: "cp-metadata-picker-panel" });
+    labelPanel.hidden = true;
+    const labelSearch = labelPanel.createEl("input", { cls: "cp-metadata-picker-search", attr: { type: "search", placeholder: "Search labels", "aria-label": "Search labels" } });
+    const labelListHost = labelPanel.createDiv({ cls: "cp-metadata-picker-list" });
     const sharedColors = new Set(items.map((item) => item.labelColor ?? ""));
-    const labelColor = this.contentEl.createEl("input", { attr: { type: "color", "aria-label": "Label color" } });
+    const labelCreate = labelPanel.createDiv({ cls: "cp-metadata-picker-create" });
+    const newLabel = labelCreate.createEl("input", { attr: { placeholder: "New label", "aria-label": "New label" } });
+    const labelColor = labelCreate.createEl("input", { cls: "cp-metadata-picker-color", attr: { type: "color", "aria-label": "Label color" } });
     labelColor.value = sharedColors.size === 1 && items[0].labelColor ? items[0].labelColor : "#8b5cf6";
     let colorTouched = false;
     labelColor.addEventListener("input", () => { colorTouched = true; });
+    const addLabel = labelCreate.createEl("button", { text: "Add", attr: { type: "button" } });
+    const updateLabelSummary = (): void => {
+      labelSummary.empty();
+      if (selectedLabel === "__keep__") labelSummary.createSpan({ cls: "cp-metadata-picker-placeholder", text: "Keep current labels" });
+      else if (!selectedLabel) labelSummary.createSpan({ cls: "cp-metadata-picker-placeholder", text: "No label" });
+      else {
+        const swatch = labelSummary.createSpan({ cls: "cp-metadata-picker-swatch" });
+        swatch.style.backgroundColor = labelColors.get(selectedLabel) ?? labelColor.value;
+        labelSummary.createSpan({ cls: "cp-metadata-picker-value", text: selectedLabel });
+      }
+      labelSummary.createSpan({ cls: "cp-metadata-picker-chevron", text: "⌄" });
+    };
+    const labelChoices = (): string[] => [...(currentLabels.size > 1 ? ["__keep__"] : []), "", ...knownLabels];
+    const renderLabels = this.virtualList<string>(labelListHost, (label) => {
+      const row = createDiv({ cls: "cp-metadata-picker-row" });
+      row.setAttribute("role", "option");
+      row.tabIndex = 0;
+      const radio = row.createEl("input", { attr: { type: "radio", tabindex: "-1" } });
+      radio.checked = label === selectedLabel;
+      if (label && label !== "__keep__") { const swatch = row.createSpan({ cls: "cp-metadata-picker-swatch" }); swatch.style.backgroundColor = labelColors.get(label) ?? "#8b5cf6"; }
+      row.createSpan({ text: label === "__keep__" ? "Keep current labels" : label || "No label" });
+      const chooseLabel = (): void => {
+        selectedLabel = label; labelTouched = true;
+        const knownColor = labelColors.get(label);
+        if (knownColor) labelColor.value = knownColor;
+        updateLabelSummary(); filterLabels(); closePanel(labelPanel, labelSummary);
+      };
+      row.addEventListener("click", chooseLabel);
+      row.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); chooseLabel(); } });
+      return row;
+    });
+    const filterLabels = (): void => {
+      const query = labelSearch.value.trim().toLocaleLowerCase();
+      renderLabels(labelChoices().filter((label) => label === "__keep__" || !query || label.toLocaleLowerCase().includes(query)));
+    };
+    labelSearch.addEventListener("input", filterLabels);
+    const createLabel = (): void => {
+      const label = newLabel.value.trim();
+      if (!label) return;
+      if (!knownLabels.includes(label)) { knownLabels.push(label); knownLabels.sort((a, b) => a.localeCompare(b)); }
+      labelColors.set(label, labelColor.value); selectedLabel = label; labelTouched = true; colorTouched = true;
+      newLabel.value = ""; labelSearch.value = ""; updateLabelSummary(); filterLabels(); closePanel(labelPanel, labelSummary);
+    };
+    addLabel.addEventListener("click", createLabel);
+    newLabel.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); createLabel(); } });
+    updateLabelSummary(); filterLabels();
+
+    const closePanel = (panel: HTMLElement, summary: HTMLButtonElement): void => { panel.hidden = true; summary.setAttribute("aria-expanded", "false"); };
+    const togglePanel = (panel: HTMLElement, summary: HTMLButtonElement, otherPanel: HTMLElement, otherSummary: HTMLButtonElement, search: HTMLInputElement): void => {
+      const opening = panel.hidden;
+      closePanel(otherPanel, otherSummary);
+      panel.hidden = !opening; summary.setAttribute("aria-expanded", opening ? "true" : "false");
+      if (opening) { search.focus(); search.select(); }
+    };
+    tagSummary.addEventListener("click", () => togglePanel(tagPanel, tagSummary, labelPanel, labelSummary, tagSearch));
+    labelSummary.addEventListener("click", () => togglePanel(labelPanel, labelSummary, tagPanel, tagSummary, labelSearch));
+    this.outsideClick = (event) => {
+      const target = event.target as Node | null;
+      if (target && !tagPicker.contains(target)) closePanel(tagPanel, tagSummary);
+      if (target && !labelPicker.contains(target)) closePanel(labelPanel, labelSummary);
+    };
+    document.addEventListener("pointerdown", this.outsideClick);
+
     this.contentEl.createEl("h3", { text: "Caption" });
     const sharedCaptions = new Set(items.map((item) => item.caption));
     const caption = this.contentEl.createEl("textarea", {
@@ -127,17 +247,13 @@ export class TagLabelModal extends Modal {
     const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
     actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
     actions.createEl("button", { text: "Apply", cls: "mod-cta" }).addEventListener("click", () => {
-      const additions = newTags.value.split(",").map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean);
-      const explicitLabel = newLabel.value.trim();
       for (const item of items) {
         const tags = new Set(item.tags);
-        for (const [tag, control] of tagControls) {
-          if (control.dataset.touched !== "true") continue;
-          if (control.checked) tags.add(tag); else tags.delete(tag);
+        for (const tag of touchedTags) {
+          if (tagStates.get(tag) === "all") tags.add(tag); else tags.delete(tag);
         }
-        for (const tag of additions) tags.add(tag);
-        const label = explicitLabel || (selectedLabel === "__keep__" ? item.label : selectedLabel);
-        const labelChanged = explicitLabel.length > 0 || selectedLabel !== "__keep__";
+        const label = selectedLabel === "__keep__" ? item.label : selectedLabel;
+        const labelChanged = labelTouched && selectedLabel !== "__keep__";
         const labelColorValue = !label ? "" : colorTouched || labelChanged ? labelColor.value : item.labelColor ?? "";
         this.plugin.store.updateItem(item.id, { displayTitle: item.displayTitle, tags: [...tags], label, labelColor: labelColorValue, caption: captionTouched || sharedCaptions.size === 1 ? caption.value.trim() : item.caption, ...(item.type === "card" ? { content: item.content ?? "" } : {}) });
       }
@@ -145,14 +261,30 @@ export class TagLabelModal extends Modal {
     });
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  onClose(): void {
+    if (this.outsideClick) document.removeEventListener("pointerdown", this.outsideClick);
+    this.outsideClick = null;
+    this.contentEl.empty();
+  }
 
-  private radio(parent: HTMLElement, name: string, value: string, title: string, checked: boolean, onSelect: (value: string) => void): void {
-    const row = parent.createEl("label", { cls: "cp-toggle-row" });
-    const input = row.createEl("input", { attr: { type: "radio", name, value } });
-    input.checked = checked;
-    input.addEventListener("change", () => { if (input.checked) onSelect(value); });
-    row.createSpan({ text: title });
+  private virtualList<T>(host: HTMLElement, createRow: (value: T) => HTMLElement): (values: T[]) => void {
+    const rowHeight = 36;
+    const overscan = 4;
+    const spacer = host.createDiv({ cls: "cp-virtual-list-spacer" });
+    let values: T[] = [];
+    const render = (): void => {
+      const viewportHeight = host.clientHeight || 216;
+      const start = Math.max(0, Math.floor(host.scrollTop / rowHeight) - overscan);
+      const end = Math.min(values.length, Math.ceil((host.scrollTop + viewportHeight) / rowHeight) + overscan);
+      spacer.empty(); spacer.style.height = `${values.length * rowHeight}px`;
+      for (let index = start; index < end; index += 1) {
+        const row = createRow(values[index]);
+        row.style.position = "absolute"; row.style.top = `${index * rowHeight}px`; row.style.height = `${rowHeight}px`;
+        spacer.appendChild(row);
+      }
+    };
+    host.addEventListener("scroll", render);
+    return (nextValues) => { values = nextValues; host.scrollTop = 0; render(); };
   }
 }
 

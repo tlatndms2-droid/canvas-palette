@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.2.34**
+Current version: **0.2.35**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
@@ -25,7 +25,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - Selected Card/Markdown previews constrain standard iframe/video embeds and MX-style Shadow DOM video players to the actual Viewport width as complete 16:9 media blocks. Media blocks participate in internal scroll snapping instead of remaining wider than the Card and being clipped.
 - Three independent persisted Side Palette splitters resize Viewport/Outliner width, Upper/Lower height, and Tag/Label width without coupling the two vertical ratios.
 - Side Palette drag-and-drop resolves the stored Palette Item by ID and restores Card content, Markdown/Image file references, or complete Group subgraphs through the target Canvas runtime at the real drop position. Every dropped Card remains another linked instance of the same Palette Item: editing any linked Canvas Card or the Palette content updates all other instances.
-- Item/collection organization: collection creation, nesting, rename, Canvas drag drop, Viewport reorder, multi-selection, batch Tags/Label/Caption editing, deletion, and move-to-collection actions.
+- Item/collection organization: collection creation, nesting, rename, Canvas drag drop, Viewport reorder, multi-selection, scalable batch Tags/Label/Caption editing, deletion, and move-to-collection actions. The metadata editor summarizes selected values, searches Tags and Labels in fixed-height dropdowns, virtualizes long result lists, and supports creating new values without expanding the modal.
 - Type-specific Card, Markdown, Image, and Group rendering; rendered Markdown, source image preview, and subgraph preview with content-first card layouts.
 - Side Palette double-click opens the existing native editor for Card/Markdown items and a large preview for Image/Group items. Image previews support mouse-wheel zoom from 20% to 500%.
 - Mini and Side Palette use the same stored Item metadata. Their focused metadata editors support Tags, Label, and Caption without changing the title, content, original file, or Canvas node.
@@ -52,7 +52,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 4. Hover the Mini Palette trigger at the upper-right of the Canvas, review items in the Inspector, and import them into a Workspace.
 5. Open Side Palette to organize Collections or Mini Palette Storage to search across Workspaces.
 6. Drag an item from either palette directly into a Canvas. Cards create linked text-node instances whose content, Back, and Palette metadata stay synchronized everywhere; Markdown and images remain source-linked file nodes, and Groups restore their subgraph. Use the small flip icon to change only that location's visible face, and double-click a Back to edit it in native Live Preview.
-7. Ctrl/Cmd-click items for multi-selection. In Side Palette, double-click Card/Markdown items to edit them, double-click Image/Group items to preview them, or right-click and choose **Edit tags & label** to update Tags, Label, Label color, and Caption. Use the mouse wheel to zoom an Image preview.
+7. Ctrl/Cmd-click items for multi-selection. In Side Palette, double-click Card/Markdown items to edit them, double-click Image/Group items to preview them, or right-click and choose **Edit tags, label & caption** to search, select, or create Tags and Labels and update Caption. Use the mouse wheel to zoom an Image preview.
 
 ## Installation for development
 

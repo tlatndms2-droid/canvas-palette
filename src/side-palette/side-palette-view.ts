@@ -340,7 +340,7 @@ export class SidePaletteView extends ItemView {
     event.preventDefault(); const menu = new Menu(); const workspace = this.plugin.activeWorkspace();
     const selected = this.sideSelectedIds(); const targetIds = selected.includes(item.id) ? selected : [item.id];
     if (!selected.includes(item.id)) this.selectSideItem(item.id);
-    menu.addItem((entry) => entry.setTitle("Edit tags & label").setIcon("tags").onClick(() => new TagLabelModal(this.app, this.plugin, targetIds).open()));
+    menu.addItem((entry) => entry.setTitle("Edit tags, label & caption").setIcon("tags").onClick(() => new TagLabelModal(this.app, this.plugin, targetIds).open()));
     if (supportsFrontBack(item)) {
       menu.addItem((entry) => entry
         .setTitle(item.facesEnabled ? "Remove Front / Back" : "Enable Front / Back")
