@@ -362,7 +362,7 @@ export class SidePaletteView extends ItemView {
     this.mountOutlineDropTarget(row, collection.workspaceId, collection.id);
     iconButton(row, "plus", "Add nested collection", () => this.promptCollection(collection.workspaceId, collection.id));
     iconButton(row, "pencil", "Rename collection", () => new TextPromptModal(this.app, "Rename collection", collection.name, (value) => this.plugin.store.renameCollection(collection.id, value)).open());
-    if (!collapsed || Boolean(this.query)) {
+    if (!collapsed) {
       for (const itemId of collection.itemIds) { const item = this.plugin.store.data.items[itemId]; if (item) this.renderOutlineItem(parent, item, depth + 1, collection.id); }
       for (const child of collection.childCollectionIds) this.renderCollection(parent, this.plugin.store.data.collections[child], depth + 1);
     }

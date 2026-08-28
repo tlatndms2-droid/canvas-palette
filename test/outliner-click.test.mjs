@@ -16,3 +16,9 @@ test("Viewport ignores Collection membership until a Collection is entered", asy
   assert.match(source, /const collection = workspace\.sideLayout\.focusedCollectionId \? this\.plugin\.store\.data\.collections\[workspace\.sideLayout\.focusedCollectionId\] : null;/);
   assert.doesNotMatch(source, /if \(!selectedId\) return workspace\.looseItemIds/);
 });
+
+test("Collection collapse remains authoritative while Viewport filters are active", async () => {
+  const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
+  assert.match(source, /if \(!collapsed\) \{[\s\S]*this\.renderOutlineItem/);
+  assert.doesNotMatch(source, /if \(!collapsed \|\| Boolean\(this\.query\)\)/);
+});
