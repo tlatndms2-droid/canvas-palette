@@ -31,5 +31,7 @@ test("Find link popup provides a large non-overlapping navigation target", () =>
   assert.match(modal, /cp-find-link-row__node/);
   assert.match(styles, /\.modal\.cp-find-link-shell\{width:min\(760px/);
   assert.match(styles, /\.cp-find-link-list\{[^}]*min-height:min\(300px,42vh\)/);
-  assert.match(styles, /\.cp-find-link-row\{[^}]*min-height:68px/);
+  assert.match(styles, /\.canvas-palette button\.cp-find-link-row\{[^}]*height:auto!important/);
+  assert.match(styles, /\.canvas-palette button\.cp-find-link-row\{[^}]*min-height:76px!important/);
+  assert.match(styles, /\.cp-find-link-row__info\{[^}]*position:static!important/);
 });

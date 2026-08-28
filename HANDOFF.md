@@ -2,12 +2,12 @@
 
 ## Current state
 
-- Version: `0.2.32`.
+- Version: `0.2.33`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.32`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.32`.
-- Latest runtime change: `0.2.32`; the multi-location `Find link` picker now expands the outer Obsidian modal, reserves a useful scrollable navigation area, and renders each Canvas destination as a separated full-row target with its title, path, and Node ID on stable lines.
+- Latest release: `0.2.33`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.33`.
+- Latest runtime change: `0.2.33`; the `Find link` destination rows now explicitly override Obsidian's fixed native button height, so their title, path, and Node ID determine the actual row height instead of overflowing into the next target.
 - Automated baseline: 29 Node tests (including per-Canvas Find-link grouping, exact path/Node selection, picker routing, source-file fallback, Canvas-to-Palette reveal routing, preferred Workspace resolution, filter clearing, single selection, scroll/highlight behavior, link-state indicator ownership and collision-safe layout, same-Canvas linked-card replacement and metadata preservation, focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
@@ -171,6 +171,8 @@
   - Static validation covered 29 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, per-Canvas location grouping, single-link direct routing, multi-link modal routing, exact Canvas path/Node selection, Side menu labels, and source-file fallback. No disposable `Obsidian Sandbox` vault was available, so packaged installation/reload and visual runtime verification were not performed; the open real Vault was not modified for testing.
 - `0.2.32` fixes the cramped multi-location `Find link` picker. It sizes the outer Obsidian modal up to 760px, keeps a responsive mobile width, reserves a 300px/42vh navigation viewport, and presents every Canvas destination as a minimum-68px bordered row. Canvas title, full path, and Node ID occupy separate stable lines, while the complete row is the click and keyboard-focus target.
   - Static validation covered 30 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, outer-modal sizing, navigation viewport height, separated destination rows, and exact Find-link routing. No disposable `Obsidian Sandbox` vault was available, so packaged installation/reload and visual runtime verification were not performed; the open real Vault was not modified for testing.
+- `0.2.33` fixes the remaining visual overlap in the `Find link` picker. Obsidian's native button rule kept each destination button at the standard input height even after a larger `min-height` was requested, so the three internal text lines overflowed across neighboring rows. The destination selector now overrides the actual height to `auto`, removes the maximum height, enforces a 76px minimum, and neutralizes inherited positioning/transforms on its content.
+  - Static validation covered 30 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, and JSON parsing. A headless Chromium render additionally reproduced a host-level 32px button height and measured both corrected rows at 81.59px with a 10px gap and no overlap. No disposable Obsidian Sandbox vault was available, so packaged installation/reload inside Obsidian was not performed; the open real Vault was not modified for testing.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
