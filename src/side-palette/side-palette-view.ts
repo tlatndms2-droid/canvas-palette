@@ -1,7 +1,7 @@
 import { ItemView, Menu, setIcon, WorkspaceLeaf } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { Collection, PaletteItem, SideLayoutState } from "../core/types";
-import { CardToMarkdownModal, ConfirmDeleteModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
+import { CardToMarkdownModal, ConfirmDeleteCollectionModal, ConfirmDeleteModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
 import { LinkedSpacesModal } from "../ui/linked-spaces-modal";
@@ -362,6 +362,14 @@ export class SidePaletteView extends ItemView {
     this.mountOutlineDropTarget(row, collection.workspaceId, collection.id);
     iconButton(row, "plus", "Add nested collection", () => this.promptCollection(collection.workspaceId, collection.id));
     iconButton(row, "pencil", "Rename collection", () => new TextPromptModal(this.app, "Rename collection", collection.name, (value) => this.plugin.store.renameCollection(collection.id, value)).open());
+    iconButton(row, "trash-2", "Delete collection", () => {
+      const parentCollection = collection.parentId ? this.plugin.store.data.collections[collection.parentId] : null;
+      const destination = parentCollection?.name ?? this.plugin.store.data.workspaces[collection.workspaceId]?.name ?? "the Workspace";
+      new ConfirmDeleteCollectionModal(this.app, collection.name, destination, collection.itemIds.length, collection.childCollectionIds.length, () => {
+        if (this.selectedOutlineCollectionId === collection.id) this.selectedOutlineCollectionId = collection.parentId;
+        this.plugin.store.removeCollection(collection.id);
+      }).open();
+    });
     if (!collapsed) {
       for (const itemId of collection.itemIds) { const item = this.plugin.store.data.items[itemId]; if (item) this.renderOutlineItem(parent, item, depth + 1, collection.id); }
       for (const child of collection.childCollectionIds) this.renderCollection(parent, this.plugin.store.data.collections[child], depth + 1);

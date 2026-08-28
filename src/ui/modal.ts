@@ -57,6 +57,19 @@ export class ConfirmDeleteModal extends Modal {
   onClose(): void { this.contentEl.empty(); }
 }
 
+export class ConfirmDeleteCollectionModal extends Modal {
+  constructor(app: App, private readonly name: string, private readonly destination: string, private readonly itemCount: number, private readonly childCount: number, private readonly onConfirm: () => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-confirm-modal");
+    this.contentEl.createEl("h2", { text: "Delete Collection?" });
+    this.contentEl.createEl("p", { text: `“${this.name}” will be removed. Its ${this.itemCount} item${this.itemCount === 1 ? "" : "s"} and ${this.childCount} nested Collection${this.childCount === 1 ? "" : "s"} will move to ${this.destination}. No Palette items, Vault files, or Canvas nodes will be deleted.` });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
+    actions.createEl("button", { text: "Delete Collection", cls: "mod-warning" }).addEventListener("click", () => { this.onConfirm(); this.close(); });
+  }
+  onClose(): void { this.contentEl.empty(); }
+}
+
 export class ConfirmCanvasReplacementModal extends Modal {
   private resolved = false;
   constructor(app: App, private readonly onResolve: (confirmed: boolean) => void) { super(app); }

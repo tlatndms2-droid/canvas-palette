@@ -285,6 +285,27 @@ export class PaletteStore {
     this.changed();
   }
 
+  removeCollection(id: string): void {
+    const collection = this.data.collections[id];
+    if (!collection) return;
+    const workspace = this.data.workspaces[collection.workspaceId];
+    if (!workspace) return;
+    const parent = collection.parentId ? this.data.collections[collection.parentId] : undefined;
+    const siblingIds = parent?.childCollectionIds ?? workspace.rootCollectionIds;
+    const index = siblingIds.indexOf(id);
+    const promotedChildren = collection.childCollectionIds.filter((childId) => this.data.collections[childId]);
+    if (index >= 0) siblingIds.splice(index, 1, ...promotedChildren);
+    else siblingIds.push(...promotedChildren.filter((childId) => !siblingIds.includes(childId)));
+    for (const childId of promotedChildren) this.data.collections[childId].parentId = collection.parentId;
+    const itemTarget = parent?.itemIds ?? workspace.looseItemIds;
+    itemTarget.push(...collection.itemIds.filter((itemId) => !itemTarget.includes(itemId)));
+    workspace.sideLayout.collapsedCollectionIds = workspace.sideLayout.collapsedCollectionIds.filter((collectionId) => collectionId !== id);
+    if (workspace.sideLayout.focusedCollectionId === id) workspace.sideLayout.focusedCollectionId = collection.parentId;
+    if (workspace.sideLayout.selectedCollectionId === id) workspace.sideLayout.selectedCollectionId = collection.parentId;
+    delete this.data.collections[id];
+    this.changed();
+  }
+
   moveCollection(id: string, parentId: string | null, targetId: string | null = null, insertAfter = false): void {
     const collection = this.data.collections[id];
     if (!collection || id === parentId || this.wouldCreateCycle(id, parentId)) return;

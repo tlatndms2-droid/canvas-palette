@@ -22,3 +22,18 @@ test("Collection collapse remains authoritative while Viewport filters are activ
   assert.match(source, /if \(!collapsed\) \{[\s\S]*this\.renderOutlineItem/);
   assert.doesNotMatch(source, /if \(!collapsed \|\| Boolean\(this\.query\)\)/);
 });
+
+test("Collection deletion preserves items and promotes nested Collections", async () => {
+  const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
+  const store = await readFile(new URL("../src/core/store.ts", import.meta.url), "utf8");
+  const modal = await readFile(new URL("../src/ui/modal.ts", import.meta.url), "utf8");
+  const removeCollection = store.match(/removeCollection\(id: string\): void \{[\s\S]*?\n  \}\n\n  moveCollection/)?.[0] ?? "";
+  assert.match(source, /iconButton\(row, "trash-2", "Delete collection"/);
+  assert.match(source, /new ConfirmDeleteCollectionModal/);
+  assert.match(store, /removeCollection\(id: string\)/);
+  assert.match(removeCollection, /siblingIds\.splice\(index, 1, \.\.\.promotedChildren\)/);
+  assert.match(removeCollection, /itemTarget\.push\(\.\.\.collection\.itemIds\.filter/);
+  assert.match(removeCollection, /delete this\.data\.collections\[id\]/);
+  assert.doesNotMatch(removeCollection, /delete this\.data\.items/);
+  assert.match(modal, /No Palette items, Vault files, or Canvas nodes will be deleted/);
+});
