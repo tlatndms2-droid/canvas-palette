@@ -21,6 +21,7 @@ export class SidePaletteView extends ItemView {
   private viewSettingsOpen = false;
   private outlinerSettingsOpen = false;
   private searchComposing = false;
+  private searchAssistantOpen = false;
   private pendingReveal: "viewport" | "outliner" | null = null;
   private activeBackEditor: { itemId: string; close: (save: boolean) => Promise<void> } | null = null;
   private readonly scrollSelectors = [".cp-viewport", ".cp-outliner", ".cp-tag-index", ".cp-label-index"] as const;
@@ -56,7 +57,7 @@ export class SidePaletteView extends ItemView {
   }
 
   private render(): void {
-    if (this.activeBackEditor) return;
+    if (this.activeBackEditor || this.searchComposing) return;
     const root = this.contentEl;
     const previousWorkspaceId = root.dataset.cpWorkspaceId;
     const scrollPositions = new Map(this.scrollSelectors.map((selector) => [selector, root.querySelector<HTMLElement>(selector)?.scrollTop ?? 0]));
@@ -74,13 +75,14 @@ export class SidePaletteView extends ItemView {
     workspaceSelect(this.plugin, selectorRow, workspace.id, (id) => { this.query = ""; this.plugin.store.data.uiState.activeWorkspaceId = id; this.plugin.store.changed(); });
     const searchWrap = root.createDiv({ cls: "cp-search-wrap" });
     const search = searchWrap.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search files, groups, tags, labels…", autocomplete: "off" }, value: this.query });
-    const refreshSearch = (): void => { this.render(); requestAnimationFrame(() => { const next = this.contentEl.querySelector<HTMLInputElement>(".cp-search"); next?.focus(); next?.setSelectionRange(next.value.length, next.value.length); }); };
+    const refreshSearch = (): void => this.refreshSearchSurface(searchWrap, workspace.id);
     search.addEventListener("compositionstart", () => { this.searchComposing = true; });
-    search.addEventListener("compositionend", () => { this.searchComposing = false; this.query = search.value.normalize("NFC"); queueMicrotask(refreshSearch); });
+    search.addEventListener("compositionend", () => { this.searchComposing = false; this.query = search.value.normalize("NFC"); search.value = this.query; queueMicrotask(refreshSearch); });
     search.addEventListener("input", (event) => { this.query = search.value; if (this.searchComposing || (event as InputEvent).isComposing) return; refreshSearch(); });
-    search.addEventListener("keydown", (event) => { if (event.key === "ArrowDown") { event.preventDefault(); searchWrap.querySelector<HTMLButtonElement>(".cp-search-suggestion")?.focus(); } else if (event.key === "Escape") search.blur(); });
-    search.addEventListener("focus", () => searchWrap.addClass("is-search-assistant-visible"));
-    searchWrap.addEventListener("focusout", () => window.setTimeout(() => { if (!searchWrap.contains(searchWrap.ownerDocument.activeElement)) searchWrap.removeClass("is-search-assistant-visible"); }, 0));
+    search.addEventListener("keydown", (event) => { if (event.key === "ArrowDown") { event.preventDefault(); searchWrap.querySelector<HTMLButtonElement>(".cp-search-suggestion")?.focus(); } else if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); this.searchAssistantOpen = false; this.renderSearchAssistant(searchWrap, workspace.id); } });
+    search.addEventListener("focus", () => { this.searchAssistantOpen = true; this.renderSearchAssistant(searchWrap, workspace.id); });
+    search.addEventListener("pointerdown", () => { if (!this.searchAssistantOpen) { this.searchAssistantOpen = true; this.renderSearchAssistant(searchWrap, workspace.id); } });
+    root.onpointerdown = (event) => { if (this.searchAssistantOpen && !searchWrap.contains(event.target as Node)) { this.searchAssistantOpen = false; this.renderSearchAssistant(searchWrap, workspace.id); search.blur(); } };
     this.renderSearchAssistant(searchWrap, workspace.id);
     const top = root.createDiv({ cls: "cp-side__top" });
     const viewport = top.createDiv({ cls: "cp-panel cp-viewport" }); this.renderViewport(viewport, workspace.id);
@@ -120,17 +122,19 @@ export class SidePaletteView extends ItemView {
   }
 
   private renderSearchAssistant(parent: HTMLElement, workspaceId: string): void {
+    parent.querySelectorAll(":scope > .cp-search-chips, :scope > .cp-search-assistant").forEach((element) => element.remove());
     const facetTokens = this.plugin.search.tokens(this.query).filter((token) => /^(tag|label|type|group|file|path|space):/i.test(token));
     if (facetTokens.length > 0) {
       const chips = parent.createDiv({ cls: "cp-search-chips" });
       for (const token of facetTokens) {
         const chip = chips.createEl("button", { cls: "cp-search-chip", text: token });
         chip.createSpan({ text: " ×" });
-        chip.addEventListener("click", () => { this.query = this.plugin.search.toggleToken(this.query, token); this.render(); });
+        chip.addEventListener("click", () => { this.query = this.plugin.search.toggleToken(this.query, token); const search = parent.querySelector<HTMLInputElement>(".cp-search"); if (search) search.value = this.query; this.refreshSearchSurface(parent, workspaceId); });
       }
     }
+    if (!this.searchAssistantOpen) return;
     const facetMatch = this.query.match(/(?:^|\s)(tag|label|type|group|file|path|space):([^\s]*)$/i);
-    const assistant = parent.createDiv({ cls: `cp-search-assistant${facetMatch ? " is-visible" : ""}` });
+    const assistant = parent.createDiv({ cls: "cp-search-assistant is-visible" });
     if (!facetMatch) {
       assistant.createDiv({ cls: "cp-search-assistant__title", text: "Search options" });
       const options = [
@@ -141,26 +145,32 @@ export class SidePaletteView extends ItemView {
       return;
     }
     const facet = facetMatch[1].toLocaleLowerCase();
-    const fragment = facetMatch[2].replace(/^"|"$/g, "").toLocaleLowerCase();
-    const items = this.items(workspaceId);
+    const rawFragment = facetMatch[2].replace(/^"|"$/g, "").toLocaleLowerCase();
+    const fragment = facet === "tag" ? rawFragment.replace(/^#/, "") : rawFragment;
+    const facetStart = facetMatch.index! + (facetMatch[0].startsWith(" ") ? 1 : 0);
+    const precedingQuery = this.query.slice(0, facetStart).trim();
+    const items = this.plugin.search.filter(this.items(workspaceId), precedingQuery, (item) => this.searchContextForItem(workspaceId, item));
     const counts = new Map<string, number>();
-    const add = (value: string): void => { const clean = value.trim(); if (clean && clean.toLocaleLowerCase().includes(fragment)) counts.set(clean, (counts.get(clean) ?? 0) + 1); };
+    const addValues = (values: string[]): void => { for (const clean of new Set(values.map((value) => value.trim()).filter((value) => value && value.toLocaleLowerCase().includes(fragment)))) counts.set(clean, (counts.get(clean) ?? 0) + 1); };
     for (const item of items) {
-      if (facet === "tag") item.tags.forEach(add);
-      else if (facet === "label") add(item.label);
-      else if (facet === "type") add(item.type);
-      else if (facet === "file") add(item.displayTitle);
-      else if (facet === "path") add(item.origin.filePath ?? "");
-      else if (facet === "space") { if (item.origin.canvasPath && item.origin.canvasNodeId) add(item.origin.canvasPath); for (const placement of item.canvasPlacements) if (placement.nodeIds.length > 0) add(placement.canvasPath); }
-      else if (facet === "group") this.searchContextForItem(workspaceId, item).groupNames?.forEach(add);
+      if (facet === "tag") addValues(item.tags);
+      else if (facet === "label") addValues([item.label]);
+      else if (facet === "type") addValues([item.type]);
+      else if (facet === "file") addValues([item.displayTitle]);
+      else if (facet === "path") addValues([item.origin.filePath ?? ""]);
+      else if (facet === "space") addValues([item.origin.canvasPath && item.origin.canvasNodeId ? item.origin.canvasPath : "", ...item.canvasPlacements.filter((placement) => placement.nodeIds.length > 0).map((placement) => placement.canvasPath)]);
+      else if (facet === "group") addValues(this.searchContextForItem(workspaceId, item).groupNames ?? []);
     }
     assistant.createDiv({ cls: "cp-search-assistant__title", text: `Matching ${facet}` });
     const values = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12);
     if (values.length === 0) assistant.createDiv({ cls: "cp-search-assistant__empty", text: "No matching suggestions." });
-    for (const [value, count] of values) this.searchSuggestion(assistant, facet === "tag" ? `#${value}` : value, String(count), () => {
-      const encoded = /\s/.test(value) ? `"${value.replace(/"/g, '\\"')}"` : value;
+    for (const [value, count] of values) this.searchSuggestion(assistant, facet === "tag" ? `#${value.replace(/^#/, "")}` : value, String(count), () => {
+      const normalizedValue = facet === "tag" ? value.replace(/^#/, "") : value;
+      const encoded = /\s/.test(normalizedValue) ? `"${normalizedValue.replace(/"/g, '\\"')}"` : normalizedValue;
       this.query = `${this.query.slice(0, facetMatch.index! + (facetMatch[0].startsWith(" ") ? 1 : 0))}${facet}:${encoded}`.trim();
-      this.render();
+      const search = parent.querySelector<HTMLInputElement>(".cp-search"); if (search) search.value = this.query;
+      this.searchAssistantOpen = false;
+      this.refreshSearchSurface(parent, workspaceId);
     });
   }
 
@@ -173,7 +183,17 @@ export class SidePaletteView extends ItemView {
 
   private appendSearchFacet(token: string): void {
     this.query = `${this.query.trim()}${this.query.trim() ? " " : ""}${token}`;
-    this.render(); requestAnimationFrame(() => this.contentEl.querySelector<HTMLInputElement>(".cp-search")?.focus());
+    const parent = this.contentEl.querySelector<HTMLElement>(".cp-search-wrap"); const search = parent?.querySelector<HTMLInputElement>(".cp-search");
+    if (!parent || !search) return;
+    search.value = this.query; this.searchAssistantOpen = true; this.refreshSearchSurface(parent, this.plugin.activeWorkspace()?.id ?? ""); search.focus(); search.setSelectionRange(search.value.length, search.value.length);
+  }
+
+  private refreshSearchSurface(searchWrap: HTMLElement, workspaceId: string): void {
+    this.renderSearchAssistant(searchWrap, workspaceId);
+    const viewport = this.contentEl.querySelector<HTMLElement>(".cp-viewport");
+    if (!viewport) return;
+    const scrollTop = viewport.scrollTop;
+    viewport.empty(); this.renderViewport(viewport, workspaceId); viewport.scrollTop = scrollTop;
   }
 
   private searchContextForItem(workspaceId: string, item: PaletteItem): { groupNames: string[] } {

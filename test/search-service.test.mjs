@@ -26,6 +26,9 @@ test("Obsidian-like tag, label, AND, OR, and parentheses filter palette items", 
   const important = item(["중요"], "보류", "Important note");
 
   assert.equal(search.matches(work, '#작업 label:"진행 중"'), true);
+  assert.equal(search.matches(work, 'tag:작업 label:"진행 중"'), true);
+  assert.equal(search.matches(work, 'tag:#작업 label:"진행 중"'), true);
+  assert.equal(search.matches({ ...work, tags: ["#작업"] }, 'tag:작업'), true);
   assert.equal(search.matches(important, '#작업 label:"진행 중"'), false);
   assert.equal(search.matches(important, "#작업 OR #중요"), true);
   assert.equal(search.matches(work, '(#작업 OR #중요) label:"진행 중"'), true);

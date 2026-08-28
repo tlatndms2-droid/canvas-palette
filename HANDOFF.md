@@ -2,13 +2,13 @@
 
 ## Current state
 
-- Version: `0.3.7`.
+- Version: `0.3.8`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release target: `0.3.7`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.7`.
-- Latest runtime change: `0.3.7`; Side Palette search preserves Korean IME composition, exposes Navigator-style search syntax and live Workspace candidates with counts, displays removable facet chips, supports `group:`, `file:`, and `path:` alongside existing facets, includes Collection/file-parent names in plain searches, and provides a clear empty-result reset.
-- Automated baseline: 49 Node tests, including Korean IME-safe rendering, guided search tokens, group/file/path matching, hierarchy, Outliner metadata/context-menu, vertical Viewport grouping, multi-item Canvas drag payload, and all previous link, metadata, Collection, editor, search, and Canvas safeguards; plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
+- Latest release target: `0.3.8`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.8`.
+- Latest runtime change: `0.3.8`; `tag:value`, `tag:#value`, and `#value` now match the same Tag, guided candidate counts respect previously applied conditions, candidate selection/blank clicks/Escape close only the assistant, and search input remains mounted through Korean IME composition while only the Viewport results refresh.
+- Automated baseline: 49 Node tests, including `tag:` normalization, Korean IME-safe partial rendering, guided search close-state/contextual-count wiring, group/file/path matching, hierarchy, Outliner metadata/context-menu, vertical Viewport grouping, multi-item Canvas drag payload, and all previous link, metadata, Collection, editor, search, and Canvas safeguards; plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
 

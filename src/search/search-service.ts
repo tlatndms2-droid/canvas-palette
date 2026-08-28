@@ -80,8 +80,8 @@ export class SearchService {
       const space = this.unquote(token.slice(6)).toLocaleLowerCase();
       return [item.origin.canvasPath, ...item.canvasPlacements.map((placement) => placement.canvasPath)].some((path) => path?.toLocaleLowerCase() === space);
     }
-    const tag = lower.startsWith("tag:#") ? token.slice(5) : token.startsWith("#") ? token.slice(1) : null;
-    if (tag !== null) return item.tags.some((value) => value.toLocaleLowerCase() === tag.toLocaleLowerCase());
+    const tag = lower.startsWith("tag:") ? this.unquote(token.slice(4)).replace(/^#/, "") : token.startsWith("#") ? token.slice(1) : null;
+    if (tag !== null) return item.tags.some((value) => value.replace(/^#/, "").toLocaleLowerCase() === tag.toLocaleLowerCase());
     const needle = this.unquote(token).toLocaleLowerCase();
     return [item.displayTitle, item.content ?? "", item.backContent, item.caption, item.label, item.origin.filePath ?? "", ...item.tags, ...(context.groupNames ?? [])].join("\n").toLocaleLowerCase().includes(needle);
   }
