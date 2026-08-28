@@ -1,5 +1,6 @@
 import { App, Notice, TFile, normalizePath } from "obsidian";
 import { createId } from "../core/ids";
+import { findMarkdownNodeReplacement } from "../core/canvas-node-replacement";
 import { SerialTaskQueue } from "../core/serial-task-queue";
 import type { CanvasEdgeSnapshot, CanvasNodeSnapshot, PaletteItem, PaletteItemType, PaletteMetadata } from "../core/types";
 import { restoreGroup, serializeGroup } from "./group-serializer";
@@ -34,6 +35,7 @@ const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "b
 
 export class CanvasAdapter {
   private readonly restoreQueue = new SerialTaskQueue();
+  private readonly previousNodesByCanvas = new Map<string, Map<string, CanvasNodeSnapshot>>();
 
   constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined, private readonly restoreNodeBack: (canvasPath: string, nodeId: string, backContent: string) => void, private readonly linkedNodes: (item: PaletteItem, canvasPath: string) => string[] = () => [], private readonly confirmReplacement: () => Promise<boolean> = async () => true, private readonly onReplaced: (itemId: string, canvasPath: string, removedNodeIds: string[], newNodeIds: string[], existingNodeIds: Set<string>) => void = () => {}) {}
 
@@ -270,6 +272,9 @@ export class CanvasAdapter {
 
   async syncItemsFromCanvas(file: TFile, items: PaletteItem[]): Promise<{ changedItems: number; nodeIds: Set<string> }> {
     const document = await this.read(file);
+    const previousNodes = this.previousNodesByCanvas.get(file.path) ?? new Map<string, CanvasNodeSnapshot>();
+    const currentNodes = new Map(document.nodes.map((node) => [node.id, node]));
+    const existingNodeIds = new Set(currentNodes.keys());
     let changed = 0;
     for (const item of items) {
       const linkedNodeIds = [
@@ -278,8 +283,13 @@ export class CanvasAdapter {
       ];
       if (linkedNodeIds.length === 0) continue;
       if (item.type === "card") {
-        const convertedNode = document.nodes.find((candidate) => linkedNodeIds.includes(candidate.id) && candidate.type === "file" && candidate.file?.toLocaleLowerCase().endsWith(".md"));
+        const replacement = findMarkdownNodeReplacement(previousNodes, currentNodes, linkedNodeIds);
+        const removedLinkedNode = replacement?.removedNode;
+        const replacementNode = replacement?.replacementNode;
+        const convertedNode = document.nodes.find((candidate) => linkedNodeIds.includes(candidate.id) && candidate.type === "file" && candidate.file?.toLocaleLowerCase().endsWith(".md"))
+          ?? replacementNode;
         if (convertedNode?.file) {
+          if (removedLinkedNode && convertedNode.id !== removedLinkedNode.id) this.onReplaced(item.id, file.path, [removedLinkedNode.id], [convertedNode.id], existingNodeIds);
           const source = this.app.vault.getAbstractFileByPath(convertedNode.file);
           item.type = "markdown";
           item.origin.filePath = convertedNode.file;
@@ -317,7 +327,8 @@ export class CanvasAdapter {
         }
       }
     }
-    return { changedItems: changed, nodeIds: new Set(document.nodes.map((node) => node.id)) };
+    this.previousNodesByCanvas.set(file.path, currentNodes);
+    return { changedItems: changed, nodeIds: existingNodeIds };
   }
 
   async revealNode(canvasPath: string, nodeId: string): Promise<boolean> {
