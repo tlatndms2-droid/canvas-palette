@@ -21,6 +21,10 @@ test("Side item menu uses focused metadata, move, and Find link actions", async 
   assert.match(source, /setTitle\("Find link"\)/);
   assert.doesNotMatch(source, /setTitle\("Open original"\)/);
   assert.match(source, /setTitle\("Open source file"\)/);
+  assert.match(source, /application\/x-canvas-palette-collection/);
+  assert.match(source, /this\.mountOutlineDropTarget\(rootRow, workspaceId, null\)/);
+  assert.match(source, /selected\.includes\(itemId\) \? selected : \[itemId\]/);
+  assert.match(source, /this\.plugin\.store\.moveCollection\(draggedCollectionId, collectionId\)/);
   assert.match(main, /new FindLinkModal\(this\.app, item\.displayTitle, locations/);
   assert.match(modal, /"Tags, label & caption"/);
   assert.match(modal, /cls: "cp-tag-label-caption"/);

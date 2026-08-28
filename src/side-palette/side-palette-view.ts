@@ -13,7 +13,9 @@ export class SidePaletteView extends ItemView {
   private unsubscribe?: () => void;
   private query = "";
   private selectionAnchorId: string | null = null;
+  private selectedOutlineCollectionId: string | null = null;
   private visibleItemIds: string[] = [];
+  private outlineItemIds: string[] = [];
   private suppressBlankClick = false;
   private viewSettingsOpen = false;
   private activeBackEditor: { itemId: string; close: (save: boolean) => Promise<void> } | null = null;
@@ -273,16 +275,34 @@ export class SidePaletteView extends ItemView {
     const collection = header.createEl("button", { text: "+ Collection" }); collection.addEventListener("click", () => this.promptCollection(workspaceId, null));
     const memo = header.createEl("button", { text: "+ Memo" }); memo.addEventListener("click", () => void this.plugin.createMemo());
     const workspace = this.plugin.store.data.workspaces[workspaceId]; if (!workspace) return;
-    parent.createDiv({ cls: "cp-outline-root", text: workspace.name });
+    this.outlineItemIds = [];
+    const indexCollectionItems = (collectionId: string): void => {
+      const candidate = this.plugin.store.data.collections[collectionId];
+      if (!candidate) return;
+      this.outlineItemIds.push(...candidate.itemIds);
+      for (const childId of candidate.childCollectionIds) indexCollectionItems(childId);
+    };
+    for (const collectionId of workspace.rootCollectionIds) indexCollectionItems(collectionId);
+    this.outlineItemIds.push(...workspace.looseItemIds);
+    const rootRow = parent.createDiv({ cls: "cp-outline-root", text: workspace.name });
+    this.mountOutlineDropTarget(rootRow, workspaceId, null);
     for (const id of workspace.rootCollectionIds) this.renderCollection(parent, this.plugin.store.data.collections[id], 0);
     for (const item of workspace.looseItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item))) this.renderOutlineItem(parent, item, 0);
   }
 
   private renderCollection(parent: HTMLElement, collection: Collection | undefined, depth: number): void {
     if (!collection) return;
-    const row = parent.createDiv({ cls: "cp-outline-row", attr: { style: `--cp-depth:${depth}` } }); row.createSpan({ cls: "cp-outline-row__title", text: `⌄  ${collection.name}` });
-    row.addEventListener("dragover", (event) => { if (event.dataTransfer?.types.includes("application/x-canvas-palette-item")) event.preventDefault(); });
-    row.addEventListener("drop", (event) => { const id = event.dataTransfer?.getData("application/x-canvas-palette-item"); if (id) { event.preventDefault(); this.plugin.store.assignItemsToCollection(collection.workspaceId, [id], collection.id); } });
+    const row = parent.createDiv({ cls: `cp-outline-row${this.selectedOutlineCollectionId === collection.id ? " is-selected" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.collectionId = collection.id; row.draggable = true; row.createSpan({ cls: "cp-outline-row__title", text: `⌄  ${collection.name}` });
+    row.addEventListener("click", (event) => {
+      if ((event.target as HTMLElement).closest("button")) return;
+      this.selectedOutlineCollectionId = collection.id;
+      this.plugin.store.data.uiState.sideSelectedItemIds = [];
+      this.plugin.store.data.uiState.selectedItemId = null;
+      this.plugin.store.changed();
+    });
+    row.addEventListener("dragstart", (event) => { event.dataTransfer?.setData("application/x-canvas-palette-collection", collection.id); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; row.addClass("is-dragging"); });
+    row.addEventListener("dragend", () => row.removeClass("is-dragging"));
+    this.mountOutlineDropTarget(row, collection.workspaceId, collection.id);
     iconButton(row, "plus", "Add nested collection", () => this.promptCollection(collection.workspaceId, collection.id));
     iconButton(row, "pencil", "Rename collection", () => new TextPromptModal(this.app, "Rename collection", collection.name, (value) => this.plugin.store.renameCollection(collection.id, value)).open());
     for (const itemId of collection.itemIds) { const item = this.plugin.store.data.items[itemId]; if (item) this.renderOutlineItem(parent, item, depth + 1); }
@@ -292,10 +312,30 @@ export class SidePaletteView extends ItemView {
   private renderOutlineItem(parent: HTMLElement, item: PaletteItem, depth: number): void {
     const selected = this.sideSelectedIds().includes(item.id);
     const showMarker = selected && this.sideSelectedIds().length > 1;
-    const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${selected ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.itemId = item.id; row.setText(`${showMarker ? "✓ " : ""}${item.type.toUpperCase()}  ${item.displayTitle}`);
+    const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${selected ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.itemId = item.id; row.draggable = true; row.setText(`${showMarker ? "✓ " : ""}${item.type.toUpperCase()}  ${item.displayTitle}`);
     let clickTimer: number | null = null;
-    row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.selectSideItem(item.id, event); }, 220); });
+    row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.selectSideItem(item.id, event, this.outlineItemIds); }, 220); });
     row.addEventListener("dblclick", () => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; void this.plugin.openSideItemPreview(item.id); });
+    row.addEventListener("dragstart", (event) => { event.dataTransfer?.setData("application/x-canvas-palette-item", item.id); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; row.addClass("is-dragging"); });
+    row.addEventListener("dragend", () => row.removeClass("is-dragging"));
+  }
+
+  private mountOutlineDropTarget(row: HTMLElement, workspaceId: string, collectionId: string | null): void {
+    const accepts = (event: DragEvent): boolean => Boolean(event.dataTransfer?.types.includes("application/x-canvas-palette-item") || event.dataTransfer?.types.includes("application/x-canvas-palette-collection"));
+    row.addEventListener("dragover", (event) => { if (!accepts(event)) return; event.preventDefault(); event.stopPropagation(); row.addClass("is-drop-target"); if (event.dataTransfer) event.dataTransfer.dropEffect = "move"; });
+    row.addEventListener("dragleave", (event) => { if (!(event.relatedTarget instanceof Node) || !row.contains(event.relatedTarget)) row.removeClass("is-drop-target"); });
+    row.addEventListener("drop", (event) => {
+      if (!accepts(event)) return;
+      event.preventDefault(); event.stopPropagation(); row.removeClass("is-drop-target");
+      const itemId = event.dataTransfer?.getData("application/x-canvas-palette-item");
+      if (itemId) {
+        const selected = this.sideSelectedIds();
+        this.plugin.store.assignItemsToCollection(workspaceId, selected.includes(itemId) ? selected : [itemId], collectionId);
+        return;
+      }
+      const draggedCollectionId = event.dataTransfer?.getData("application/x-canvas-palette-collection");
+      if (draggedCollectionId) this.plugin.store.moveCollection(draggedCollectionId, collectionId);
+    });
   }
 
   private renderIndex(parent: HTMLElement, title: string, values: string[], kind: "tag" | "label"): void {
@@ -371,14 +411,14 @@ export class SidePaletteView extends ItemView {
   }
 
   private sideSelectedIds(): string[] { return this.plugin.store.data.uiState.sideSelectedItemIds; }
-  private selectSideItem(id: string, event?: Pick<MouseEvent | KeyboardEvent, "ctrlKey" | "metaKey" | "shiftKey">): void {
+  private selectSideItem(id: string, event?: Pick<MouseEvent | KeyboardEvent, "ctrlKey" | "metaKey" | "shiftKey">, orderedItemIds = this.visibleItemIds): void {
     const selected = this.sideSelectedIds();
     const toggle = Boolean(event?.ctrlKey || event?.metaKey);
     let next: string[];
     if (event?.shiftKey && this.selectionAnchorId) {
-      const anchorIndex = this.visibleItemIds.indexOf(this.selectionAnchorId);
-      const targetIndex = this.visibleItemIds.indexOf(id);
-      const range = anchorIndex >= 0 && targetIndex >= 0 ? this.visibleItemIds.slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1) : [id];
+      const anchorIndex = orderedItemIds.indexOf(this.selectionAnchorId);
+      const targetIndex = orderedItemIds.indexOf(id);
+      const range = anchorIndex >= 0 && targetIndex >= 0 ? orderedItemIds.slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1) : [id];
       next = toggle ? [...new Set([...selected, ...range])] : range;
     } else if (toggle) {
       next = selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id];

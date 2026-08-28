@@ -239,6 +239,29 @@ test("drag reordering inserts an item before or after the highlighted gap", asyn
   await cleanup();
 });
 
+test("Outliner moves multiple items and safely reparents collections", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.data.items.second = { ...store.data.items.card, id: "second", displayTitle: "Second", origin: {}, canvasPlacements: [] };
+  store.data.workspaces.workspace.looseItemIds = ["card", "second"];
+  store.data.collections.parent = { id: "parent", workspaceId: "workspace", parentId: null, name: "Parent", childCollectionIds: [], itemIds: [] };
+  store.data.collections.child = { id: "child", workspaceId: "workspace", parentId: null, name: "Child", childCollectionIds: [], itemIds: [] };
+  store.data.workspaces.workspace.rootCollectionIds = ["parent", "child"];
+
+  store.assignItemsToCollection("workspace", ["card", "second"], "parent");
+  assert.deepEqual(store.data.collections.parent.itemIds, ["card", "second"]);
+  assert.deepEqual(store.data.workspaces.workspace.looseItemIds, []);
+  store.moveCollection("child", "parent");
+  assert.equal(store.data.collections.child.parentId, "parent");
+  assert.deepEqual(store.data.collections.parent.childCollectionIds, ["child"]);
+  store.moveCollection("parent", "child");
+  assert.equal(store.data.collections.parent.parentId, null);
+  assert.deepEqual(store.data.collections.child.childCollectionIds, []);
+  await cleanup();
+});
+
 test("Card to Markdown conversion preserves one item identity and all Canvas links", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
