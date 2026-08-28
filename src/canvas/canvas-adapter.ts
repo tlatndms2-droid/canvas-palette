@@ -176,6 +176,61 @@ export class CanvasAdapter {
     for (const [canvasPath, nodeIds] of byCanvas) await this.syncCardToCanvas(item, canvasPath, nodeIds);
   }
 
+  async renameLinkedFileNodes(locations: Array<{ canvasPath: string; nodeId: string }>, filePath: string): Promise<void> {
+    await this.mutateLinkedNodes(locations, (node) => {
+      if (node.type !== "file" || node.file === filePath) return false;
+      node.file = filePath;
+      return true;
+    });
+  }
+
+  async renameLinkedGroupNodes(locations: Array<{ canvasPath: string; nodeId: string }>, title: string): Promise<void> {
+    await this.mutateLinkedNodes(locations, (node) => {
+      if (node.type !== "group" || node.label === title) return false;
+      node.label = title;
+      return true;
+    });
+  }
+
+  async convertLinkedCardsToMarkdown(locations: Array<{ canvasPath: string; nodeId: string }>, filePath: string): Promise<void> {
+    await this.mutateLinkedNodes(locations, (node) => {
+      if (node.type !== "text") return false;
+      node.type = "file";
+      node.file = filePath;
+      delete node.text;
+      return true;
+    });
+  }
+
+  private async mutateLinkedNodes(locations: Array<{ canvasPath: string; nodeId: string }>, mutate: (node: CanvasNodeSnapshot) => boolean): Promise<void> {
+    const byCanvas = new Map<string, Set<string>>();
+    for (const location of locations) {
+      const nodeIds = byCanvas.get(location.canvasPath) ?? new Set<string>();
+      nodeIds.add(location.nodeId);
+      byCanvas.set(location.canvasPath, nodeIds);
+    }
+    for (const [canvasPath, nodeIds] of byCanvas) {
+      const open = this.openContexts().find((context) => context.file.path === canvasPath);
+      if (open?.runtime.getData && open.runtime.setData) {
+        const current = open.runtime.getData();
+        if (!current || typeof current !== "object") continue;
+        const document = this.parse(JSON.stringify(current));
+        let changed = false;
+        for (const node of document.nodes) if (nodeIds.has(node.id)) changed = mutate(node) || changed;
+        if (!changed) continue;
+        await open.runtime.setData(document);
+        open.runtime.requestSave?.();
+        continue;
+      }
+      const file = this.app.vault.getAbstractFileByPath(canvasPath);
+      if (!(file instanceof TFile)) continue;
+      const document = await this.read(file);
+      let changed = false;
+      for (const node of document.nodes) if (nodeIds.has(node.id)) changed = mutate(node) || changed;
+      if (changed) await this.app.vault.modify(file, JSON.stringify(document, null, 2));
+    }
+  }
+
   private async syncCardToCanvas(item: PaletteItem, canvasPath: string, nodeIds: string[]): Promise<void> {
     const open = this.openContexts().find((context) => context.file.path === canvasPath);
     if (open?.runtime.getData && open.runtime.setData) {

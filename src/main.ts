@@ -272,12 +272,47 @@ export default class CanvasPalettePlugin extends Plugin {
     try {
       await this.ensureVaultFolder(folder);
       await this.app.vault.create(path, item.content ?? "");
+      await this.canvas.convertLinkedCardsToMarkdown(this.store.linkedCanvasNodes(item), path);
       if (!this.store.convertCardToMarkdown(item.id, path)) return false;
       new Notice(`${item.displayTitle} converted to Markdown.`);
       return true;
     } catch (error) {
       console.error("Canvas Palette failed to convert a Card to Markdown", error);
       new Notice("Could not create the Markdown file.");
+      return false;
+    }
+  }
+
+  async renameLinkedItem(itemId: string, requestedTitle: string): Promise<boolean> {
+    const item = this.store.data.items[itemId];
+    if (!item || item.type === "card") return false;
+    const title = requestedTitle.trim();
+    if (!title) return false;
+    const locations = this.store.linkedCanvasNodes(item);
+    try {
+      if (item.type === "markdown" || item.type === "image") {
+        const source = item.origin.filePath ? this.app.vault.getAbstractFileByPath(item.origin.filePath) : null;
+        if (!(source instanceof TFile)) { new Notice("The linked source file is unavailable."); return false; }
+        const baseName = title.replace(new RegExp(`\\.${source.extension}$`, "i"), "");
+        if (!baseName || /[\\/:*?"<>|]/.test(baseName)) { new Notice("Enter a valid file name."); return false; }
+        const parentPath = source.parent?.path && source.parent.path !== "/" ? `${source.parent.path}/` : "";
+        const nextPath = normalizePath(`${parentPath}${baseName}.${source.extension}`);
+        if (nextPath !== source.path && this.app.vault.getAbstractFileByPath(nextPath)) { new Notice(`A file already exists at ${nextPath}.`); return false; }
+        if (nextPath !== source.path) await this.app.fileManager.renameFile(source, nextPath);
+        item.origin.filePath = nextPath;
+        await this.canvas.renameLinkedFileNodes(locations, nextPath);
+      } else if (item.type === "group") {
+        const rootGroup = item.group?.nodes.find((node) => node.type === "group" && !node.parentId) ?? item.group?.nodes.find((node) => node.type === "group");
+        if (rootGroup) rootGroup.label = title;
+        await this.canvas.renameLinkedGroupNodes(locations, title);
+      }
+      this.store.updateItem(item.id, { displayTitle: title, tags: item.tags, label: item.label, labelColor: item.labelColor, caption: item.caption });
+      new Notice(`Renamed linked ${item.type} item to ${title}.`);
+      return true;
+    } catch (error) {
+      console.error("Canvas Palette failed to rename a linked item", error);
+      new Notice("Could not rename every linked item.");
+      this.store.changed();
       return false;
     }
   }

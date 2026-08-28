@@ -342,9 +342,9 @@ export class SidePaletteView extends ItemView {
     if (!selected.includes(item.id)) this.selectSideItem(item.id);
     menu.addItem((entry) => entry.setTitle("Edit tags, label & caption").setIcon("tags").onClick(() => new TagLabelModal(this.app, this.plugin, targetIds).open()));
     if (item.type === "image" || item.type === "markdown" || item.type === "group") menu.addItem((entry) => entry
-      .setTitle("Rename palette title")
+      .setTitle("Rename linked item")
       .setIcon("pencil")
-      .onClick(() => new TextPromptModal(this.app, "Rename palette title", item.displayTitle, (value) => this.plugin.store.updateItem(item.id, { displayTitle: value, tags: item.tags, label: item.label, labelColor: item.labelColor, caption: item.caption }), "Palette title").open()));
+      .onClick(() => new TextPromptModal(this.app, "Rename linked item", item.displayTitle, (value) => this.plugin.renameLinkedItem(item.id, value), "Linked item name").open()));
     if (item.type === "card") menu.addItem((entry) => entry
       .setTitle("Convert to Markdown…")
       .setIcon("file-output")
