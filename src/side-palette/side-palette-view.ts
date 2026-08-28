@@ -169,9 +169,9 @@ export class SidePaletteView extends ItemView {
     rangeControl("Preview font size", "fontSize", 8, 14, 14);
     applyViewSettings();
     this.mountViewportReorder(parent, listEl, workspaceId);
-    const visibleItems = this.plugin.search.filter(this.itemsForSelectedCollection(workspaceId), this.query);
+    const visibleItems = this.plugin.search.filter(this.itemsForViewportScope(workspaceId), this.query);
     const workspace = this.plugin.store.data.workspaces[workspaceId];
-    const collection = workspace.sideLayout.selectedCollectionId ? this.plugin.store.data.collections[workspace.sideLayout.selectedCollectionId] : null;
+    const collection = workspace.sideLayout.focusedCollectionId ? this.plugin.store.data.collections[workspace.sideLayout.focusedCollectionId] : null;
     parent.createDiv({ cls: "cp-viewport-scope", text: `${collection?.name ?? workspace.name} · ${visibleItems.length} items` });
     this.visibleItemIds = visibleItems.map((item) => item.id);
     for (const item of visibleItems) {
@@ -418,11 +418,12 @@ export class SidePaletteView extends ItemView {
   }
 
   private items(workspaceId: string): PaletteItem[] { return this.plugin.store.itemsForWorkspace(workspaceId); }
-  private itemsForSelectedCollection(workspaceId: string): PaletteItem[] {
+  private itemsForViewportScope(workspaceId: string): PaletteItem[] {
     const workspace = this.plugin.store.data.workspaces[workspaceId]; if (!workspace) return [];
-    const selectedId = workspace.sideLayout.selectedCollectionId; if (!selectedId) return workspace.looseItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
+    const focusedId = workspace.sideLayout.focusedCollectionId;
+    if (!focusedId) return this.items(workspaceId);
     const ids: string[] = []; const collect = (id: string): void => { const collection = this.plugin.store.data.collections[id]; if (!collection) return; ids.push(...collection.itemIds); if (workspace.sideLayout.outlinerIncludeDescendants) for (const child of collection.childCollectionIds) collect(child); };
-    collect(selectedId); return ids.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
+    collect(focusedId); return ids.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
   }
   private applyLayoutVariables(root: HTMLElement, layout: SideLayoutState): void {
     root.style.setProperty("--cp-side-upper-left", `${layout.viewportRatio}fr`);
