@@ -84,7 +84,7 @@ export class TagLabelModal extends Modal {
     const knownTags = [...new Set([...workspaceItems.flatMap((item) => item.tags), ...items.flatMap((item) => item.tags)])].sort((a, b) => a.localeCompare(b));
     const knownLabels = [...new Set([...workspaceItems.map((item) => item.label), ...items.map((item) => item.label)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
     this.contentEl.addClass("canvas-palette", "cp-tag-label-modal");
-    this.contentEl.createEl("h2", { text: items.length === 1 ? "Tags & label" : `Tags & label · ${items.length} items` });
+    this.contentEl.createEl("h2", { text: items.length === 1 ? "Tags, label & caption" : `Tags, label & caption · ${items.length} items` });
     this.contentEl.createEl("h3", { text: "Tags" });
     const tagControls = new Map<string, HTMLInputElement>();
     const tagList = this.contentEl.createDiv({ cls: "cp-toggle-list" });
@@ -115,6 +115,15 @@ export class TagLabelModal extends Modal {
     labelColor.value = sharedColors.size === 1 && items[0].labelColor ? items[0].labelColor : "#8b5cf6";
     let colorTouched = false;
     labelColor.addEventListener("input", () => { colorTouched = true; });
+    this.contentEl.createEl("h3", { text: "Caption" });
+    const sharedCaptions = new Set(items.map((item) => item.caption));
+    const caption = this.contentEl.createEl("textarea", {
+      cls: "cp-tag-label-caption",
+      text: sharedCaptions.size === 1 ? items[0].caption : "",
+      attr: { placeholder: sharedCaptions.size === 1 ? "Short description" : "Keep current captions unless changed" }
+    });
+    let captionTouched = false;
+    caption.addEventListener("input", () => { captionTouched = true; });
     const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
     actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
     actions.createEl("button", { text: "Apply", cls: "mod-cta" }).addEventListener("click", () => {
@@ -130,7 +139,7 @@ export class TagLabelModal extends Modal {
         const label = explicitLabel || (selectedLabel === "__keep__" ? item.label : selectedLabel);
         const labelChanged = explicitLabel.length > 0 || selectedLabel !== "__keep__";
         const labelColorValue = !label ? "" : colorTouched || labelChanged ? labelColor.value : item.labelColor ?? "";
-        this.plugin.store.updateItem(item.id, { displayTitle: item.displayTitle, tags: [...tags], label, labelColor: labelColorValue, caption: item.caption, ...(item.type === "card" ? { content: item.content ?? "" } : {}) });
+        this.plugin.store.updateItem(item.id, { displayTitle: item.displayTitle, tags: [...tags], label, labelColor: labelColorValue, caption: captionTouched || sharedCaptions.size === 1 ? caption.value.trim() : item.caption, ...(item.type === "card" ? { content: item.content ?? "" } : {}) });
       }
       this.close();
     });

@@ -5,6 +5,7 @@ import test from "node:test";
 test("Side item menu uses focused metadata, move, and Find link actions", async () => {
   const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  const modal = await readFile(new URL("../src/ui/modal.ts", import.meta.url), "utf8");
 
   assert.match(source, /setTitle\("Edit tags & label"\)/);
   assert.match(source, /setTitle\("Move to…"\)/);
@@ -14,4 +15,8 @@ test("Side item menu uses focused metadata, move, and Find link actions", async 
   assert.doesNotMatch(source, /setTitle\("Open original"\)/);
   assert.match(source, /setTitle\("Open source file"\)/);
   assert.match(main, /new FindLinkModal\(this\.app, item\.displayTitle, locations/);
+  assert.match(modal, /"Tags, label & caption"/);
+  assert.match(modal, /cls: "cp-tag-label-caption"/);
+  assert.match(modal, /let captionTouched = false/);
+  assert.match(modal, /caption: captionTouched \|\| sharedCaptions\.size === 1 \? caption\.value\.trim\(\) : item\.caption/);
 });
