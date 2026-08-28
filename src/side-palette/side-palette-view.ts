@@ -1,4 +1,4 @@
-import { ItemView, Menu, WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, setIcon, WorkspaceLeaf } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { Collection, PaletteItem, SideLayoutState } from "../core/types";
 import { CardToMarkdownModal, ConfirmDeleteModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
@@ -13,11 +13,12 @@ export class SidePaletteView extends ItemView {
   private unsubscribe?: () => void;
   private query = "";
   private selectionAnchorId: string | null = null;
-  private selectedOutlineCollectionId: string | null = null;
   private visibleItemIds: string[] = [];
   private outlineItemIds: string[] = [];
   private suppressBlankClick = false;
   private viewSettingsOpen = false;
+  private outlinerSettingsOpen = false;
+  private pendingReveal: "viewport" | "outliner" | null = null;
   private activeBackEditor: { itemId: string; close: (save: boolean) => Promise<void> } | null = null;
   private readonly scrollSelectors = [".cp-viewport", ".cp-outliner", ".cp-tag-index", ".cp-label-index"] as const;
 
@@ -31,6 +32,14 @@ export class SidePaletteView extends ItemView {
   revealItem(itemId: string): void {
     this.query = "";
     this.selectionAnchorId = itemId;
+    const workspace = this.plugin.activeWorkspace();
+    if (workspace) {
+      const collection = Object.values(this.plugin.store.data.collections).find((entry) => entry.workspaceId === workspace.id && entry.itemIds.includes(itemId));
+      workspace.sideLayout.selectedCollectionId = collection?.id ?? null;
+      const expanded: string[] = []; let cursor = collection;
+      while (cursor) { expanded.push(cursor.id); cursor = cursor.parentId ? this.plugin.store.data.collections[cursor.parentId] : undefined; }
+      workspace.sideLayout.collapsedCollectionIds = workspace.sideLayout.collapsedCollectionIds.filter((id) => !expanded.includes(id));
+    }
     this.plugin.store.data.uiState.sideSelectedItemIds = [itemId];
     this.plugin.store.data.uiState.selectedItemId = itemId;
     this.plugin.store.changed();
@@ -89,6 +98,14 @@ export class SidePaletteView extends ItemView {
         const panel = root.querySelector<HTMLElement>(selector);
         if (panel) panel.scrollTop = scrollTop;
       }
+    }
+    if (this.pendingReveal) {
+      const target = this.pendingReveal; this.pendingReveal = null;
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        const id = this.plugin.store.data.uiState.selectedItemId; if (!id) return;
+        const selector = target === "viewport" ? `.cp-item[data-item-id="${CSS.escape(id)}"]` : `.cp-outline-item[data-item-id="${CSS.escape(id)}"]`;
+        this.contentEl.querySelector<HTMLElement>(selector)?.scrollIntoView({ block: "center", inline: "nearest" });
+      }));
     }
   }
 
@@ -150,12 +167,15 @@ export class SidePaletteView extends ItemView {
     rangeControl("Preview font size", "fontSize", 8, 14, 14);
     applyViewSettings();
     this.mountViewportReorder(parent, listEl, workspaceId);
-    const visibleItems = this.plugin.search.filter(this.items(workspaceId), this.query);
+    const visibleItems = this.plugin.search.filter(this.itemsForSelectedCollection(workspaceId), this.query);
+    const workspace = this.plugin.store.data.workspaces[workspaceId];
+    const collection = workspace.sideLayout.selectedCollectionId ? this.plugin.store.data.collections[workspace.sideLayout.selectedCollectionId] : null;
+    parent.createDiv({ cls: "cp-viewport-scope", text: `${collection?.name ?? workspace.name} · ${visibleItems.length} items` });
     this.visibleItemIds = visibleItems.map((item) => item.id);
     for (const item of visibleItems) {
       const facesEnabled = supportsFrontBack(item) && item.facesEnabled;
       const face = facesEnabled ? this.plugin.store.data.uiState.sideItemFaces[item.id] ?? "front" : "front";
-      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, currentFace: face, onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("side", item.id, next) : undefined, onSelect: (event) => this.selectSideItem(item.id, event), onOpen: () => face === "back" ? void this.openInlineBackEditor(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => this.plugin.findLinkedCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, currentFace: face, onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("side", item.id, next) : undefined, onSelect: (event) => { this.pendingReveal = "outliner"; this.selectSideItem(item.id, event); }, onOpen: () => face === "back" ? void this.openInlineBackEditor(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => this.plugin.findLinkedCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
       const body = card.querySelector<HTMLElement>(".cp-item__body");
       if (body) {
         const compactLimit = Math.round(360 * 14 / this.plugin.store.data.settings.fontSize);
@@ -275,6 +295,27 @@ export class SidePaletteView extends ItemView {
     const collection = header.createEl("button", { text: "+ Collection" }); collection.addEventListener("click", () => this.promptCollection(workspaceId, null));
     const memo = header.createEl("button", { text: "+ Memo" }); memo.addEventListener("click", () => void this.plugin.createMemo());
     const workspace = this.plugin.store.data.workspaces[workspaceId]; if (!workspace) return;
+    parent.style.setProperty("--cp-outline-height", `${workspace.sideLayout.outlinerItemHeight}px`);
+    parent.style.setProperty("--cp-outline-font", `${workspace.sideLayout.outlinerFontSize}px`);
+    parent.toggleClass("is-wrap-titles", workspace.sideLayout.outlinerWrapTitles);
+    const options = parent.createEl("details", { cls: "cp-outline-options" }); options.open = this.outlinerSettingsOpen;
+    options.addEventListener("toggle", () => { this.outlinerSettingsOpen = options.open; }); options.createEl("summary", { text: "Outliner settings" });
+    const addRange = (label: string, key: "outlinerItemHeight" | "outlinerFontSize", min: number, max: number): void => {
+      const row = options.createDiv({ cls: "cp-outline-option" }); row.createSpan({ text: label }); const value = row.createSpan({ text: `${workspace.sideLayout[key]}px` });
+      const input = row.createEl("input", { attr: { type: "range", min: String(min), max: String(max), value: String(workspace.sideLayout[key]) } });
+      input.addEventListener("input", () => { workspace.sideLayout[key] = Number(input.value); value.setText(`${input.value}px`); parent.style.setProperty(key === "outlinerItemHeight" ? "--cp-outline-height" : "--cp-outline-font", `${input.value}px`); });
+      input.addEventListener("change", () => this.plugin.store.changed());
+    };
+    addRange("Row height", "outlinerItemHeight", 24, 44); addRange("Font size", "outlinerFontSize", 11, 16);
+    for (const [label, key] of [["Include nested collections", "outlinerIncludeDescendants"], ["Wrap long titles", "outlinerWrapTitles"]] as const) {
+      const row = options.createEl("label", { cls: "cp-outline-toggle" }); const input = row.createEl("input", { attr: { type: "checkbox" } }); input.checked = workspace.sideLayout[key]; row.createSpan({ text: label });
+      input.addEventListener("change", () => { workspace.sideLayout[key] = input.checked; this.plugin.store.changed(); });
+    }
+    const breadcrumb = parent.createDiv({ cls: "cp-outline-breadcrumb" });
+    const path: Collection[] = []; let cursor = workspace.sideLayout.focusedCollectionId ? this.plugin.store.data.collections[workspace.sideLayout.focusedCollectionId] : undefined;
+    while (cursor) { path.unshift(cursor); cursor = cursor.parentId ? this.plugin.store.data.collections[cursor.parentId] : undefined; }
+    const crumb = (name: string, id: string | null): void => { const button = breadcrumb.createEl("button", { text: name }); button.addEventListener("click", () => { workspace.sideLayout.focusedCollectionId = id; workspace.sideLayout.selectedCollectionId = id; this.plugin.store.changed(); }); };
+    crumb(workspace.name, null); for (const entry of path) { breadcrumb.createSpan({ text: "›" }); crumb(entry.name, entry.id); }
     this.outlineItemIds = [];
     const indexCollectionItems = (collectionId: string): void => {
       const candidate = this.plugin.store.data.collections[collectionId];
@@ -284,40 +325,59 @@ export class SidePaletteView extends ItemView {
     };
     for (const collectionId of workspace.rootCollectionIds) indexCollectionItems(collectionId);
     this.outlineItemIds.push(...workspace.looseItemIds);
-    const rootRow = parent.createDiv({ cls: "cp-outline-root", text: workspace.name });
+    const rootRow = parent.createDiv({ cls: `cp-outline-root${workspace.sideLayout.selectedCollectionId === null ? " is-selected" : ""}`, text: workspace.sideLayout.focusedCollectionId ? "Current collection" : workspace.name });
+    rootRow.addEventListener("click", () => { workspace.sideLayout.selectedCollectionId = workspace.sideLayout.focusedCollectionId; this.plugin.store.changed(); });
     this.mountOutlineDropTarget(rootRow, workspaceId, null);
-    for (const id of workspace.rootCollectionIds) this.renderCollection(parent, this.plugin.store.data.collections[id], 0);
-    for (const item of workspace.looseItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item))) this.renderOutlineItem(parent, item, 0);
+    const focused = workspace.sideLayout.focusedCollectionId ? this.plugin.store.data.collections[workspace.sideLayout.focusedCollectionId] : null;
+    const collectionIds = focused?.childCollectionIds ?? workspace.rootCollectionIds; const itemIds = focused?.itemIds ?? workspace.looseItemIds;
+    for (const id of collectionIds) this.renderCollection(parent, this.plugin.store.data.collections[id], 0);
+    for (const item of itemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item))) this.renderOutlineItem(parent, item, 0, focused?.id ?? null);
   }
 
   private renderCollection(parent: HTMLElement, collection: Collection | undefined, depth: number): void {
     if (!collection) return;
-    const row = parent.createDiv({ cls: `cp-outline-row${this.selectedOutlineCollectionId === collection.id ? " is-selected" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.collectionId = collection.id; row.draggable = true; row.createSpan({ cls: "cp-outline-row__title", text: `⌄  ${collection.name}` });
+    const layout = this.plugin.store.data.workspaces[collection.workspaceId].sideLayout; const collapsed = layout.collapsedCollectionIds.includes(collection.id);
+    const row = parent.createDiv({ cls: `cp-outline-row${layout.selectedCollectionId === collection.id ? " is-selected" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.collectionId = collection.id; row.draggable = true;
+    const arrow = row.createEl("button", { cls: "cp-outline-arrow", attr: { "aria-label": collapsed ? "Expand" : "Collapse" } }); setIcon(arrow, collapsed ? "chevron-right" : "chevron-down");
+    arrow.addEventListener("click", (event) => { event.stopPropagation(); layout.collapsedCollectionIds = collapsed ? layout.collapsedCollectionIds.filter((id) => id !== collection.id) : [...layout.collapsedCollectionIds, collection.id]; this.plugin.store.changed(); });
+    row.createSpan({ cls: "cp-outline-row__title", text: collection.name });
     row.addEventListener("click", (event) => {
       if ((event.target as HTMLElement).closest("button")) return;
-      this.selectedOutlineCollectionId = collection.id;
+      layout.selectedCollectionId = collection.id;
       this.plugin.store.data.uiState.sideSelectedItemIds = [];
       this.plugin.store.data.uiState.selectedItemId = null;
       this.plugin.store.changed();
     });
+    row.addEventListener("dblclick", () => { layout.focusedCollectionId = collection.id; layout.selectedCollectionId = collection.id; this.plugin.store.changed(); });
     row.addEventListener("dragstart", (event) => { event.dataTransfer?.setData("application/x-canvas-palette-collection", collection.id); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; row.addClass("is-dragging"); });
     row.addEventListener("dragend", () => row.removeClass("is-dragging"));
     this.mountOutlineDropTarget(row, collection.workspaceId, collection.id);
     iconButton(row, "plus", "Add nested collection", () => this.promptCollection(collection.workspaceId, collection.id));
     iconButton(row, "pencil", "Rename collection", () => new TextPromptModal(this.app, "Rename collection", collection.name, (value) => this.plugin.store.renameCollection(collection.id, value)).open());
-    for (const itemId of collection.itemIds) { const item = this.plugin.store.data.items[itemId]; if (item) this.renderOutlineItem(parent, item, depth + 1); }
-    for (const child of collection.childCollectionIds) this.renderCollection(parent, this.plugin.store.data.collections[child], depth + 1);
+    if (!collapsed || Boolean(this.query)) {
+      for (const itemId of collection.itemIds) { const item = this.plugin.store.data.items[itemId]; if (item) this.renderOutlineItem(parent, item, depth + 1, collection.id); }
+      for (const child of collection.childCollectionIds) this.renderCollection(parent, this.plugin.store.data.collections[child], depth + 1);
+    }
   }
 
-  private renderOutlineItem(parent: HTMLElement, item: PaletteItem, depth: number): void {
+  private renderOutlineItem(parent: HTMLElement, item: PaletteItem, depth: number, collectionId: string | null): void {
     const selected = this.sideSelectedIds().includes(item.id);
     const showMarker = selected && this.sideSelectedIds().length > 1;
-    const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${selected ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.itemId = item.id; row.draggable = true; row.setText(`${showMarker ? "✓ " : ""}${item.type.toUpperCase()}  ${item.displayTitle}`);
+    const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${selected ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.itemId = item.id; row.draggable = true;
+    const icon = row.createSpan({ cls: "cp-outline-item__icon" }); setIcon(icon, item.type === "image" ? "image" : item.type === "markdown" ? "file-text" : item.type === "group" ? "group" : "sticky-note");
+    if (showMarker) row.createSpan({ cls: "cp-outline-item__check", text: "✓" }); row.createSpan({ cls: "cp-outline-item__title", text: item.displayTitle });
     let clickTimer: number | null = null;
-    row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.selectSideItem(item.id, event, this.outlineItemIds); }, 220); });
+    row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.pendingReveal = "viewport"; this.selectSideItem(item.id, event, this.outlineItemIds); }, 220); });
     row.addEventListener("dblclick", () => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; void this.plugin.openSideItemPreview(item.id); });
     row.addEventListener("dragstart", (event) => { event.dataTransfer?.setData("application/x-canvas-palette-item", item.id); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; row.addClass("is-dragging"); });
     row.addEventListener("dragend", () => row.removeClass("is-dragging"));
+    this.mountOutlineItemDropTarget(row, item.id, collectionId);
+  }
+
+  private mountOutlineItemDropTarget(row: HTMLElement, targetId: string, collectionId: string | null): void {
+    let after = false; const clear = (): void => row.removeClass("is-drop-before", "is-drop-after");
+    row.addEventListener("dragover", (event) => { if (!event.dataTransfer?.types.includes("application/x-canvas-palette-item")) return; event.preventDefault(); event.stopPropagation(); after = event.clientY > row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2; clear(); row.addClass(after ? "is-drop-after" : "is-drop-before"); });
+    row.addEventListener("dragleave", clear); row.addEventListener("drop", (event) => { const source = event.dataTransfer?.getData("application/x-canvas-palette-item"); const workspace = this.plugin.activeWorkspace(); if (!source || !workspace) return; event.preventDefault(); event.stopPropagation(); clear(); const selected = this.sideSelectedIds(); this.plugin.store.moveItems(workspace.id, selected.includes(source) ? selected : [source], collectionId, targetId, after); });
   }
 
   private mountOutlineDropTarget(row: HTMLElement, workspaceId: string, collectionId: string | null): void {
@@ -330,7 +390,7 @@ export class SidePaletteView extends ItemView {
       const itemId = event.dataTransfer?.getData("application/x-canvas-palette-item");
       if (itemId) {
         const selected = this.sideSelectedIds();
-        this.plugin.store.assignItemsToCollection(workspaceId, selected.includes(itemId) ? selected : [itemId], collectionId);
+        this.plugin.store.moveItems(workspaceId, selected.includes(itemId) ? selected : [itemId], collectionId);
         return;
       }
       const draggedCollectionId = event.dataTransfer?.getData("application/x-canvas-palette-collection");
@@ -350,6 +410,12 @@ export class SidePaletteView extends ItemView {
   }
 
   private items(workspaceId: string): PaletteItem[] { return this.plugin.store.itemsForWorkspace(workspaceId); }
+  private itemsForSelectedCollection(workspaceId: string): PaletteItem[] {
+    const workspace = this.plugin.store.data.workspaces[workspaceId]; if (!workspace) return [];
+    const selectedId = workspace.sideLayout.selectedCollectionId; if (!selectedId) return workspace.looseItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
+    const ids: string[] = []; const collect = (id: string): void => { const collection = this.plugin.store.data.collections[id]; if (!collection) return; ids.push(...collection.itemIds); if (workspace.sideLayout.outlinerIncludeDescendants) for (const child of collection.childCollectionIds) collect(child); };
+    collect(selectedId); return ids.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
+  }
   private applyLayoutVariables(root: HTMLElement, layout: SideLayoutState): void {
     root.style.setProperty("--cp-side-upper-left", `${layout.viewportRatio}fr`);
     root.style.setProperty("--cp-side-upper-right", `${1 - layout.viewportRatio}fr`);

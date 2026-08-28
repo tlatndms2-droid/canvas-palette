@@ -251,6 +251,20 @@ export class PaletteStore {
     this.changed();
   }
 
+  moveItems(workspaceId: string, itemIds: string[], collectionId: string | null, targetId: string | null = null, insertAfter = false): void {
+    const workspace = this.data.workspaces[workspaceId];
+    if (!workspace) return;
+    const valid = [...new Set(itemIds)].filter((id) => this.data.items[id]);
+    const containers = [workspace.looseItemIds, ...Object.values(this.data.collections).filter((entry) => entry.workspaceId === workspaceId).map((entry) => entry.itemIds)];
+    if (!valid.some((id) => containers.some((ids) => ids.includes(id)))) return;
+    for (const ids of containers) for (const id of valid) { const index = ids.indexOf(id); if (index >= 0) ids.splice(index, 1); }
+    const collection = collectionId ? this.data.collections[collectionId] : null;
+    const target = collection?.workspaceId === workspaceId ? collection.itemIds : workspace.looseItemIds;
+    const targetIndex = targetId ? target.indexOf(targetId) : -1;
+    target.splice(targetIndex >= 0 ? targetIndex + (insertAfter ? 1 : 0) : target.length, 0, ...valid);
+    this.changed();
+  }
+
   assignItemsToCollection(workspaceId: string, itemIds: string[], collectionId: string | null): void {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace) return;
@@ -271,7 +285,7 @@ export class PaletteStore {
     this.changed();
   }
 
-  moveCollection(id: string, parentId: string | null): void {
+  moveCollection(id: string, parentId: string | null, targetId: string | null = null, insertAfter = false): void {
     const collection = this.data.collections[id];
     if (!collection || id === parentId || this.wouldCreateCycle(id, parentId)) return;
     const workspace = this.data.workspaces[collection.workspaceId];
@@ -283,8 +297,10 @@ export class PaletteStore {
     }
     else workspace.rootCollectionIds = workspace.rootCollectionIds.filter((childId) => childId !== id);
     collection.parentId = parentId;
-    if (parentId) this.data.collections[parentId]?.childCollectionIds.push(id);
-    else workspace.rootCollectionIds.push(id);
+    const target = parentId ? this.data.collections[parentId]?.childCollectionIds : workspace.rootCollectionIds;
+    if (!target) return;
+    const targetIndex = targetId ? target.indexOf(targetId) : -1;
+    target.splice(targetIndex >= 0 ? targetIndex + (insertAfter ? 1 : 0) : target.length, 0, id);
     this.changed();
   }
 

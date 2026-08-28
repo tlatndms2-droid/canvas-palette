@@ -1,9 +1,13 @@
 import type { PaletteData, SideLayoutState } from "./types";
 
-export const DEFAULT_SIDE_LAYOUT: SideLayoutState = { viewportRatio: 0.52, topRatio: 0.69, indexRatio: 0.5, viewMode: "grid" };
+export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
+  viewportRatio: 0.52, topRatio: 0.69, indexRatio: 0.5, viewMode: "grid",
+  selectedCollectionId: null, focusedCollectionId: null, collapsedCollectionIds: [],
+  outlinerItemHeight: 30, outlinerFontSize: 13, outlinerIncludeDescendants: true, outlinerWrapTitles: false
+};
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 11,
+  schemaVersion: 12,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
@@ -31,7 +35,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 11,
+    schemaVersion: 12,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
       const supportsFaces = item.type !== "group";
       return [id, { ...item, backContent: supportsFaces ? item.backContent ?? "" : "", facesEnabled: supportsFaces && (item.facesEnabled ?? Boolean(item.backContent)), labelColor: item.labelColor ?? "", canvasPlacements: item.canvasPlacements ?? [] }];

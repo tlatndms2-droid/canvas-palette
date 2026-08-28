@@ -57,7 +57,16 @@ export interface PaletteItem {
 
 export interface Collection { id: string; workspaceId: string; parentId: string | null; name: string; childCollectionIds: string[]; itemIds: string[]; }
 
-export interface SideLayoutState { viewportRatio: number; topRatio: number; indexRatio: number; viewMode: AssetViewMode; }
+export interface SideLayoutState {
+  viewportRatio: number; topRatio: number; indexRatio: number; viewMode: AssetViewMode;
+  selectedCollectionId: string | null;
+  focusedCollectionId: string | null;
+  collapsedCollectionIds: string[];
+  outlinerItemHeight: number;
+  outlinerFontSize: number;
+  outlinerIncludeDescendants: boolean;
+  outlinerWrapTitles: boolean;
+}
 export interface PaletteWorkspace {
   id: string;
   name: string;
