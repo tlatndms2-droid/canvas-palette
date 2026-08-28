@@ -277,6 +277,22 @@ export class CanvasAdapter {
         ...item.canvasPlacements.filter((placement) => placement.canvasPath === file.path).flatMap((placement) => placement.nodeIds)
       ];
       if (linkedNodeIds.length === 0) continue;
+      if (item.type === "card") {
+        const convertedNode = document.nodes.find((candidate) => linkedNodeIds.includes(candidate.id) && candidate.type === "file" && candidate.file?.toLocaleLowerCase().endsWith(".md"));
+        if (convertedNode?.file) {
+          const source = this.app.vault.getAbstractFileByPath(convertedNode.file);
+          item.type = "markdown";
+          item.origin.filePath = convertedNode.file;
+          delete item.origin.textRange;
+          if (source instanceof TFile) {
+            item.displayTitle = source.basename;
+            item.content = await this.app.vault.cachedRead(source);
+          }
+          item.modifiedAt = Date.now();
+          changed++;
+          continue;
+        }
+      }
       const linkedNodes = document.nodes.filter((candidate) => linkedNodeIds.includes(candidate.id) && candidate.type === (item.type === "card" ? "text" : "group"));
       const node = item.type === "card"
         ? linkedNodes.find((candidate) => (candidate.text ?? "") !== (item.content ?? "")) ?? linkedNodes[0]
