@@ -199,10 +199,10 @@ export class CanvasAdapter {
       node.file = filePath;
       delete node.text;
       return true;
-    });
+    }, true);
   }
 
-  private async mutateLinkedNodes(locations: Array<{ canvasPath: string; nodeId: string }>, mutate: (node: CanvasNodeSnapshot) => boolean): Promise<void> {
+  private async mutateLinkedNodes(locations: Array<{ canvasPath: string; nodeId: string }>, mutate: (node: CanvasNodeSnapshot) => boolean, replaceOpenRuntimeNodes = false): Promise<void> {
     const byCanvas = new Map<string, Set<string>>();
     for (const location of locations) {
       const nodeIds = byCanvas.get(location.canvasPath) ?? new Set<string>();
@@ -216,8 +216,21 @@ export class CanvasAdapter {
         if (!current || typeof current !== "object") continue;
         const document = this.parse(JSON.stringify(current));
         let changed = false;
-        for (const node of document.nodes) if (nodeIds.has(node.id)) changed = mutate(node) || changed;
+        const changedNodeIds = new Set<string>();
+        for (const node of document.nodes) {
+          if (!nodeIds.has(node.id) || !mutate(node)) continue;
+          changed = true;
+          changedNodeIds.add(node.id);
+        }
         if (!changed) continue;
+        if (replaceOpenRuntimeNodes) {
+          const withoutConvertedNodes: CanvasDocument = {
+            ...document,
+            nodes: document.nodes.filter((node) => !changedNodeIds.has(node.id)),
+            edges: document.edges.filter((edge) => !changedNodeIds.has(edge.fromNode) && !changedNodeIds.has(edge.toNode))
+          };
+          await open.runtime.setData(withoutConvertedNodes);
+        }
         await open.runtime.setData(document);
         open.runtime.requestSave?.();
         continue;

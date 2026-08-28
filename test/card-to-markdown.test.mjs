@@ -18,6 +18,11 @@ test("Card conversion creates exactly one Vault Markdown path shared by Palette 
   assert.match(canvas, /node\.type = "file"/);
   assert.match(canvas, /node\.file = filePath/);
   assert.match(canvas, /delete node\.text/);
+  assert.match(canvas, /\}, true\);/);
+  assert.match(canvas, /const changedNodeIds = new Set<string>\(\)/);
+  assert.match(canvas, /nodes: document\.nodes\.filter\(\(node\) => !changedNodeIds\.has\(node\.id\)\)/);
+  assert.match(canvas, /edges: document\.edges\.filter\(\(edge\) => !changedNodeIds\.has\(edge\.fromNode\) && !changedNodeIds\.has\(edge\.toNode\)\)/);
+  assert.match(canvas, /await open\.runtime\.setData\(withoutConvertedNodes\)[\s\S]{0,120}await open\.runtime\.setData\(document\)/);
 });
 
 test("linked renames propagate source file paths and Group labels through CanvasAdapter", () => {

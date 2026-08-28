@@ -2,12 +2,12 @@
 
 ## Current state
 
-- Version: `0.2.40`.
+- Version: `0.2.41`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.40`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.40`.
-- Latest runtime change: `0.2.40`; the shared Card-to-Markdown conversion from `0.2.39` is republished under a new sequential version so BRAT/Obsidian cannot retain the deleted-and-reused `0.2.39` package. `Convert to shared Markdown…` creates one Vault `.md`; the Palette Card and all linked Canvas Cards become references to that same file.
+- Latest release: `0.2.41`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.41`.
+- Latest runtime change: `0.2.41`; open Canvas text nodes are now removed from the runtime and recreated in place as file nodes during Card-to-Markdown conversion. A single `setData` had allowed Obsidian to reuse the existing text-node object even though serialized data changed to `file`. The two-stage replacement preserves the same node ID, bounds, edges, metadata, and link records while making the visible node type change immediately.
 - Automated baseline: 36 Node tests (including a single Vault-create assertion, identical Palette/Canvas shared-path routing, Card-to-Markdown type conversion, identity/metadata/link preservation, linked file-path/Group-label propagation, all-node Canvas mutation, scalable metadata picker search, virtualization, fixed-height layout, creation/summary wiring, per-Canvas Find-link grouping, exact path/Node selection, picker routing, source-file fallback, Canvas-to-Palette reveal routing, preferred Workspace resolution, filter clearing, single selection, scroll/highlight behavior, link-state indicator ownership and collision-safe layout, same-Canvas linked-card replacement and metadata preservation, focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
@@ -187,6 +187,8 @@
   - Static validation covers 36 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, exactly one Vault file creation, identical path routing into Palette and Canvas, all-linked-node conversion, identity/metadata/link preservation, dialog wording, and linked rename behavior. No disposable Obsidian Sandbox vault was available, so packaged installation/reload and actual Vault conversion UI verification were not performed; the open real Vault was not modified for testing.
 - `0.2.40` republishes the same corrected single-source conversion under a never-before-used sequential version. This avoids BRAT/Obsidian treating the deleted-and-recreated `0.2.39` as already installed and ensures the corrected `main.js` is eligible for download. No conversion semantics changed from the final `0.2.39` source.
   - Static validation covers the complete 36-test suite, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, manifest/package/compatibility version alignment, and public release asset verification. No disposable Obsidian Sandbox vault was available, so packaged installation/reload was not performed; the open real Vault was not modified for testing.
+- `0.2.41` fixes the visible half-conversion on an already-open Canvas. The Palette Item had changed to Markdown, but Obsidian reused the existing runtime text-node object when the same node ID was updated through one `setData` call. Conversion now submits an intermediate document without the affected node/edges, then the final document with the same ID and original edges restored as a file node, forcing the runtime class to be recreated without changing persistent identity or layout.
+  - Static validation covers 36 Node tests, including the open-runtime two-stage replacement wiring and affected-edge restoration, plus TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, version alignment, and release asset verification. No disposable Obsidian Sandbox vault was available, so live Obsidian runtime verification was not performed; the open real Vault was not modified for testing.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
