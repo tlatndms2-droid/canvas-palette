@@ -69,3 +69,17 @@ test("multi-item Canvas drag payload restores every selected item", async () => 
   assert.match(canvas, /async restoreItemsFromDrop\(items: PaletteItem\[\], event: DragEvent\)/);
   assert.match(canvas, /index % columns/);
 });
+
+test("Side search preserves Korean IME composition and renders guided suggestions", async () => {
+  const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(source, /addEventListener\("compositionstart"/);
+  assert.match(source, /addEventListener\("compositionend"/);
+  assert.match(source, /if \(this\.searchComposing \|\| \(event as InputEvent\)\.isComposing\) return/);
+  assert.match(source, /normalize\("NFC"\)/);
+  assert.match(source, /renderSearchAssistant/);
+  assert.match(source, /\["group:", "Search group names"\]/);
+  assert.match(source, /cp-search-chips/);
+  assert.match(source, /searchContextForItem/);
+  assert.match(styles, /\.cp-search-assistant\{/);
+});

@@ -20,6 +20,7 @@ export class SidePaletteView extends ItemView {
   private suppressBlankClick = false;
   private viewSettingsOpen = false;
   private outlinerSettingsOpen = false;
+  private searchComposing = false;
   private pendingReveal: "viewport" | "outliner" | null = null;
   private activeBackEditor: { itemId: string; close: (save: boolean) => Promise<void> } | null = null;
   private readonly scrollSelectors = [".cp-viewport", ".cp-outliner", ".cp-tag-index", ".cp-label-index"] as const;
@@ -72,8 +73,15 @@ export class SidePaletteView extends ItemView {
     const selectorRow = root.createDiv({ cls: "cp-workspace-row" }); selectorRow.createSpan({ text: "Current workspace" });
     workspaceSelect(this.plugin, selectorRow, workspace.id, (id) => { this.query = ""; this.plugin.store.data.uiState.activeWorkspaceId = id; this.plugin.store.changed(); });
     const searchWrap = root.createDiv({ cls: "cp-search-wrap" });
-    const search = searchWrap.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search cards, files, tags, labels…" }, value: this.query });
-    search.addEventListener("input", () => { this.query = search.value; this.render(); requestAnimationFrame(() => this.contentEl.querySelector<HTMLInputElement>(".cp-search")?.focus()); });
+    const search = searchWrap.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search files, groups, tags, labels…", autocomplete: "off" }, value: this.query });
+    const refreshSearch = (): void => { this.render(); requestAnimationFrame(() => { const next = this.contentEl.querySelector<HTMLInputElement>(".cp-search"); next?.focus(); next?.setSelectionRange(next.value.length, next.value.length); }); };
+    search.addEventListener("compositionstart", () => { this.searchComposing = true; });
+    search.addEventListener("compositionend", () => { this.searchComposing = false; this.query = search.value.normalize("NFC"); queueMicrotask(refreshSearch); });
+    search.addEventListener("input", (event) => { this.query = search.value; if (this.searchComposing || (event as InputEvent).isComposing) return; refreshSearch(); });
+    search.addEventListener("keydown", (event) => { if (event.key === "ArrowDown") { event.preventDefault(); searchWrap.querySelector<HTMLButtonElement>(".cp-search-suggestion")?.focus(); } else if (event.key === "Escape") search.blur(); });
+    search.addEventListener("focus", () => searchWrap.addClass("is-search-assistant-visible"));
+    searchWrap.addEventListener("focusout", () => window.setTimeout(() => { if (!searchWrap.contains(searchWrap.ownerDocument.activeElement)) searchWrap.removeClass("is-search-assistant-visible"); }, 0));
+    this.renderSearchAssistant(searchWrap, workspace.id);
     const top = root.createDiv({ cls: "cp-side__top" });
     const viewport = top.createDiv({ cls: "cp-panel cp-viewport" }); this.renderViewport(viewport, workspace.id);
     const vDivider = top.createDiv({ cls: "cp-divider cp-divider--vertical" });
@@ -109,6 +117,73 @@ export class SidePaletteView extends ItemView {
         this.contentEl.querySelector<HTMLElement>(selector)?.scrollIntoView({ block: "center", inline: "nearest" });
       }));
     }
+  }
+
+  private renderSearchAssistant(parent: HTMLElement, workspaceId: string): void {
+    const facetTokens = this.plugin.search.tokens(this.query).filter((token) => /^(tag|label|type|group|file|path|space):/i.test(token));
+    if (facetTokens.length > 0) {
+      const chips = parent.createDiv({ cls: "cp-search-chips" });
+      for (const token of facetTokens) {
+        const chip = chips.createEl("button", { cls: "cp-search-chip", text: token });
+        chip.createSpan({ text: " ×" });
+        chip.addEventListener("click", () => { this.query = this.plugin.search.toggleToken(this.query, token); this.render(); });
+      }
+    }
+    const facetMatch = this.query.match(/(?:^|\s)(tag|label|type|group|file|path|space):([^\s]*)$/i);
+    const assistant = parent.createDiv({ cls: `cp-search-assistant${facetMatch ? " is-visible" : ""}` });
+    if (!facetMatch) {
+      assistant.createDiv({ cls: "cp-search-assistant__title", text: "Search options" });
+      const options = [
+        ["tag:", "Search tags"], ["label:", "Search labels"], ["type:", "Search item types"], ["group:", "Search group names"],
+        ["file:", "Search file names"], ["path:", "Search original file paths"], ["space:", "Search linked Canvases"]
+      ];
+      for (const [token, description] of options) this.searchSuggestion(assistant, token, description, () => this.appendSearchFacet(token));
+      return;
+    }
+    const facet = facetMatch[1].toLocaleLowerCase();
+    const fragment = facetMatch[2].replace(/^"|"$/g, "").toLocaleLowerCase();
+    const items = this.items(workspaceId);
+    const counts = new Map<string, number>();
+    const add = (value: string): void => { const clean = value.trim(); if (clean && clean.toLocaleLowerCase().includes(fragment)) counts.set(clean, (counts.get(clean) ?? 0) + 1); };
+    for (const item of items) {
+      if (facet === "tag") item.tags.forEach(add);
+      else if (facet === "label") add(item.label);
+      else if (facet === "type") add(item.type);
+      else if (facet === "file") add(item.displayTitle);
+      else if (facet === "path") add(item.origin.filePath ?? "");
+      else if (facet === "space") { if (item.origin.canvasPath && item.origin.canvasNodeId) add(item.origin.canvasPath); for (const placement of item.canvasPlacements) if (placement.nodeIds.length > 0) add(placement.canvasPath); }
+      else if (facet === "group") this.searchContextForItem(workspaceId, item).groupNames?.forEach(add);
+    }
+    assistant.createDiv({ cls: "cp-search-assistant__title", text: `Matching ${facet}` });
+    const values = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12);
+    if (values.length === 0) assistant.createDiv({ cls: "cp-search-assistant__empty", text: "No matching suggestions." });
+    for (const [value, count] of values) this.searchSuggestion(assistant, facet === "tag" ? `#${value}` : value, String(count), () => {
+      const encoded = /\s/.test(value) ? `"${value.replace(/"/g, '\\"')}"` : value;
+      this.query = `${this.query.slice(0, facetMatch.index! + (facetMatch[0].startsWith(" ") ? 1 : 0))}${facet}:${encoded}`.trim();
+      this.render();
+    });
+  }
+
+  private searchSuggestion(parent: HTMLElement, label: string, description: string, action: () => void): void {
+    const button = parent.createEl("button", { cls: "cp-search-suggestion" });
+    button.createSpan({ cls: "cp-search-suggestion__label", text: label }); button.createSpan({ cls: "cp-search-suggestion__description", text: description });
+    button.addEventListener("click", action);
+    button.addEventListener("keydown", (event) => { if (event.key === "ArrowDown") { event.preventDefault(); (button.nextElementSibling as HTMLElement | null)?.focus(); } else if (event.key === "ArrowUp") { event.preventDefault(); const previous = button.previousElementSibling as HTMLElement | null; if (previous?.matches("button")) previous.focus(); else this.contentEl.querySelector<HTMLInputElement>(".cp-search")?.focus(); } });
+  }
+
+  private appendSearchFacet(token: string): void {
+    this.query = `${this.query.trim()}${this.query.trim() ? " " : ""}${token}`;
+    this.render(); requestAnimationFrame(() => this.contentEl.querySelector<HTMLInputElement>(".cp-search")?.focus());
+  }
+
+  private searchContextForItem(workspaceId: string, item: PaletteItem): { groupNames: string[] } {
+    const names: string[] = []; let cursor = item.parentItemId ? this.plugin.store.data.items[item.parentItemId] : undefined;
+    while (cursor) { names.push(cursor.displayTitle); cursor = cursor.parentItemId ? this.plugin.store.data.items[cursor.parentItemId] : undefined; }
+    let rootId = item.id; let root = item;
+    while (root.parentItemId && this.plugin.store.data.items[root.parentItemId]) { rootId = root.parentItemId; root = this.plugin.store.data.items[root.parentItemId]; }
+    let collection = Object.values(this.plugin.store.data.collections).find((entry) => entry.workspaceId === workspaceId && entry.itemIds.includes(rootId));
+    while (collection) { names.push(collection.name); collection = collection.parentId ? this.plugin.store.data.collections[collection.parentId] : undefined; }
+    return { groupNames: [...new Set(names)] };
   }
 
   private renderViewport(parent: HTMLElement, workspaceId: string): void {
@@ -169,7 +244,7 @@ export class SidePaletteView extends ItemView {
     rangeControl("Preview font size", "fontSize", 8, 14, 14);
     applyViewSettings();
     this.mountViewportReorder(parent, listEl, workspaceId);
-    const visibleItems = this.plugin.search.filter(this.itemsForViewportScope(workspaceId), this.query);
+    const visibleItems = this.plugin.search.filter(this.itemsForViewportScope(workspaceId), this.query, (item) => this.searchContextForItem(workspaceId, item));
     const workspace = this.plugin.store.data.workspaces[workspaceId];
     const collection = workspace.sideLayout.focusedCollectionId ? this.plugin.store.data.collections[workspace.sideLayout.focusedCollectionId] : null;
     parent.createDiv({ cls: "cp-viewport-scope", text: `${collection?.name ?? workspace.name} · ${visibleItems.length} items` });
@@ -223,7 +298,7 @@ export class SidePaletteView extends ItemView {
       for (const rootId of collection.itemIds) renderItemTree(listEl, rootId);
       if (workspace.sideLayout.outlinerIncludeDescendants) for (const childCollectionId of collection.childCollectionIds) for (const rootId of collectionItems(childCollectionId)) renderItemTree(listEl, rootId);
     }
-    if (listEl.childElementCount === 0) listEl.createDiv({ cls: "cp-empty", text: "No matching items." });
+    if (listEl.childElementCount === 0) { const empty = listEl.createDiv({ cls: "cp-empty cp-search-empty" }); empty.createDiv({ text: "No matching items." }); if (this.query.trim()) { empty.createDiv({ cls: "cp-search-empty__query", text: `Current search: ${this.query}` }); const reset = empty.createEl("button", { text: "Clear search" }); reset.addEventListener("click", () => { this.query = ""; this.render(); }); } }
     this.mountViewportSelection(parent, listEl);
   }
 

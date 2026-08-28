@@ -1,7 +1,9 @@
 import type { PaletteItem } from "../core/types";
 
+export interface SearchItemContext { groupNames?: string[]; }
+
 export class SearchService {
-  matches(item: PaletteItem, query: string): boolean {
+  matches(item: PaletteItem, query: string, context: SearchItemContext = {}): boolean {
     const tokens = this.tokens(query);
     if (tokens.length === 0) return true;
     let index = 0;
@@ -31,13 +33,13 @@ export class SearchService {
         if (tokens[index] === ")") index += 1;
         return result;
       }
-      return this.matchesToken(item, token);
+      return this.matchesToken(item, token, context);
     };
     return expression();
   }
 
-  filter(items: PaletteItem[], query: string): PaletteItem[] {
-    return items.filter((item) => this.matches(item, query));
+  filter(items: PaletteItem[], query: string, contextForItem?: (item: PaletteItem) => SearchItemContext): PaletteItem[] {
+    return items.filter((item) => this.matches(item, query, contextForItem?.(item)));
   }
 
   hasToken(query: string, token: string): boolean {
@@ -62,15 +64,18 @@ export class SearchService {
     return tokens.join(" ").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")").trim();
   }
 
-  private tokens(query: string): string[] {
-    return query.match(/(?:label|space):"(?:\\.|[^"])*"|tag:#[^\s()]+|"(?:\\.|[^"])*"|\(|\)|\bOR\b|[^\s()]+/gi) ?? [];
+  tokens(query: string): string[] {
+    return query.match(/(?:label|space|tag|type|group|file|path):"(?:\\.|[^"])*"|tag:#[^\s()]+|"(?:\\.|[^"])*"|\(|\)|\bOR\b|[^\s()]+/gi) ?? [];
   }
 
-  private matchesToken(item: PaletteItem, token: string): boolean {
+  private matchesToken(item: PaletteItem, token: string, context: SearchItemContext): boolean {
     const lower = token.toLocaleLowerCase();
     if (lower === "unlinked") return !(item.origin.canvasPath && item.origin.canvasNodeId) && !item.canvasPlacements.some((placement) => placement.nodeIds.length > 0);
     if (lower.startsWith("label:")) return item.label.toLocaleLowerCase() === this.unquote(token.slice(6)).toLocaleLowerCase();
     if (lower.startsWith("type:")) return item.type === lower.slice(5);
+    if (lower.startsWith("group:")) { const value = this.unquote(token.slice(6)).toLocaleLowerCase(); return (context.groupNames ?? []).some((name) => name.toLocaleLowerCase().includes(value)); }
+    if (lower.startsWith("file:")) { const value = this.unquote(token.slice(5)).toLocaleLowerCase(); return [item.displayTitle, item.origin.filePath?.split("/").pop() ?? ""].some((name) => name.toLocaleLowerCase().includes(value)); }
+    if (lower.startsWith("path:")) return (item.origin.filePath ?? "").toLocaleLowerCase().includes(this.unquote(token.slice(5)).toLocaleLowerCase());
     if (lower.startsWith("space:")) {
       const space = this.unquote(token.slice(6)).toLocaleLowerCase();
       return [item.origin.canvasPath, ...item.canvasPlacements.map((placement) => placement.canvasPath)].some((path) => path?.toLocaleLowerCase() === space);
@@ -78,7 +83,7 @@ export class SearchService {
     const tag = lower.startsWith("tag:#") ? token.slice(5) : token.startsWith("#") ? token.slice(1) : null;
     if (tag !== null) return item.tags.some((value) => value.toLocaleLowerCase() === tag.toLocaleLowerCase());
     const needle = this.unquote(token).toLocaleLowerCase();
-    return [item.displayTitle, item.content ?? "", item.backContent, item.caption, item.label, ...item.tags].join("\n").toLocaleLowerCase().includes(needle);
+    return [item.displayTitle, item.content ?? "", item.backContent, item.caption, item.label, item.origin.filePath ?? "", ...item.tags, ...(context.groupNames ?? [])].join("\n").toLocaleLowerCase().includes(needle);
   }
 
   private unquote(value: string): string {

@@ -39,7 +39,19 @@ test("Obsidian-like tag, label, AND, OR, and parentheses filter palette items", 
   assert.equal(search.matches(unlinked, "unlinked"), true);
   assert.equal(search.matches({ ...unlinked, canvasPlacements: [{ canvasPath: "A.canvas", nodeIds: [], placedAt: 1 }] }, "unlinked"), true);
   assert.equal(search.matches(work, "synthesis"), true);
+  assert.equal(search.matches(work, "file:Planning"), true);
+  assert.equal(search.matches(work, "path:Projects"), false);
+  assert.equal(search.matches(work, "group:프로젝트", { groupNames: ["프로젝트 자료"] }), true);
+  assert.equal(search.matches(work, "프로젝트", { groupNames: ["프로젝트 자료"] }), true);
 
+  await cleanup();
+});
+
+test("guided search exposes reusable tokens for chips and quoted facets", async () => {
+  const { SearchService, cleanup } = await loadSearch();
+  const search = new SearchService();
+  assert.deepEqual(search.tokens('tag:request group:"하나의 그룹" path:inbox'), ["tag:request", 'group:"하나의 그룹"', "path:inbox"]);
+  assert.equal(search.toggleToken('tag:request group:"하나의 그룹"', 'group:"하나의 그룹"'), "tag:request");
   await cleanup();
 });
 

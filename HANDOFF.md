@@ -2,13 +2,13 @@
 
 ## Current state
 
-- Version: `0.3.6`.
+- Version: `0.3.7`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release target: `0.3.6`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.6`.
-- Latest runtime change: `0.3.6`; selected Side Palette items export together to Canvas with spaced placement, Outliner files expose the same context menu and show Tag/Label metadata without Caption, selected files can be wrapped in a new virtual group from the Outliner context menu, Viewport renders Collection and file-parent groups as vertical card stacks, and ordinary Palette files can contain nested files without moving Vault files.
-- Automated baseline: 47 Node tests, including the 0.3.6 hierarchy, Outliner metadata/context-menu, vertical Viewport grouping, multi-item Canvas drag payload, cycle prevention, and all previous link, metadata, Collection, editor, search, and Canvas safeguards; plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
+- Latest release target: `0.3.7`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.7`.
+- Latest runtime change: `0.3.7`; Side Palette search preserves Korean IME composition, exposes Navigator-style search syntax and live Workspace candidates with counts, displays removable facet chips, supports `group:`, `file:`, and `path:` alongside existing facets, includes Collection/file-parent names in plain searches, and provides a clear empty-result reset.
+- Automated baseline: 49 Node tests, including Korean IME-safe rendering, guided search tokens, group/file/path matching, hierarchy, Outliner metadata/context-menu, vertical Viewport grouping, multi-item Canvas drag payload, and all previous link, metadata, Collection, editor, search, and Canvas safeguards; plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
 
