@@ -1,7 +1,7 @@
 import { ItemView, Menu, WorkspaceLeaf } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { Collection, PaletteItem, SideLayoutState } from "../core/types";
-import { CardToMarkdownModal, ConfirmDeleteModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
+import { CardMarkdownExportModal, ConfirmDeleteModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
 import { LinkedSpacesModal } from "../ui/linked-spaces-modal";
@@ -346,12 +346,12 @@ export class SidePaletteView extends ItemView {
       .setIcon("pencil")
       .onClick(() => new TextPromptModal(this.app, "Rename linked item", item.displayTitle, (value) => this.plugin.renameLinkedItem(item.id, value), "Linked item name").open()));
     if (item.type === "card") menu.addItem((entry) => entry
-      .setTitle("Convert to Markdown…")
+      .setTitle("Create Markdown file…")
       .setIcon("file-output")
       .onClick(() => {
         const fileName = `${item.displayTitle.replace(/[\\/:*?"<>|]/g, " ").trim() || "Card"}.md`;
         const folder = this.app.workspace.getActiveFile()?.parent?.path ?? "";
-        new CardToMarkdownModal(this.app, fileName, folder, (name, targetFolder) => this.plugin.convertCardToMarkdown(item.id, name, targetFolder)).open();
+        new CardMarkdownExportModal(this.app, fileName, folder, (name, targetFolder) => this.plugin.createMarkdownFromCard(item.id, name, targetFolder)).open();
       }));
     if (supportsFrontBack(item)) {
       menu.addItem((entry) => entry
