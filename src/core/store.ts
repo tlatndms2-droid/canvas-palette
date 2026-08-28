@@ -306,6 +306,12 @@ export class PaletteStore {
     return locations.filter((location, index, all) => all.findIndex((candidate) => candidate.canvasPath === location.canvasPath && candidate.nodeId === location.nodeId) === index);
   }
 
+  linkedCanvasLocations(item: PaletteItem): Array<{ canvasPath: string; nodeId: string }> {
+    const locations = new Map<string, { canvasPath: string; nodeId: string }>();
+    for (const location of this.linkedCanvasNodes(item)) if (!locations.has(location.canvasPath)) locations.set(location.canvasPath, location);
+    return [...locations.values()];
+  }
+
   reconcileCanvasLinks(canvasPath: string, existingNodeIds: Set<string>): boolean {
     let changed = false;
     for (const item of this.allItems()) {

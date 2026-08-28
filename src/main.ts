@@ -16,6 +16,7 @@ import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
 import { ConfirmCanvasReplacementModal, ItemEditorModal, MetadataEditorModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
+import { FindLinkModal } from "./ui/find-link-modal";
 
 export default class CanvasPalettePlugin extends Plugin {
   private readonly canvasSyncTimers = new Map<string, number>();
@@ -271,6 +272,16 @@ export default class CanvasPalettePlugin extends Plugin {
     const canvasPath = item.origin.canvasPath;
     const nodeId = item.origin.canvasNodeId;
     if (!canvasPath || !nodeId || !(await this.canvas.revealNode(canvasPath, nodeId))) new Notice("The original Canvas item is unavailable.");
+  }
+
+  findLinkedCanvas(item: PaletteItem): void {
+    const locations = this.store.linkedCanvasLocations(item);
+    if (locations.length === 0) { new Notice("This Palette item has no linked Canvas location."); return; }
+    const reveal = async (location: { canvasPath: string; nodeId: string }): Promise<void> => {
+      if (!(await this.canvas.revealNode(location.canvasPath, location.nodeId))) new Notice("The linked Canvas location is unavailable.");
+    };
+    if (locations.length === 1) { void reveal(locations[0]); return; }
+    new FindLinkModal(this.app, item.displayTitle, locations, (location) => void reveal(location)).open();
   }
 
   private scheduleCanvasSync(file: TFile): void {

@@ -252,3 +252,17 @@ test("Palette reveal resolves the item's preferred containing Workspace", async 
   assert.equal(store.workspaceForItem("card")?.id, "older");
   await cleanup();
 });
+
+test("Find link exposes one representative node per linked Canvas", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.recordCanvasPlacement("card", "B.canvas", ["drop", "legacy-extra"]);
+
+  assert.deepEqual(store.linkedCanvasLocations(store.data.items.card), [
+    { canvasPath: "A.canvas", nodeId: "origin" },
+    { canvasPath: "B.canvas", nodeId: "drop" }
+  ]);
+  await cleanup();
+});

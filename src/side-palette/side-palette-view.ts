@@ -150,7 +150,7 @@ export class SidePaletteView extends ItemView {
     for (const item of visibleItems) {
       const facesEnabled = supportsFrontBack(item) && item.facesEnabled;
       const face = facesEnabled ? this.plugin.store.data.uiState.sideItemFaces[item.id] ?? "front" : "front";
-      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, currentFace: face, onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("side", item.id, next) : undefined, onSelect: (event) => this.selectSideItem(item.id, event), onOpen: () => face === "back" ? void this.openInlineBackEditor(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+      const card = renderItem(listEl, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, currentFace: face, onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("side", item.id, next) : undefined, onSelect: (event) => this.selectSideItem(item.id, event), onOpen: () => face === "back" ? void this.openInlineBackEditor(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => this.plugin.findLinkedCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
       const body = card.querySelector<HTMLElement>(".cp-item__body");
       if (body) {
         const compactLimit = Math.round(360 * 14 / this.plugin.store.data.settings.fontSize);
@@ -348,7 +348,9 @@ export class SidePaletteView extends ItemView {
         .onClick(() => item.facesEnabled ? this.plugin.store.disableItemFaces(item.id) : this.plugin.store.enableItemFaces(item.id)));
     }
     if (workspace) menu.addItem((entry) => entry.setTitle("Move to…").setIcon("folder-input").onClick(() => new MoveItemsModal(this.app, workspace.name, Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id), targetIds.length, (collectionId) => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collectionId)).open()));
-    menu.addItem((entry) => entry.setTitle("Open original").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
+    const linkedLocations = this.plugin.store.linkedCanvasLocations(item);
+    if (linkedLocations.length > 0) menu.addItem((entry) => entry.setTitle("Find link").setIcon("locate-fixed").onClick(() => this.plugin.findLinkedCanvas(item)));
+    else if (item.origin.filePath) menu.addItem((entry) => entry.setTitle("Open source file").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
     menu.addSeparator(); menu.addItem((entry) => entry.setTitle(`Delete${targetIds.length > 1 ? ` ${targetIds.length} items` : ""}`).setIcon("trash").onClick(() => this.confirmDelete(targetIds)));
     menu.showAtMouseEvent(event);
   }
