@@ -192,6 +192,16 @@ export class CanvasAdapter {
     });
   }
 
+  async convertLinkedCardsToMarkdown(locations: Array<{ canvasPath: string; nodeId: string }>, filePath: string): Promise<void> {
+    await this.mutateLinkedNodes(locations, (node) => {
+      if (node.type !== "text") return false;
+      node.type = "file";
+      node.file = filePath;
+      delete node.text;
+      return true;
+    });
+  }
+
   private async mutateLinkedNodes(locations: Array<{ canvasPath: string; nodeId: string }>, mutate: (node: CanvasNodeSnapshot) => boolean): Promise<void> {
     const byCanvas = new Map<string, Set<string>>();
     for (const location of locations) {

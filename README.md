@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.2.38**
+Current version: **0.2.39**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
@@ -26,7 +26,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - Three independent persisted Side Palette splitters resize Viewport/Outliner width, Upper/Lower height, and Tag/Label width without coupling the two vertical ratios.
 - Side Palette drag-and-drop resolves the stored Palette Item by ID and restores Card content, Markdown/Image file references, or complete Group subgraphs through the target Canvas runtime at the real drop position. Every dropped Card remains another linked instance of the same Palette Item: editing any linked Canvas Card or the Palette content updates all other instances.
 - Item/collection organization: collection creation, nesting, rename, Canvas drag drop, Viewport reorder, multi-selection, scalable batch Tags/Label/Caption editing, deletion, and move-to-collection actions. The metadata editor summarizes selected values, searches Tags and Labels in fixed-height dropdowns, virtualizes long result lists, and supports creating new values without expanding the modal.
-- Image and Markdown context menus rename the linked Vault source file, Palette title, and every linked Canvas file-node path together. Group renaming updates the Palette title, stored root Group label, and every linked Canvas Group node. `Create Markdown file…` copies a Card's current synchronized content into a separate new `.md` file at a user-entered Vault folder/name; the Palette Item remains a Card and every linked Canvas Card, node type, link, position, edge, and metadata record remains unchanged.
+- Image and Markdown context menus rename the linked Vault source file, Palette title, and every linked Canvas file-node path together. Group renaming updates the Palette title, stored root Group label, and every linked Canvas Group node. `Convert to shared Markdown…` creates exactly one real `.md` file in the Vault, changes the Palette Card into a Markdown Item whose source path is that file, and changes every linked Canvas text Card into a file node whose path is the same file. Both surfaces therefore render and edit one shared Markdown source while preserving Item identity, metadata, node IDs, positions, edges, and link records.
 - Type-specific Card, Markdown, Image, and Group rendering; rendered Markdown, source image preview, and subgraph preview with content-first card layouts.
 - Side Palette double-click opens the existing native editor for Card/Markdown items and a large preview for Image/Group items. Image previews support mouse-wheel zoom from 20% to 500%.
 - Mini and Side Palette use the same stored Item metadata. Their focused metadata editors support Tags, Label, and Caption without changing the title, content, original file, or Canvas node.

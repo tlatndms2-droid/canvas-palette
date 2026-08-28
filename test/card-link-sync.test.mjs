@@ -239,6 +239,30 @@ test("drag reordering inserts an item before or after the highlighted gap", asyn
   await cleanup();
 });
 
+test("Card to Markdown conversion preserves one item identity and all Canvas links", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.recordCanvasPlacement("card", "B.canvas", ["drop"]);
+  const before = store.data.items.card;
+
+  assert.equal(store.convertCardToMarkdown("card", "Notes/Card.md"), true);
+  const converted = store.data.items.card;
+  assert.equal(converted, before);
+  assert.equal(converted.type, "markdown");
+  assert.equal(converted.origin.filePath, "Notes/Card.md");
+  assert.equal(converted.content, "Body");
+  assert.deepEqual(converted.tags, ["one"]);
+  assert.equal(converted.label, "Shared");
+  assert.equal(converted.caption, "Caption");
+  assert.deepEqual(store.linkedCanvasNodes(converted), [
+    { canvasPath: "A.canvas", nodeId: "origin" },
+    { canvasPath: "B.canvas", nodeId: "drop" }
+  ]);
+  await cleanup();
+});
+
 test("Palette reveal resolves the item's preferred containing Workspace", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
