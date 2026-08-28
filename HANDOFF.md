@@ -2,12 +2,12 @@
 
 ## Current state
 
-- Version: `0.2.39`.
+- Version: `0.2.40`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.39`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.39`.
-- Latest runtime change: `0.2.39`; `Convert to shared Markdown…` creates exactly one real Vault `.md` file. The Palette Card becomes a Markdown Item and every linked Canvas text Card becomes a file node; the Palette source path and every Canvas file path are the same path, so both surfaces share the same file rather than independent copies. Linked Image/Markdown/Group rename propagation from `0.2.37` remains intact.
+- Latest release: `0.2.40`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.40`.
+- Latest runtime change: `0.2.40`; the shared Card-to-Markdown conversion from `0.2.39` is republished under a new sequential version so BRAT/Obsidian cannot retain the deleted-and-reused `0.2.39` package. `Convert to shared Markdown…` creates one Vault `.md`; the Palette Card and all linked Canvas Cards become references to that same file.
 - Automated baseline: 36 Node tests (including a single Vault-create assertion, identical Palette/Canvas shared-path routing, Card-to-Markdown type conversion, identity/metadata/link preservation, linked file-path/Group-label propagation, all-node Canvas mutation, scalable metadata picker search, virtualization, fixed-height layout, creation/summary wiring, per-Canvas Find-link grouping, exact path/Node selection, picker routing, source-file fallback, Canvas-to-Palette reveal routing, preferred Workspace resolution, filter clearing, single selection, scroll/highlight behavior, link-state indicator ownership and collision-safe layout, same-Canvas linked-card replacement and metadata preservation, focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
@@ -185,6 +185,8 @@
   - Static validation covered 35 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, separate-file creation, no-overwrite behavior, explicit absence of store conversion and Canvas node conversion, modal wording/routing, and unchanged linked-rename behavior for Image/Markdown/Group. No disposable Obsidian Sandbox vault was available, so packaged installation/reload and actual Vault file-creation UI verification were not performed; the open real Vault was not modified for testing.
 - `0.2.39` replaces the incorrect independent-copy behavior with a single-source conversion. The action creates exactly one real `.md` file; the Palette Card becomes a Markdown Item with that source path, and every linked Canvas Card becomes a file node with the exact same path. There is no second Markdown copy. Item identity, Tags, Label, Caption, content, node IDs, positions, edges, Canvas placement records, and link relationships remain intact.
   - Static validation covers 36 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, exactly one Vault file creation, identical path routing into Palette and Canvas, all-linked-node conversion, identity/metadata/link preservation, dialog wording, and linked rename behavior. No disposable Obsidian Sandbox vault was available, so packaged installation/reload and actual Vault conversion UI verification were not performed; the open real Vault was not modified for testing.
+- `0.2.40` republishes the same corrected single-source conversion under a never-before-used sequential version. This avoids BRAT/Obsidian treating the deleted-and-recreated `0.2.39` as already installed and ensures the corrected `main.js` is eligible for download. No conversion semantics changed from the final `0.2.39` source.
+  - Static validation covers the complete 36-test suite, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, manifest/package/compatibility version alignment, and public release asset verification. No disposable Obsidian Sandbox vault was available, so packaged installation/reload was not performed; the open real Vault was not modified for testing.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
