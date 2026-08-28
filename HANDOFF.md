@@ -2,12 +2,12 @@
 
 ## Current state
 
-- Version: `0.2.48`.
+- Version: `0.2.49`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.48`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.48`.
-- Latest runtime change: `0.2.48`; Palette type markers retain distinct Card, Markdown, Image, and Group colors but now show only the icon, with no redundant type text. Item/file titles wrap instead of using a single-line ellipsis, revealing the complete title. Canvas nodes and the separate link/Front-Back action area remain unchanged.
+- Latest release: `0.2.49`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.49`.
+- Latest runtime change: `0.2.49`; the Side Palette Viewport now includes an `Unlinked` filter toggle. It writes the visible `unlinked` search token, shows only Items with neither a linked origin node nor a linked placement node, and composes with the existing free-text and type filters. Empty legacy placement records do not count as links.
 - Automated baseline: 39 Node tests (including four distinct Palette type labels and colors, native Canvas replacement-node detection and link transfer, explicit absence of a Canvas Markdown badge, trailing-period filename normalization, a single Vault-create assertion, identical Palette/Canvas shared-path routing, open-runtime node recreation, Card-to-Markdown type conversion, identity/metadata/link preservation, linked file-path/Group-label propagation, all-node Canvas mutation, scalable metadata picker search, virtualization, fixed-height layout, creation/summary wiring, per-Canvas Find-link grouping, exact path/Node selection, picker routing, source-file fallback, Canvas-to-Palette reveal routing, preferred Workspace resolution, filter clearing, single selection, scroll/highlight behavior, same-Canvas linked-card replacement and metadata preservation, focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC

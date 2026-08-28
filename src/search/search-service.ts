@@ -68,6 +68,7 @@ export class SearchService {
 
   private matchesToken(item: PaletteItem, token: string): boolean {
     const lower = token.toLocaleLowerCase();
+    if (lower === "unlinked") return !(item.origin.canvasPath && item.origin.canvasNodeId) && !item.canvasPlacements.some((placement) => placement.nodeIds.length > 0);
     if (lower.startsWith("label:")) return item.label.toLocaleLowerCase() === this.unquote(token.slice(6)).toLocaleLowerCase();
     if (lower.startsWith("type:")) return item.type === lower.slice(5);
     if (lower.startsWith("space:")) {

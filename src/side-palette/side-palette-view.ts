@@ -110,6 +110,9 @@ export class SidePaletteView extends ItemView {
       const button = filters.createEl("button", { text: label, cls: active ? "is-active" : "", attr: { "aria-pressed": String(active) } });
       button.addEventListener("click", () => { this.query = this.plugin.search.setFacet(this.query, "type", active ? null : token); this.render(); });
     }
+    const unlinkedActive = this.plugin.search.hasToken(this.query, "unlinked");
+    const unlinked = filters.createEl("button", { text: "Unlinked", cls: unlinkedActive ? "is-active cp-unlinked-filter" : "cp-unlinked-filter", attr: { "aria-pressed": String(unlinkedActive), title: "Show items with no Canvas link" } });
+    unlinked.addEventListener("click", () => { this.query = this.plugin.search.toggleToken(this.query, "unlinked"); this.render(); });
     const spaces = filters.createEl("button", { text: "Linked spaces", cls: /\bspace:/i.test(this.query) ? "is-active cp-linked-spaces-button" : "cp-linked-spaces-button" });
     spaces.addEventListener("click", () => new LinkedSpacesModal(this.app, this.items(workspaceId), this.query, (token) => this.plugin.search.hasToken(this.query, token), (token) => { this.query = this.plugin.search.setFacet(this.query, "space", token); this.render(); }, (itemIds, path) => this.plugin.store.unlinkItemsFromCanvas(itemIds, path)).open());
     const options = parent.createEl("details", { cls: "cp-view-options" });

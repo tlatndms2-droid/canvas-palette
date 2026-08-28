@@ -34,6 +34,10 @@ test("Obsidian-like tag, label, AND, OR, and parentheses filter palette items", 
   assert.equal(search.matches(work, "type:card"), true);
   assert.equal(search.matches(work, 'space:"Projects/Planning.canvas"'), true);
   assert.equal(search.matches(work, 'space:"Other.canvas"'), false);
+  assert.equal(search.matches(work, "unlinked"), false);
+  const unlinked = { ...work, origin: {}, canvasPlacements: [] };
+  assert.equal(search.matches(unlinked, "unlinked"), true);
+  assert.equal(search.matches({ ...unlinked, canvasPlacements: [{ canvasPath: "A.canvas", nodeIds: [], placedAt: 1 }] }, "unlinked"), true);
   assert.equal(search.matches(work, "synthesis"), true);
 
   await cleanup();
@@ -48,6 +52,8 @@ test("index tokens are added to and removed from the visible search query", asyn
   assert.equal(search.toggleToken(withTag, "#작업"), "meeting");
   assert.equal(search.setFacet("meeting type:image", "type", "type:card"), "meeting type:card");
   assert.equal(search.setFacet('meeting space:"Archive.canvas"', "space", null), "meeting");
+  assert.equal(search.toggleToken("type:image", "unlinked"), "type:image unlinked");
+  assert.equal(search.toggleToken("type:image unlinked", "unlinked"), "type:image");
 
   await cleanup();
 });

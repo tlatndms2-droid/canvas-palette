@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.2.48**
+Current version: **0.2.49**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
@@ -21,7 +21,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - PDF-aligned docked three-pane Storage layout with independent left/right toggle and divider resize.
 - Side Palette with representative workspaces, search, Card/List Viewport, Outliner, nested collections, Tag Index, Label Index, and independent scroll regions.
 - Side Palette selection keeps the Viewport, Outliner, Tag Index, and Label Index scroll positions stable. The visible selection count and Delete action occupy a fixed status slot, so selecting cards never inserts content that pushes the asset list downward; the redundant batch metadata action is removed.
-- Side Palette selection follows Windows File Explorer conventions: plain click selects one Card, Ctrl/Cmd-click toggles individual Cards, Shift-click selects a visible range, blank-space click clears selection, and dragging from blank grid space draws a live selection rectangle. A single selection uses only the Card border; check markers appear only when two or more Cards are selected.
+- Side Palette selection follows Windows File Explorer conventions: plain click selects one Card, Ctrl/Cmd-click toggles individual Cards, Shift-click selects a visible range, blank-space click clears selection, and dragging from blank grid space draws a live selection rectangle. A single selection uses only the Card border; check markers appear only when two or more Cards are selected. The Viewport `Unlinked` toggle filters the current results to Items that have no remaining Canvas node link and composes with search and type filters.
 - Selected Card/Markdown previews constrain standard iframe/video embeds and MX-style Shadow DOM video players to the actual Viewport width as complete 16:9 media blocks. Media blocks participate in internal scroll snapping instead of remaining wider than the Card and being clipped.
 - Three independent persisted Side Palette splitters resize Viewport/Outliner width, Upper/Lower height, and Tag/Label width without coupling the two vertical ratios.
 - Side Palette drag-and-drop resolves the stored Palette Item by ID and restores Card content, Markdown/Image file references, or complete Group subgraphs through the target Canvas runtime at the real drop position. Every dropped Card remains another linked instance of the same Palette Item: editing any linked Canvas Card or the Palette content updates all other instances.
