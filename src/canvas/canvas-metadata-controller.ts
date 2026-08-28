@@ -51,10 +51,16 @@ export class CanvasMetadataController {
     this.remove(node);
     const state = metadata ?? { tags: [], label: "", labelColor: "", caption: "", backContent: "", currentFace: "front" as const, facesEnabled: false, modifiedAt: Date.now() };
     const supportsFaces = this.adapter.supportsFrontBack(node);
+    const linked = Boolean(this.plugin.store.linkedItemForNode(canvasPath, nodeId));
     const data = node.getData?.();
     const type = data?.type ?? "unknown";
     nodeEl.addClass("cp-canvas-has-metadata", `cp-canvas-has-metadata--${type}`);
+    if (linked) nodeEl.addClass("cp-canvas-linked");
     const layer = nodeEl.createDiv({ cls: `cp-canvas-metadata cp-canvas-metadata--${type}`, attr: { "aria-label": "Canvas Palette metadata" } });
+    if (linked) {
+      const linkBadge = layer.createSpan({ cls: "cp-canvas-link-badge", attr: { "aria-label": "Linked to Canvas Palette", title: "Linked to Canvas Palette" } });
+      setIcon(linkBadge, "link-2");
+    }
     if (supportsFaces && state.facesEnabled) {
       const flip = layer.createEl("button", { cls: "clickable-icon cp-canvas-face-toggle", attr: { type: "button", "aria-label": state.currentFace === "front" ? "Show back" : "Show front", title: state.currentFace === "front" ? "Show back" : "Show front" } });
       setIcon(flip, "refresh-cw");
@@ -212,7 +218,7 @@ export class CanvasMetadataController {
     if (!(nodeEl instanceof HTMLElement)) return;
     this.resizeObserver.unobserve(nodeEl);
     nodeEl.removeClass("cp-canvas-has-metadata", "cp-canvas-has-metadata--text", "cp-canvas-has-metadata--file", "cp-canvas-has-metadata--group", "cp-canvas-has-metadata--unknown");
-    nodeEl.removeClass("cp-canvas-showing-back");
+    nodeEl.removeClass("cp-canvas-showing-back", "cp-canvas-linked");
     nodeEl.querySelector(":scope > .cp-canvas-metadata")?.remove();
     nodeEl.style.removeProperty("--cp-canvas-meta-scale");
   }

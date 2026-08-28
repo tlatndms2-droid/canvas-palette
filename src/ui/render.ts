@@ -22,6 +22,11 @@ export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: bo
 export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group"; }
 
 export function renderItem(parent: HTMLElement, item: PaletteItem, options: ItemRenderOptions): HTMLElement {
+  const canvasPaths = [...new Set([
+    item.origin.canvasPath && item.origin.canvasNodeId ? item.origin.canvasPath : undefined,
+    ...item.canvasPlacements.filter((placement) => placement.nodeIds.length > 0).map((placement) => placement.canvasPath)
+  ].filter((path): path is string => Boolean(path)))];
+  const unlinked = canvasPaths.length === 0;
   const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${options.selected ? " is-selected" : ""}${options.compact ? " is-compact" : ""}` });
   card.dataset.itemId = item.id;
   card.tabIndex = 0;
@@ -31,16 +36,23 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   setIcon(icon, TYPE_ICON[item.type]);
   header.createSpan({ cls: "cp-item__title", text: item.displayTitle || "Untitled" });
   const face = options.currentFace ?? "front";
-  if (options.onToggleFace) {
-    const flip = header.createEl("button", { cls: "clickable-icon cp-face-toggle", attr: { type: "button", "aria-label": face === "front" ? "Show back" : "Show front", title: face === "front" ? "Show back" : "Show front" } });
-    setIcon(flip, "refresh-cw");
-    flip.addEventListener("pointerdown", (event) => event.stopPropagation());
-    flip.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); options.onToggleFace?.(face === "front" ? "back" : "front"); });
-    flip.addEventListener("dblclick", (event) => event.stopPropagation());
-  }
   if (item.label) {
     const label = header.createSpan({ cls: "cp-label", text: item.label });
     if (item.labelColor) label.style.setProperty("--cp-label-color", item.labelColor);
+  }
+  if (unlinked || options.onToggleFace) {
+    const actions = header.createSpan({ cls: "cp-item__header-actions" });
+    if (unlinked) {
+      const unlinkedBadge = actions.createSpan({ cls: "cp-item__link-state cp-item__link-state--unlinked", attr: { "aria-label": "Unlinked from Canvas", title: "Unlinked from Canvas" } });
+      setIcon(unlinkedBadge, "unlink");
+    }
+    if (options.onToggleFace) {
+      const flip = actions.createEl("button", { cls: "clickable-icon cp-face-toggle", attr: { type: "button", "aria-label": face === "front" ? "Show back" : "Show front", title: face === "front" ? "Show back" : "Show front" } });
+      setIcon(flip, "refresh-cw");
+      flip.addEventListener("pointerdown", (event) => event.stopPropagation());
+      flip.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); options.onToggleFace?.(face === "front" ? "back" : "front"); });
+      flip.addEventListener("dblclick", (event) => event.stopPropagation());
+    }
   }
   const body = card.createDiv({ cls: "cp-item__body" });
   body.dataset.face = face;
@@ -48,7 +60,6 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   else if (item.type === "image" && item.origin.filePath) body.createDiv({ cls: "cp-image-placeholder", text: item.origin.filePath });
   else if (item.type === "group") body.createDiv({ text: `${item.group?.nodes.length ?? 0} nodes · ${item.group?.edges.length ?? 0} edges` });
   else body.setText((item.content ?? item.origin.filePath ?? "No preview").slice(0, 240));
-  const canvasPaths = [...new Set([item.origin.canvasPath, ...item.canvasPlacements.map((placement) => placement.canvasPath)].filter((path): path is string => Boolean(path)))];
   if (canvasPaths.length > 0) {
     const links = card.createDiv({ cls: "cp-item__canvas-links", attr: { title: canvasPaths.join("\n") } });
     const linkIcon = links.createSpan(); setIcon(linkIcon, "workflow");
