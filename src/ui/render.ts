@@ -34,6 +34,10 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   const header = card.createDiv({ cls: "cp-item__header" });
   const icon = header.createSpan({ cls: "cp-item__icon" });
   setIcon(icon, TYPE_ICON[item.type]);
+  if (item.type === "markdown") {
+    icon.addClass("cp-item__type-badge", "cp-item__type-badge--markdown");
+    icon.createSpan({ cls: "cp-item__type-badge-label", text: "MD" });
+  }
   header.createSpan({ cls: "cp-item__title", text: item.displayTitle || "Untitled" });
   const face = options.currentFace ?? "front";
   if (item.label) {

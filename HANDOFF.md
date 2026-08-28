@@ -2,13 +2,13 @@
 
 ## Current state
 
-- Version: `0.2.43`.
+- Version: `0.2.44`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.43`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.43`.
-- Latest runtime change: `0.2.43`; removes the unrequested `MD` badge added in `0.2.42`. Shared Card-to-Markdown conversion, open-runtime node recreation, and trailing-period filename normalization remain unchanged.
-- Automated baseline: 37 Node tests (including explicit absence of the unrequested Markdown badge, trailing-period filename normalization, a single Vault-create assertion, identical Palette/Canvas shared-path routing, open-runtime node recreation, Card-to-Markdown type conversion, identity/metadata/link preservation, linked file-path/Group-label propagation, all-node Canvas mutation, scalable metadata picker search, virtualization, fixed-height layout, creation/summary wiring, per-Canvas Find-link grouping, exact path/Node selection, picker routing, source-file fallback, Canvas-to-Palette reveal routing, preferred Workspace resolution, filter clearing, single selection, scroll/highlight behavior, same-Canvas linked-card replacement and metadata preservation, focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
+- Latest release: `0.2.44`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.44`.
+- Latest runtime change: `0.2.44`; Palette Markdown Item headers now combine the existing file icon with a compact green `MD` label, matching the supplied reference. No Markdown type badge is rendered on Canvas nodes. Shared conversion, runtime node recreation, and filename normalization remain unchanged.
+- Automated baseline: 38 Node tests (including Palette-only Markdown icon labeling, explicit absence of a Canvas Markdown badge, trailing-period filename normalization, a single Vault-create assertion, identical Palette/Canvas shared-path routing, open-runtime node recreation, Card-to-Markdown type conversion, identity/metadata/link preservation, linked file-path/Group-label propagation, all-node Canvas mutation, scalable metadata picker search, virtualization, fixed-height layout, creation/summary wiring, per-Canvas Find-link grouping, exact path/Node selection, picker routing, source-file fallback, Canvas-to-Palette reveal routing, preferred Workspace resolution, filter clearing, single selection, scroll/highlight behavior, same-Canvas linked-card replacement and metadata preservation, focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
 
@@ -193,6 +193,8 @@
   - Static validation covers 37 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON/version alignment, badge ownership and collision-safe coordinates, filename normalization, and release assets. Real-Vault inspection was read-only; no existing file, Canvas node, or Palette record was renamed or mutated.
 - `0.2.43` removes the `MD` type badge because the user did not request an additional Canvas icon. The clickable link badge and opt-in Front/Back control retain their established isolated positions. Shared Markdown conversion and new-filename normalization from the preceding releases remain intact.
   - Static validation covers 37 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON/version alignment, explicit absence of the badge in source and CSS, and release assets. No real Vault data was changed.
+- `0.2.44` adds the requested type label to the Palette rather than Canvas. Markdown Item headers reuse their file-text icon and append `MD` inside one compact green badge; Card, Image, and Group icons are unchanged. Canvas nodes remain free of the removed `MD` overlay, so the existing link and Front/Back controls keep their established layout.
+  - Static validation covers 38 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON/version alignment, Palette-only badge wiring/CSS, explicit Canvas-badge absence, and release assets. No real Vault data was changed.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
