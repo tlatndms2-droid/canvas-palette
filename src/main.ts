@@ -1,4 +1,4 @@
-import { Editor, EventRef, Menu, Notice, Plugin, TFile } from "obsidian";
+import { Editor, EventRef, Menu, Notice, Plugin, TFile, TFolder, normalizePath } from "obsidian";
 import { CanvasAdapter } from "./canvas/canvas-adapter";
 import { mergeCanvasNodeIds } from "./core/canvas-node-presence";
 import { CanvasMetadataController } from "./canvas/canvas-metadata-controller";
@@ -259,6 +259,38 @@ export default class CanvasPalettePlugin extends Plugin {
       if (file instanceof TFile) { await this.app.workspace.getLeaf("tab").openFile(file); return; }
     }
     new Notice("The original item is unavailable.");
+  }
+
+  async convertCardToMarkdown(itemId: string, requestedName: string, requestedFolder: string): Promise<boolean> {
+    const item = this.store.data.items[itemId];
+    if (!item || item.type !== "card") { new Notice("Only Card items can be converted to Markdown."); return false; }
+    const baseName = requestedName.trim().replace(/\.md$/i, "");
+    if (!baseName || /[\\/:*?"<>|]/.test(baseName)) { new Notice("Enter a valid Markdown file name."); return false; }
+    const folder = requestedFolder.trim().replace(/^\/+|\/+$/g, "");
+    const path = normalizePath(`${folder ? `${folder}/` : ""}${baseName}.md`);
+    if (this.app.vault.getAbstractFileByPath(path)) { new Notice(`A file already exists at ${path}.`); return false; }
+    try {
+      await this.ensureVaultFolder(folder);
+      await this.app.vault.create(path, item.content ?? "");
+      if (!this.store.convertCardToMarkdown(item.id, path)) return false;
+      new Notice(`${item.displayTitle} converted to Markdown.`);
+      return true;
+    } catch (error) {
+      console.error("Canvas Palette failed to convert a Card to Markdown", error);
+      new Notice("Could not create the Markdown file.");
+      return false;
+    }
+  }
+
+  private async ensureVaultFolder(folder: string): Promise<void> {
+    if (!folder) return;
+    let current = "";
+    for (const segment of folder.split("/").filter(Boolean)) {
+      current = normalizePath(current ? `${current}/${segment}` : segment);
+      const existing = this.app.vault.getAbstractFileByPath(current);
+      if (existing && !(existing instanceof TFolder)) throw new Error(`${current} is not a folder`);
+      if (!existing) await this.app.vault.createFolder(current);
+    }
   }
 
   async syncPaletteItemToCanvas(item: PaletteItem): Promise<void> {

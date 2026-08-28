@@ -226,10 +226,8 @@ export class CanvasAdapter {
       } else if (item.type === "group" && node.type === "group") {
         const nodes = this.expandGroupNodes(document.nodes, [node.id]);
         const group = serializeGroup(nodes, document.edges);
-        const displayTitle = (node.label ?? nodes.find((candidate) => candidate.text)?.text?.split(/\r?\n/, 1)[0] ?? "Canvas group").slice(0, 80);
-        if (JSON.stringify(item.group) !== JSON.stringify(group) || item.displayTitle !== displayTitle) {
+        if (JSON.stringify(item.group) !== JSON.stringify(group)) {
           item.group = group;
-          item.displayTitle = displayTitle;
           item.modifiedAt = Date.now();
           changed++;
         }

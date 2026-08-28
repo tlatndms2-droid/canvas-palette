@@ -288,6 +288,31 @@ export class TagLabelModal extends Modal {
   }
 }
 
+export class CardToMarkdownModal extends Modal {
+  constructor(app: App, private readonly initialName: string, private readonly initialFolder: string, private readonly onConvert: (fileName: string, folder: string) => Promise<boolean>) { super(app); }
+
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-card-to-markdown-modal");
+    this.contentEl.createEl("h2", { text: "Convert Card to Markdown" });
+    this.contentEl.createEl("p", { text: "Create a new Markdown file from this Card. Existing Canvas Card nodes will remain unchanged." });
+    this.contentEl.createEl("label", { text: "File name" });
+    const fileName = this.contentEl.createEl("input", { value: this.initialName, attr: { placeholder: "Card title.md" } });
+    this.contentEl.createEl("label", { text: "Folder" });
+    const folder = this.contentEl.createEl("input", { value: this.initialFolder, attr: { placeholder: "Vault root" } });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
+    const convert = actions.createEl("button", { text: "Convert", cls: "mod-cta" });
+    convert.addEventListener("click", async () => {
+      convert.disabled = true;
+      try { if (await this.onConvert(fileName.value, folder.value)) this.close(); }
+      finally { convert.disabled = false; }
+    });
+    window.requestAnimationFrame(() => { fileName.focus(); fileName.select(); });
+  }
+
+  onClose(): void { this.contentEl.empty(); }
+}
+
 export class MoveItemsModal extends Modal {
   private query = "";
 

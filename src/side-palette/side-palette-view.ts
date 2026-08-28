@@ -1,7 +1,7 @@
 import { ItemView, Menu, WorkspaceLeaf } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { Collection, PaletteItem, SideLayoutState } from "../core/types";
-import { ConfirmDeleteModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
+import { CardToMarkdownModal, ConfirmDeleteModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
 import { LinkedSpacesModal } from "../ui/linked-spaces-modal";
@@ -341,6 +341,18 @@ export class SidePaletteView extends ItemView {
     const selected = this.sideSelectedIds(); const targetIds = selected.includes(item.id) ? selected : [item.id];
     if (!selected.includes(item.id)) this.selectSideItem(item.id);
     menu.addItem((entry) => entry.setTitle("Edit tags, label & caption").setIcon("tags").onClick(() => new TagLabelModal(this.app, this.plugin, targetIds).open()));
+    if (item.type === "image" || item.type === "markdown" || item.type === "group") menu.addItem((entry) => entry
+      .setTitle("Rename palette title")
+      .setIcon("pencil")
+      .onClick(() => new TextPromptModal(this.app, "Rename palette title", item.displayTitle, (value) => this.plugin.store.updateItem(item.id, { displayTitle: value, tags: item.tags, label: item.label, labelColor: item.labelColor, caption: item.caption }), "Palette title").open()));
+    if (item.type === "card") menu.addItem((entry) => entry
+      .setTitle("Convert to Markdown…")
+      .setIcon("file-output")
+      .onClick(() => {
+        const fileName = `${item.displayTitle.replace(/[\\/:*?"<>|]/g, " ").trim() || "Card"}.md`;
+        const folder = this.app.workspace.getActiveFile()?.parent?.path ?? "";
+        new CardToMarkdownModal(this.app, fileName, folder, (name, targetFolder) => this.plugin.convertCardToMarkdown(item.id, name, targetFolder)).open();
+      }));
     if (supportsFrontBack(item)) {
       menu.addItem((entry) => entry
         .setTitle(item.facesEnabled ? "Remove Front / Back" : "Enable Front / Back")

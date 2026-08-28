@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.2.35**
+Current version: **0.2.36**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
@@ -26,6 +26,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - Three independent persisted Side Palette splitters resize Viewport/Outliner width, Upper/Lower height, and Tag/Label width without coupling the two vertical ratios.
 - Side Palette drag-and-drop resolves the stored Palette Item by ID and restores Card content, Markdown/Image file references, or complete Group subgraphs through the target Canvas runtime at the real drop position. Every dropped Card remains another linked instance of the same Palette Item: editing any linked Canvas Card or the Palette content updates all other instances.
 - Item/collection organization: collection creation, nesting, rename, Canvas drag drop, Viewport reorder, multi-selection, scalable batch Tags/Label/Caption editing, deletion, and move-to-collection actions. The metadata editor summarizes selected values, searches Tags and Labels in fixed-height dropdowns, virtualizes long result lists, and supports creating new values without expanding the modal.
+- Image, Markdown, and Group context menus can rename only the Palette display title without renaming the source Vault file or rewriting Group data. Card context menus can create a new `.md` file at a user-entered Vault folder/name and convert the same Palette Item to a Markdown reference while preserving its Tags, Label, Caption, linked Canvas history, and existing Canvas Card nodes.
 - Type-specific Card, Markdown, Image, and Group rendering; rendered Markdown, source image preview, and subgraph preview with content-first card layouts.
 - Side Palette double-click opens the existing native editor for Card/Markdown items and a large preview for Image/Group items. Image previews support mouse-wheel zoom from 20% to 500%.
 - Mini and Side Palette use the same stored Item metadata. Their focused metadata editors support Tags, Label, and Caption without changing the title, content, original file, or Canvas node.

@@ -6,8 +6,14 @@ test("Side item menu uses focused metadata, move, and Find link actions", async 
   const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
   const modal = await readFile(new URL("../src/ui/modal.ts", import.meta.url), "utf8");
+  const canvas = await readFile(new URL("../src/canvas/canvas-adapter.ts", import.meta.url), "utf8");
 
   assert.match(source, /setTitle\("Edit tags, label & caption"\)/);
+  assert.match(source, /setTitle\("Rename palette title"\)/);
+  assert.match(source, /item\.type === "image" \|\| item\.type === "markdown" \|\| item\.type === "group"/);
+  assert.match(source, /setTitle\("Convert to Markdown…"\)/);
+  assert.match(source, /new CardToMarkdownModal/);
+  assert.doesNotMatch(canvas, /else if \(item\.type === "group"[\s\S]{0,600}item\.displayTitle/);
   assert.match(source, /setTitle\("Move to…"\)/);
   assert.doesNotMatch(source, /setTitle\(`Move to \$\{collection\.name\}`\)/);
   assert.doesNotMatch(source, /setTitle\("Locate on Canvas"\)/);
