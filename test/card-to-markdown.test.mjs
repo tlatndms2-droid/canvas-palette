@@ -8,6 +8,7 @@ const canvas = await readFile(new URL("../src/canvas/canvas-adapter.ts", import.
 
 test("Card conversion creates exactly one Vault Markdown path shared by Palette and Canvas", () => {
   assert.match(main, /async convertCardToMarkdown\(itemId: string, requestedName: string, requestedFolder: string\)/);
+  assert.match(main, /replace\(\/\[\.\\s\]\+\$\/g, ""\)/);
   assert.match(main, /if \(this\.app\.vault\.getAbstractFileByPath\(path\)\)/);
   assert.match(main, /await this\.ensureVaultFolder\(folder\)/);
   assert.match(main, /await this\.app\.vault\.create\(path, item\.content \?\? ""\)/);

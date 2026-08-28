@@ -264,7 +264,7 @@ export default class CanvasPalettePlugin extends Plugin {
   async convertCardToMarkdown(itemId: string, requestedName: string, requestedFolder: string): Promise<boolean> {
     const item = this.store.data.items[itemId];
     if (!item || item.type !== "card") { new Notice("Only Card items can be converted to Markdown."); return false; }
-    const baseName = requestedName.trim().replace(/\.md$/i, "");
+    const baseName = requestedName.trim().replace(/\.md$/i, "").replace(/[.\s]+$/g, "");
     if (!baseName || /[\\/:*?"<>|]/.test(baseName)) { new Notice("Enter a valid Markdown file name."); return false; }
     const folder = requestedFolder.trim().replace(/^\/+|\/+$/g, "");
     const path = normalizePath(`${folder ? `${folder}/` : ""}${baseName}.md`);

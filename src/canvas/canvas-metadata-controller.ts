@@ -54,6 +54,7 @@ export class CanvasMetadataController {
     const linked = Boolean(this.plugin.store.linkedItemForNode(canvasPath, nodeId));
     const data = node.getData?.();
     const type = data?.type ?? "unknown";
+    const isMarkdownFile = type === "file" && typeof data?.file === "string" && /\.md$/i.test(data.file);
     nodeEl.addClass("cp-canvas-has-metadata", `cp-canvas-has-metadata--${type}`);
     if (linked) nodeEl.addClass("cp-canvas-linked");
     const layer = nodeEl.createDiv({ cls: `cp-canvas-metadata cp-canvas-metadata--${type}`, attr: { "aria-label": "Canvas Palette metadata" } });
@@ -64,6 +65,7 @@ export class CanvasMetadataController {
       linkBadge.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); void this.plugin.revealPaletteItemForCanvasNode(canvasPath, nodeId); });
       linkBadge.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); });
     }
+    if (isMarkdownFile) layer.createSpan({ cls: "cp-canvas-markdown-badge", text: "MD", attr: { "aria-label": "Markdown file node", title: "Markdown file node" } });
     if (supportsFaces && state.facesEnabled) {
       const flip = layer.createEl("button", { cls: "clickable-icon cp-canvas-face-toggle", attr: { type: "button", "aria-label": state.currentFace === "front" ? "Show back" : "Show front", title: state.currentFace === "front" ? "Show back" : "Show front" } });
       setIcon(flip, "refresh-cw");

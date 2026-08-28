@@ -25,3 +25,12 @@ test("unlinked Palette state occupies a header slot separate from Front Back and
   assert.match(styles, /\.cp-item__selection\{[^}]*position:absolute/);
   assert.match(styles, /\.cp-canvas-face-toggle\{[^}]*right:calc\(7px \* var\(--cp-canvas-meta-scale,1\)\)/);
 });
+
+test("Markdown Canvas nodes show an MD badge between link and Front Back controls", () => {
+  assert.match(canvasController, /const isMarkdownFile = type === "file" && typeof data\?\.file === "string" && \/\\\.md\$\/i\.test\(data\.file\)/);
+  assert.match(canvasController, /cp-canvas-markdown-badge/);
+  assert.match(canvasController, /text: "MD"/);
+  assert.match(styles, /\.cp-canvas-markdown-badge\{[^}]*left:calc\(34px \* var\(--cp-canvas-meta-scale,1\)\)/);
+  assert.match(styles, /\.cp-canvas-link-badge\{left:calc\(7px \* var\(--cp-canvas-meta-scale,1\)\)/);
+  assert.match(styles, /\.cp-canvas-face-toggle\{right:calc\(7px \* var\(--cp-canvas-meta-scale,1\)\)/);
+});
