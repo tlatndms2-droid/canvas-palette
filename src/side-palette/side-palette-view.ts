@@ -26,6 +26,21 @@ export class SidePaletteView extends ItemView {
   async onOpen(): Promise<void> { this.unsubscribe = this.plugin.store.subscribe(() => this.render()); this.render(); }
   async onClose(): Promise<void> { this.unsubscribe?.(); await this.activeBackEditor?.close(true); }
 
+  revealItem(itemId: string): void {
+    this.query = "";
+    this.selectionAnchorId = itemId;
+    this.plugin.store.data.uiState.sideSelectedItemIds = [itemId];
+    this.plugin.store.data.uiState.selectedItemId = itemId;
+    this.plugin.store.changed();
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      const card = this.contentEl.querySelector<HTMLElement>(`.cp-item[data-item-id="${CSS.escape(itemId)}"]`);
+      if (!card) return;
+      card.scrollIntoView({ block: "center", inline: "nearest" });
+      card.addClass("is-link-revealed");
+      window.setTimeout(() => card.removeClass("is-link-revealed"), 1600);
+    }));
+  }
+
   private render(): void {
     if (this.activeBackEditor) return;
     const root = this.contentEl;

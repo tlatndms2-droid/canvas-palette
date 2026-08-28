@@ -2,13 +2,13 @@
 
 ## Current state
 
-- Version: `0.2.29`.
+- Version: `0.2.30`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.29`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.29`.
-- Latest runtime change: `0.2.29`; every linked Canvas node shows a non-interactive upper-left link badge, and a Palette card with no remaining Canvas-node link shows an Unlinked icon in a dedicated header action slot. Canvas link and Front/Back controls occupy opposite corners; Palette Unlinked, Front/Back, and the reserved selection marker use separate layout slots.
-- Automated baseline: 23 Node tests (including link-state indicator ownership and collision-safe layout, same-Canvas linked-card replacement and metadata preservation, focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
+- Latest release: `0.2.30`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.30`.
+- Latest runtime change: `0.2.30`; clicking a linked Canvas node's upper-left badge opens or reuses Side Palette, switches to the Item's containing Workspace, clears filters, selects the one matching Item, scrolls it into view, and briefly highlights it. The button isolates pointer/click/double-click events from Canvas selection and dragging and remains opposite the Front/Back control.
+- Automated baseline: 26 Node tests (including Canvas-to-Palette reveal routing, preferred Workspace resolution, filter clearing, single selection, scroll/highlight behavior, link-state indicator ownership and collision-safe layout, same-Canvas linked-card replacement and metadata preservation, focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
 
@@ -165,6 +165,8 @@
 - `0.2.28` prevents silent duplicate linked placements on the same Canvas. A repeated Side or Mini Palette drop shows a confirmation dialog with `취소` and `새 위치에 배치`. Confirming removes the existing linked placement and attached edges, restores the item at the new drop point, and retains Front, Back, Tags, Label, Caption, and shared Palette identity; cancelling changes nothing.
 - `0.2.29` makes Palette–Canvas link state visible without changing synchronization semantics. Every linked Canvas node receives a pointer-transparent link badge at the upper-left; unlinking removes it on the next store refresh. A Side or Mini Palette card with no remaining Canvas-node relationship shows an Unlinked icon in a dedicated header action slot, and dropping it back onto a Canvas removes that state automatically. Canvas link and Front/Back controls use opposite corners, while Palette Unlinked and Front/Back controls flow together before the separately reserved selection marker so the indicators do not overlap.
   - Static validation covered 23 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, and CSS/DOM invariants for the two status indicators. No disposable `Obsidian Sandbox` vault was found on this PC, so packaged installation/reload and visual runtime verification were not performed; the open `secondbrain` Vault was not modified for testing.
+- `0.2.30` turns the linked Canvas badge into the direct navigation requested by the user. Clicking it resolves the exact linked Palette Item and its actual containing Workspace, opens or reuses Side Palette, clears the visible query and type/space filters, selects only that card, scrolls it to the center of the Viewport, and applies a short Accent highlight. Pointer, click, and double-click events stop at the badge so Canvas selection, movement, drag, and the upper-right Front/Back button remain independent. Unlink still removes the badge and therefore removes the navigation entry point.
+  - Static validation covered 26 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, preferred/fallback Workspace resolution, navigation wiring, filter clearing, selection, scroll/highlight behavior, and event-isolation/CSS invariants. No disposable `Obsidian Sandbox` vault was available, so packaged installation/reload and visual runtime verification were not performed; the open real Vault was not modified for testing.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 

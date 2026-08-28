@@ -238,3 +238,17 @@ test("drag reordering inserts an item before or after the highlighted gap", asyn
   assert.deepEqual(store.data.workspaces.workspace.looseItemIds, ["card", "second", "third"]);
   await cleanup();
 });
+
+test("Palette reveal resolves the item's preferred containing Workspace", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.data.workspaces.older = { ...store.data.workspaces.workspace, id: "older", name: "Older", looseItemIds: ["card"] };
+  store.data.items.card.origin.workspaceId = "workspace";
+
+  assert.equal(store.workspaceForItem("card")?.id, "workspace");
+  store.data.workspaces.workspace.looseItemIds = [];
+  assert.equal(store.workspaceForItem("card")?.id, "older");
+  await cleanup();
+});

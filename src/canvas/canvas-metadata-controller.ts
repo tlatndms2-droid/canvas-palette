@@ -58,8 +58,11 @@ export class CanvasMetadataController {
     if (linked) nodeEl.addClass("cp-canvas-linked");
     const layer = nodeEl.createDiv({ cls: `cp-canvas-metadata cp-canvas-metadata--${type}`, attr: { "aria-label": "Canvas Palette metadata" } });
     if (linked) {
-      const linkBadge = layer.createSpan({ cls: "cp-canvas-link-badge", attr: { "aria-label": "Linked to Canvas Palette", title: "Linked to Canvas Palette" } });
+      const linkBadge = layer.createEl("button", { cls: "clickable-icon cp-canvas-link-badge", attr: { type: "button", "aria-label": "Show linked item in Side Palette", title: "Show linked item in Side Palette" } });
       setIcon(linkBadge, "link-2");
+      linkBadge.addEventListener("pointerdown", (event) => event.stopPropagation());
+      linkBadge.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); void this.plugin.revealPaletteItemForCanvasNode(canvasPath, nodeId); });
+      linkBadge.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); });
     }
     if (supportsFaces && state.facesEnabled) {
       const flip = layer.createEl("button", { cls: "clickable-icon cp-canvas-face-toggle", attr: { type: "button", "aria-label": state.currentFace === "front" ? "Show back" : "Show front", title: state.currentFace === "front" ? "Show back" : "Show front" } });

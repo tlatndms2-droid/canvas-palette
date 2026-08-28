@@ -6,11 +6,13 @@ const canvasController = await readFile(new URL("../src/canvas/canvas-metadata-c
 const itemRenderer = await readFile(new URL("../src/ui/render.ts", import.meta.url), "utf8");
 const styles = await readFile(new URL("../styles.css", import.meta.url), "utf8");
 
-test("linked Canvas nodes render a non-interactive top-left link badge", () => {
+test("linked Canvas nodes render an isolated clickable top-left link badge", () => {
   assert.match(canvasController, /linkedItemForNode\(canvasPath, nodeId\)/);
   assert.match(canvasController, /cp-canvas-link-badge/);
   assert.match(canvasController, /setIcon\(linkBadge, "link-2"\)/);
-  assert.match(styles, /\.cp-canvas-link-badge\{[^}]*left:calc\(7px \* var\(--cp-canvas-meta-scale,1\)\)[^}]*pointer-events:none/);
+  assert.match(canvasController, /revealPaletteItemForCanvasNode\(canvasPath, nodeId\)/);
+  assert.match(canvasController, /linkBadge\.addEventListener\("pointerdown", \(event\) => event\.stopPropagation\(\)\)/);
+  assert.match(styles, /\.cp-canvas-link-badge\{pointer-events:auto!important;cursor:pointer\}/);
 });
 
 test("unlinked Palette state occupies a header slot separate from Front Back and selection", () => {

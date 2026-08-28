@@ -432,6 +432,17 @@ export class PaletteStore {
     return [...ids].map((id) => this.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
   }
 
+  workspaceForItem(itemId: string): PaletteWorkspace | undefined {
+    const contains = (workspace: PaletteWorkspace): boolean => {
+      if (workspace.looseItemIds.includes(itemId)) return true;
+      return Object.values(this.data.collections).some((collection) => collection.workspaceId === workspace.id && collection.itemIds.includes(itemId));
+    };
+    const preferredId = this.data.items[itemId]?.origin.workspaceId;
+    const preferred = preferredId ? this.data.workspaces[preferredId] : undefined;
+    if (preferred && contains(preferred)) return preferred;
+    return Object.values(this.data.workspaces).find(contains);
+  }
+
   allItems(): PaletteItem[] { return Object.values(this.data.items); }
 
   private wouldCreateCycle(id: string, parentId: string | null): boolean {

@@ -1,4 +1,4 @@
-import { Editor, EventRef, Menu, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import { Editor, EventRef, Menu, Notice, Plugin, TFile } from "obsidian";
 import { CanvasAdapter } from "./canvas/canvas-adapter";
 import { mergeCanvasNodeIds } from "./core/canvas-node-presence";
 import { CanvasMetadataController } from "./canvas/canvas-metadata-controller";
@@ -112,6 +112,20 @@ export default class CanvasPalettePlugin extends Plugin {
   }
 
   selectItem(id: string): void { this.store.data.uiState.selectedItemId = id; this.store.changed(); }
+
+  async revealPaletteItemForCanvasNode(canvasPath: string, nodeId: string): Promise<void> {
+    const item = this.store.linkedItemForNode(canvasPath, nodeId);
+    if (!item) { new Notice("This Canvas node is no longer linked to a Palette item."); return; }
+    const workspace = this.store.workspaceForItem(item.id);
+    if (!workspace) { new Notice("The linked Palette item is not stored in a Workspace."); return; }
+    if (this.store.data.uiState.activeWorkspaceId !== workspace.id) {
+      this.store.data.uiState.activeWorkspaceId = workspace.id;
+      this.store.changed();
+    }
+    const view = await this.activateSidePalette();
+    if (!view) { new Notice("Unable to open Side Palette."); return; }
+    view.revealItem(item.id);
+  }
 
   async openItemEditor(itemId: string): Promise<void> {
     if (await this.editorManager.openItem(itemId)) return;
@@ -305,13 +319,12 @@ export default class CanvasPalettePlugin extends Plugin {
     if (workspace && workspace.id !== this.store.data.uiState.activeWorkspaceId) { this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed(); }
   }
 
-  private async activateSidePalette(): Promise<void> {
-    await this.activateView(SIDE_PALETTE_VIEW, this.app.workspace.getRightLeaf(false));
-  }
-
-  private async activateView(type: string, leaf: WorkspaceLeaf | null): Promise<void> {
-    if (!leaf) return;
-    await leaf.setViewState({ type, active: true });
+  private async activateSidePalette(): Promise<SidePaletteView | null> {
+    const existing = this.app.workspace.getLeavesOfType(SIDE_PALETTE_VIEW)[0];
+    const leaf = existing ?? this.app.workspace.getRightLeaf(false);
+    if (!leaf) return null;
+    if (!existing) await leaf.setViewState({ type: SIDE_PALETTE_VIEW, active: true });
     this.app.workspace.revealLeaf(leaf);
+    return leaf.view instanceof SidePaletteView ? leaf.view : null;
   }
 }
