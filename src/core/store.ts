@@ -94,17 +94,6 @@ export class PaletteStore {
     void this.plugin.syncPaletteItemToCanvas(item);
   }
 
-  convertCardToMarkdown(id: string, filePath: string): boolean {
-    const item = this.data.items[id];
-    if (!item || item.type !== "card") return false;
-    item.type = "markdown";
-    item.origin.filePath = filePath;
-    delete item.origin.textRange;
-    item.modifiedAt = Date.now();
-    this.changed();
-    return true;
-  }
-
   setItemBack(id: string, backContent: string): void {
     const item = this.data.items[id];
     if (!item || item.backContent === backContent) return;
