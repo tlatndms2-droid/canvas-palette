@@ -37,3 +37,35 @@ test("Collection deletion preserves items and promotes nested Collections", asyn
   assert.doesNotMatch(removeCollection, /delete this\.data\.items/);
   assert.match(modal, /No Palette items, Vault files, or Canvas nodes will be deleted/);
 });
+
+test("Outliner files support metadata, context menus, child files, and grouping selected items", async () => {
+  const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
+  const store = await readFile(new URL("../src/core/store.ts", import.meta.url), "utf8");
+  const defaults = await readFile(new URL("../src/core/defaults.ts", import.meta.url), "utf8");
+  assert.match(source, /row\.addEventListener\("contextmenu", \(event\) => this\.itemMenu\(event, item\)\)/);
+  assert.match(source, /cp-outline-item__metadata/);
+  assert.match(source, /setTitle\("Group selected items…"\)/);
+  assert.match(source, /zone === "inside"[\s\S]*targetId/);
+  assert.match(store, /parentItemId: string \| null = null/);
+  assert.match(store, /this\.isItemDescendant\(parentItemId, id\)/);
+  assert.match(defaults, /schemaVersion: 13/);
+});
+
+test("Viewport renders Collection and file-parent groups as vertical card stacks", async () => {
+  const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(source, /cp-viewport-group__header/);
+  assert.match(source, /cp-viewport-group__body/);
+  assert.match(source, /focusedCollectionId = collectionId/);
+  assert.match(styles, /\.cp-viewport-group__body\{display:flex;flex-direction:column/);
+});
+
+test("multi-item Canvas drag payload restores every selected item", async () => {
+  const render = await readFile(new URL("../src/ui/render.ts", import.meta.url), "utf8");
+  const drop = await readFile(new URL("../src/canvas/palette-drop-controller.ts", import.meta.url), "utf8");
+  const canvas = await readFile(new URL("../src/canvas/canvas-adapter.ts", import.meta.url), "utf8");
+  assert.match(render, /application\/x-canvas-palette-items/);
+  assert.match(drop, /restoreItemsFromDrop\(items, event\)/);
+  assert.match(canvas, /async restoreItemsFromDrop\(items: PaletteItem\[\], event: DragEvent\)/);
+  assert.match(canvas, /index % columns/);
+});

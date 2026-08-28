@@ -367,6 +367,21 @@ export class CanvasAdapter {
     return this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, item, point));
   }
 
+  async restoreItemsFromDrop(items: PaletteItem[], event: DragEvent): Promise<boolean> {
+    const context = this.contextForTarget(event.target);
+    if (!context || items.length === 0) return false;
+    const point = context.runtime.posFromEvt?.(event);
+    if (!point) { new Notice("Unable to calculate the Canvas drop position."); return false; }
+    let restored = 0;
+    for (let index = 0; index < items.length; index++) {
+      const columns = Math.max(1, Math.ceil(Math.sqrt(items.length)));
+      const position = { x: point.x + (index % columns) * 320, y: point.y + Math.floor(index / columns) * 220 };
+      if (await this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, items[index], position))) restored++;
+    }
+    if (items.length > 1) new Notice(`${restored} of ${items.length} items added to Canvas.`);
+    return restored > 0;
+  }
+
   async exportCollection(name: string, nodes: Array<{ id: string; name: string; depth: number; item?: PaletteItem }>): Promise<TFile | null> {
     if (nodes.length === 0) { new Notice("The collection is empty."); return null; }
     const context = this.activeContext();

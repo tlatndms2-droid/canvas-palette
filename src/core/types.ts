@@ -53,6 +53,8 @@ export interface PaletteItem {
   backContent: string;
   facesEnabled: boolean;
   group?: GroupSnapshot;
+  parentItemId?: string | null;
+  childItemIds?: string[];
 }
 
 export interface Collection { id: string; workspaceId: string; parentId: string | null; name: string; childCollectionIds: string[]; itemIds: string[]; }
@@ -62,6 +64,7 @@ export interface SideLayoutState {
   selectedCollectionId: string | null;
   focusedCollectionId: string | null;
   collapsedCollectionIds: string[];
+  collapsedItemIds: string[];
   outlinerItemHeight: number;
   outlinerFontSize: number;
   outlinerIncludeDescendants: boolean;

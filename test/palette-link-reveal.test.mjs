@@ -14,7 +14,7 @@ test("Canvas link reveal resolves the linked item and its actual Workspace", () 
   assert.match(main, /view\.revealItem\(item\.id\)/);
   assert.match(store, /workspaceForItem\(itemId: string\)/);
   assert.match(store, /workspace\.looseItemIds\.includes\(itemId\)/);
-  assert.match(store, /collection\.workspaceId === workspace\.id && collection\.itemIds\.includes\(itemId\)/);
+  assert.match(store, /this\.itemsForWorkspace\(workspace\.id\)\.some\(\(item\) => item\.id === itemId\)/);
 });
 
 test("Side Palette reveal clears filters, selects, scrolls, and highlights one card", () => {

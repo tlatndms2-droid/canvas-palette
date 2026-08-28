@@ -63,6 +63,8 @@ export class PaletteStore {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace) return;
     item.origin.workspaceId = workspaceId;
+    item.parentItemId ??= null;
+    item.childItemIds ??= [];
     this.data.items[item.id] = item;
     if (!workspace.looseItemIds.includes(item.id)) workspace.looseItemIds.push(item.id);
     if (item.origin.canvasPath && !workspace.canvasPaths.includes(item.origin.canvasPath)) workspace.canvasPaths.push(item.origin.canvasPath);
@@ -77,6 +79,8 @@ export class PaletteStore {
       const item = this.data.items[id];
       if (!item) continue;
       item.origin.workspaceId = workspaceId;
+      item.parentItemId ??= null;
+      item.childItemIds ??= [];
       if (item.origin.canvasPath && !workspace.canvasPaths.includes(item.origin.canvasPath)) workspace.canvasPaths.push(item.origin.canvasPath);
       if (item.origin.canvasPath && !workspace.representativeCanvasPath) workspace.representativeCanvasPath = item.origin.canvasPath;
       if (!workspace.looseItemIds.includes(id)) workspace.looseItemIds.push(id);
@@ -242,7 +246,7 @@ export class PaletteStore {
   reorderItems(workspaceId: string, sourceId: string, targetId: string, insertAfter = false): void {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace || sourceId === targetId) return;
-    const containers = [workspace.looseItemIds, ...Object.values(this.data.collections).filter((collection) => collection.workspaceId === workspaceId).map((collection) => collection.itemIds)];
+    const containers = this.itemContainers(workspaceId);
     const target = containers.find((ids) => ids.includes(targetId));
     if (!target || !containers.some((ids) => ids.includes(sourceId))) return;
     for (const ids of containers) { const index = ids.indexOf(sourceId); if (index >= 0) ids.splice(index, 1); }
@@ -251,31 +255,26 @@ export class PaletteStore {
     this.changed();
   }
 
-  moveItems(workspaceId: string, itemIds: string[], collectionId: string | null, targetId: string | null = null, insertAfter = false): void {
+  moveItems(workspaceId: string, itemIds: string[], collectionId: string | null, targetId: string | null = null, insertAfter = false, parentItemId: string | null = null): void {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace) return;
-    const valid = [...new Set(itemIds)].filter((id) => this.data.items[id]);
-    const containers = [workspace.looseItemIds, ...Object.values(this.data.collections).filter((entry) => entry.workspaceId === workspaceId).map((entry) => entry.itemIds)];
+    const requested = [...new Set(itemIds)].filter((id) => this.data.items[id]);
+    const valid = requested.filter((id) => !requested.some((candidate) => candidate !== id && this.isItemDescendant(id, candidate)));
+    if (parentItemId && (valid.includes(parentItemId) || valid.some((id) => this.isItemDescendant(parentItemId, id)))) return;
+    const containers = this.itemContainers(workspaceId);
     if (!valid.some((id) => containers.some((ids) => ids.includes(id)))) return;
     for (const ids of containers) for (const id of valid) { const index = ids.indexOf(id); if (index >= 0) ids.splice(index, 1); }
+    for (const id of valid) this.data.items[id].parentItemId = parentItemId;
     const collection = collectionId ? this.data.collections[collectionId] : null;
-    const target = collection?.workspaceId === workspaceId ? collection.itemIds : workspace.looseItemIds;
+    const parentItem = parentItemId ? this.data.items[parentItemId] : null;
+    const target = parentItem ? (parentItem.childItemIds ??= []) : collection?.workspaceId === workspaceId ? collection.itemIds : workspace.looseItemIds;
     const targetIndex = targetId ? target.indexOf(targetId) : -1;
     target.splice(targetIndex >= 0 ? targetIndex + (insertAfter ? 1 : 0) : target.length, 0, ...valid);
     this.changed();
   }
 
   assignItemsToCollection(workspaceId: string, itemIds: string[], collectionId: string | null): void {
-    const workspace = this.data.workspaces[workspaceId];
-    if (!workspace) return;
-    for (const collection of Object.values(this.data.collections)) {
-      if (collection.workspaceId === workspaceId) collection.itemIds = collection.itemIds.filter((id) => !itemIds.includes(id));
-    }
-    workspace.looseItemIds = workspace.looseItemIds.filter((id) => !itemIds.includes(id));
-    const target = collectionId ? this.data.collections[collectionId] : undefined;
-    if (target) target.itemIds.push(...itemIds.filter((id) => !target.itemIds.includes(id)));
-    else workspace.looseItemIds.push(...itemIds.filter((id) => !workspace.looseItemIds.includes(id)));
-    this.changed();
+    this.moveItems(workspaceId, itemIds, collectionId);
   }
 
   renameCollection(id: string, name: string): void {
@@ -483,13 +482,15 @@ export class PaletteStore {
     if (!workspace) return [];
     const ids = new Set(workspace.looseItemIds);
     if (includeCollections) for (const collection of Object.values(this.data.collections)) if (collection.workspaceId === workspaceId) for (const id of collection.itemIds) ids.add(id);
+    const addChildren = (id: string): void => { const item = this.data.items[id]; if (!item) return; for (const childId of item.childItemIds ?? []) { ids.add(childId); addChildren(childId); } };
+    for (const id of [...ids]) addChildren(id);
     return [...ids].map((id) => this.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
   }
 
   workspaceForItem(itemId: string): PaletteWorkspace | undefined {
     const contains = (workspace: PaletteWorkspace): boolean => {
       if (workspace.looseItemIds.includes(itemId)) return true;
-      return Object.values(this.data.collections).some((collection) => collection.workspaceId === workspace.id && collection.itemIds.includes(itemId));
+      return this.itemsForWorkspace(workspace.id).some((item) => item.id === itemId);
     };
     const preferredId = this.data.items[itemId]?.origin.workspaceId;
     const preferred = preferredId ? this.data.workspaces[preferredId] : undefined;
@@ -509,14 +510,38 @@ export class PaletteStore {
   }
 
   removeItems(itemIds: string[]): void {
+    const removed = new Set(itemIds);
+    for (const id of itemIds) {
+      const item = this.data.items[id];
+      if (!item) continue;
+      const destination = item.parentItemId ? this.data.items[item.parentItemId]?.childItemIds : undefined;
+      const workspace = this.workspaceForItem(id);
+      const collection = workspace ? Object.values(this.data.collections).find((entry) => entry.workspaceId === workspace.id && entry.itemIds.includes(id)) : undefined;
+      const fallback = destination ?? collection?.itemIds ?? workspace?.looseItemIds;
+      if (fallback) fallback.push(...(item.childItemIds ?? []).filter((childId) => !removed.has(childId) && !fallback.includes(childId)));
+      for (const childId of item.childItemIds ?? []) if (!removed.has(childId) && this.data.items[childId]) this.data.items[childId].parentItemId = item.parentItemId ?? null;
+    }
     for (const id of itemIds) delete this.data.items[id];
     this.data.pendingItemIds = this.data.pendingItemIds.filter((id) => !itemIds.includes(id));
     for (const workspace of Object.values(this.data.workspaces)) workspace.looseItemIds = workspace.looseItemIds.filter((id) => !itemIds.includes(id));
     for (const collection of Object.values(this.data.collections)) collection.itemIds = collection.itemIds.filter((id) => !itemIds.includes(id));
+    for (const item of Object.values(this.data.items)) item.childItemIds = (item.childItemIds ?? []).filter((id) => !itemIds.includes(id));
     this.data.uiState.sideSelectedItemIds = this.data.uiState.sideSelectedItemIds.filter((id) => !itemIds.includes(id));
     for (const id of itemIds) { delete this.data.uiState.sideItemFaces[id]; delete this.data.uiState.miniItemFaces[id]; }
     this.data.uiState.miniPalette.selectedItemIds = this.data.uiState.miniPalette.selectedItemIds.filter((id) => !itemIds.includes(id));
     if (this.data.uiState.selectedItemId && itemIds.includes(this.data.uiState.selectedItemId)) this.data.uiState.selectedItemId = null;
     this.changed();
+  }
+
+  private itemContainers(workspaceId: string): string[][] {
+    const workspace = this.data.workspaces[workspaceId];
+    if (!workspace) return [];
+    return [workspace.looseItemIds, ...Object.values(this.data.collections).filter((entry) => entry.workspaceId === workspaceId).map((entry) => entry.itemIds), ...this.itemsForWorkspace(workspaceId).map((item) => item.childItemIds ??= [])];
+  }
+
+  private isItemDescendant(itemId: string, ancestorId: string): boolean {
+    let cursor = this.data.items[itemId]?.parentItemId ?? null;
+    while (cursor) { if (cursor === ancestorId) return true; cursor = this.data.items[cursor]?.parentItemId ?? null; }
+    return false;
   }
 }

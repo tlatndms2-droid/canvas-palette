@@ -17,7 +17,7 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
   return button;
 }
 
-export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; currentFace?: CardFace; onToggleFace?: (face: CardFace) => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
+export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; dragItemIds?: string[]; currentFace?: CardFace; onToggleFace?: (face: CardFace) => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
 
 export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group"; }
 
@@ -86,6 +86,7 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
       if (event.dataTransfer) {
         event.dataTransfer.clearData();
         event.dataTransfer.setData("application/x-canvas-palette-item", item.id);
+        event.dataTransfer.setData("application/x-canvas-palette-items", JSON.stringify(options.dragItemIds?.includes(item.id) ? options.dragItemIds : [item.id]));
         event.dataTransfer.setData("application/x-canvas-palette-type", item.type);
         event.dataTransfer.effectAllowed = "copyMove";
         event.dataTransfer.setDragImage(card, Math.max(0, Math.min(event.offsetX, card.clientWidth)), Math.max(0, Math.min(event.offsetY, card.clientHeight)));
