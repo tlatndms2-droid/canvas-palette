@@ -13,6 +13,8 @@ export class SidePaletteView extends ItemView {
   private unsubscribe?: () => void;
   private query = "";
   private selectionAnchorId: string | null = null;
+  private selectedOutlineCollectionId: string | null = null;
+  private lastCollectionClick: { id: string; at: number } | null = null;
   private visibleItemIds: string[] = [];
   private outlineItemIds: string[] = [];
   private suppressBlankClick = false;
@@ -337,18 +339,24 @@ export class SidePaletteView extends ItemView {
   private renderCollection(parent: HTMLElement, collection: Collection | undefined, depth: number): void {
     if (!collection) return;
     const layout = this.plugin.store.data.workspaces[collection.workspaceId].sideLayout; const collapsed = layout.collapsedCollectionIds.includes(collection.id);
-    const row = parent.createDiv({ cls: `cp-outline-row${layout.selectedCollectionId === collection.id ? " is-selected" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.collectionId = collection.id; row.draggable = true;
+    const row = parent.createDiv({ cls: `cp-outline-row${this.selectedOutlineCollectionId === collection.id ? " is-selected" : ""}${layout.focusedCollectionId === collection.id ? " is-current" : ""}`, attr: { style: `--cp-depth:${depth}`, title: "한 번 클릭: 선택 · 빠른 더블클릭: 내부 진입" } }); row.dataset.collectionId = collection.id; row.draggable = true;
     const arrow = row.createEl("button", { cls: "cp-outline-arrow", attr: { "aria-label": collapsed ? "Expand" : "Collapse" } }); setIcon(arrow, collapsed ? "chevron-right" : "chevron-down");
     arrow.addEventListener("click", (event) => { event.stopPropagation(); layout.collapsedCollectionIds = collapsed ? layout.collapsedCollectionIds.filter((id) => id !== collection.id) : [...layout.collapsedCollectionIds, collection.id]; this.plugin.store.changed(); });
     row.createSpan({ cls: "cp-outline-row__title", text: collection.name });
     row.addEventListener("click", (event) => {
       if ((event.target as HTMLElement).closest("button")) return;
-      layout.selectedCollectionId = collection.id;
+      const now = performance.now();
+      const entersCollection = this.lastCollectionClick?.id === collection.id && now - this.lastCollectionClick.at <= 220;
+      this.selectedOutlineCollectionId = collection.id;
       this.plugin.store.data.uiState.sideSelectedItemIds = [];
       this.plugin.store.data.uiState.selectedItemId = null;
+      if (entersCollection) {
+        layout.focusedCollectionId = collection.id;
+        layout.selectedCollectionId = collection.id;
+        this.lastCollectionClick = null;
+      } else this.lastCollectionClick = { id: collection.id, at: now };
       this.plugin.store.changed();
     });
-    row.addEventListener("dblclick", () => { layout.focusedCollectionId = collection.id; layout.selectedCollectionId = collection.id; this.plugin.store.changed(); });
     row.addEventListener("dragstart", (event) => { event.dataTransfer?.setData("application/x-canvas-palette-collection", collection.id); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; row.addClass("is-dragging"); });
     row.addEventListener("dragend", () => row.removeClass("is-dragging"));
     this.mountOutlineDropTarget(row, collection.workspaceId, collection.id);

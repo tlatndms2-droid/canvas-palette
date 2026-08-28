@@ -2,12 +2,12 @@
 
 ## Current state
 
-- Version: `0.3.1`.
+- Version: `0.3.2`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release target: `0.3.1`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.1`.
-- Latest runtime change: `0.3.1`; Outliner Collection selection now scopes the Viewport, double-click enters a Collection with breadcrumbs, arrows independently collapse branches, item types use icons, Outliner and Viewport selection reveal each other, item drops distinguish before/after/inside, and per-Workspace Outliner density/filter settings persist.
+- Latest release target: `0.3.2`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.2`.
+- Latest runtime change: `0.3.2`; one Collection click only selects its row and leaves the Viewport unchanged. Entering and filtering to that Collection requires a second click on the same row within 220 ms. Slower separate clicks remain selections, while the disclosure arrow continues to only collapse or expand the branch.
 - Automated baseline: 39 Node tests (including four distinct Palette type labels and colors, native Canvas replacement-node detection and link transfer, explicit absence of a Canvas Markdown badge, trailing-period filename normalization, a single Vault-create assertion, identical Palette/Canvas shared-path routing, open-runtime node recreation, Card-to-Markdown type conversion, identity/metadata/link preservation, linked file-path/Group-label propagation, all-node Canvas mutation, scalable metadata picker search, virtualization, fixed-height layout, creation/summary wiring, per-Canvas Find-link grouping, exact path/Node selection, picker routing, source-file fallback, Canvas-to-Palette reveal routing, preferred Workspace resolution, filter clearing, single selection, scroll/highlight behavior, same-Canvas linked-card replacement and metadata preservation, focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
