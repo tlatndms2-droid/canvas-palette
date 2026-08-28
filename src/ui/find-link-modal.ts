@@ -6,16 +6,22 @@ export class FindLinkModal extends Modal {
   constructor(app: App, private readonly itemTitle: string, private readonly locations: CanvasLinkLocation[], private readonly onChoose: (location: CanvasLinkLocation) => void) { super(app); }
 
   onOpen(): void {
+    this.modalEl.addClass("cp-find-link-shell");
     this.contentEl.addClass("canvas-palette", "cp-find-link-modal");
     this.contentEl.createEl("h2", { text: "Find link" });
-    this.contentEl.createEl("p", { text: `Choose a linked Canvas location for ${this.itemTitle}.` });
+    this.contentEl.createEl("p", { cls: "cp-find-link-description", text: `Choose a linked Canvas location for ${this.itemTitle}.` });
     const list = this.contentEl.createDiv({ cls: "cp-find-link-list" });
     for (const location of this.locations) {
-      const row = list.createEl("button", { cls: "cp-find-link-row", attr: { type: "button" } });
+      const name = canvasName(location.canvasPath);
+      const row = list.createEl("button", {
+        cls: "cp-find-link-row",
+        attr: { type: "button", "aria-label": `Open ${name}`, title: location.canvasPath }
+      });
       const icon = row.createSpan({ cls: "cp-find-link-row__icon" }); setIcon(icon, "layout-dashboard");
       const info = row.createSpan({ cls: "cp-find-link-row__info" });
-      info.createEl("strong", { text: canvasName(location.canvasPath) });
-      info.createSpan({ text: `${location.canvasPath} · Node ${location.nodeId}` });
+      info.createEl("strong", { text: name });
+      info.createSpan({ cls: "cp-find-link-row__path", text: location.canvasPath });
+      info.createSpan({ cls: "cp-find-link-row__node", text: `Node ${location.nodeId}` });
       row.addEventListener("click", () => { this.onChoose(location); this.close(); });
     }
   }

@@ -2,12 +2,12 @@
 
 ## Current state
 
-- Version: `0.2.31`.
+- Version: `0.2.32`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release: `0.2.31`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.31`.
-- Latest runtime change: `0.2.31`; Side Palette's linked-space row and context menu now use `Find link`. One Canvas location opens directly; multiple Canvas paths open a picker that chooses the exact stored Canvas path and representative Node ID, then selects and centers that node. Items without a Canvas link retain `Open source file` when a Vault source exists.
+- Latest release: `0.2.32`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.2.32`.
+- Latest runtime change: `0.2.32`; the multi-location `Find link` picker now expands the outer Obsidian modal, reserves a useful scrollable navigation area, and renders each Canvas destination as a separated full-row target with its title, path, and Node ID on stable lines.
 - Automated baseline: 29 Node tests (including per-Canvas Find-link grouping, exact path/Node selection, picker routing, source-file fallback, Canvas-to-Palette reveal routing, preferred Workspace resolution, filter clearing, single selection, scroll/highlight behavior, link-state indicator ownership and collision-safe layout, same-Canvas linked-card replacement and metadata preservation, focused Side item-menu actions, Canvas-faithful Group preview structure and proportions, pre-save runtime-node preservation, serialized rapid restores and recovery after a failed restore, opt-in Image migration, Back synchronization/removal, local face independence, preserved one-shot unlinking, search, Card link synchronization, reconciliation, viewport reorder, editor alignment CSS, and media-preview CSS invariants), plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
 
 ## Start here on another PC
@@ -169,6 +169,8 @@
   - Static validation covered 26 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, preferred/fallback Workspace resolution, navigation wiring, filter clearing, selection, scroll/highlight behavior, and event-isolation/CSS invariants. No disposable `Obsidian Sandbox` vault was available, so packaged installation/reload and visual runtime verification were not performed; the open real Vault was not modified for testing.
 - `0.2.31` replaces Side Palette's ambiguous `Open original` action with `Find link` for Items that have linked Canvas locations. The same action is used by the card's linked-space row. A single Canvas location opens immediately; two or more Canvas paths open a responsive picker showing one representative linked node per Canvas, and choosing a row calls the existing Canvas reveal path to open that file, select the node, and center it. This preserves the same-Canvas one-placement rule while allowing the user to choose among different Canvas files. Items with no Canvas link but an original Markdown/Image Vault path show `Open source file` instead of losing source access.
   - Static validation covered 29 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, per-Canvas location grouping, single-link direct routing, multi-link modal routing, exact Canvas path/Node selection, Side menu labels, and source-file fallback. No disposable `Obsidian Sandbox` vault was available, so packaged installation/reload and visual runtime verification were not performed; the open real Vault was not modified for testing.
+- `0.2.32` fixes the cramped multi-location `Find link` picker. It sizes the outer Obsidian modal up to 760px, keeps a responsive mobile width, reserves a 300px/42vh navigation viewport, and presents every Canvas destination as a minimum-68px bordered row. Canvas title, full path, and Node ID occupy separate stable lines, while the complete row is the click and keyboard-focus target.
+  - Static validation covered 30 Node tests, TypeScript no-emit, production bundling, generated `main.js` syntax, JSON parsing, outer-modal sizing, navigation viewport height, separated destination rows, and exact Find-link routing. No disposable `Obsidian Sandbox` vault was available, so packaged installation/reload and visual runtime verification were not performed; the open real Vault was not modified for testing.
 
 ## User-observed 0.1.2 defects addressed in 0.1.3
 
