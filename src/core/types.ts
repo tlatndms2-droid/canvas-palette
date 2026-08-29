@@ -112,6 +112,7 @@ export interface QuickEditorGeometry { x: number | null; y: number | null; width
 
 export interface UIState {
   activeWorkspaceId: string | null;
+  lastCanvasPath: string | null;
   selectedItemId: string | null;
   sideSelectedItemIds: string[];
   sideItemFaces: Record<string, CardFace>;

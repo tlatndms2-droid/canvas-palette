@@ -20,6 +20,7 @@ import { FindLinkModal } from "./ui/find-link-modal";
 
 export default class CanvasPalettePlugin extends Plugin {
   private readonly canvasSyncTimers = new Map<string, number>();
+  private lastCanvasPath: string | null = null;
   store = new PaletteStore(this);
   search = new SearchService();
   canvas = new CanvasAdapter(
@@ -59,6 +60,7 @@ export default class CanvasPalettePlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.store.load();
+    this.lastCanvasPath = this.store.data.uiState.lastCanvasPath;
     this.reconcileLoadedMarkdownSources();
     this.register(this.dropController.mount(this.app.workspace.containerEl.ownerDocument));
     this.register(this.canvasToolbar.mount(this.app.workspace.containerEl.ownerDocument));
@@ -92,16 +94,31 @@ export default class CanvasPalettePlugin extends Plugin {
     this.registerEvent(this.app.vault.on("create", (file) => { if (file instanceof TFile && file.extension.toLowerCase() === "md") void this.reconnectMovedMarkdown(file); }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
       const context = this.canvas.activeContext();
-      if (context) { this.miniPalette.mount(); this.scheduleCanvasSync(context.file); }
+      if (context) {
+        const changedCanvas = context.file.path !== this.lastCanvasPath;
+        this.lastCanvasPath = context.file.path;
+        if (this.store.data.uiState.lastCanvasPath !== context.file.path) {
+          this.store.data.uiState.lastCanvasPath = context.file.path;
+          this.store.changed();
+        }
+        this.miniPalette.mount();
+        this.scheduleCanvasSync(context.file);
+        if (changedCanvas) this.selectRepresentativeWorkspace(context.file.path);
+      }
       else this.miniPalette.destroy();
-      this.selectRepresentativeWorkspace();
       this.canvasMetadata.refreshSoon();
       this.canvasToolbar.refreshSoon();
     }));
     this.registerEvent(workspaceEvents.on("layout-change", () => { this.canvasMetadata.refreshSoon(); this.canvasToolbar.refreshSoon(); }));
     this.addSettingTab(new CanvasPaletteSettingTab(this));
     const initialCanvas = this.canvas.activeContext();
-    if (initialCanvas) { this.miniPalette.mount(); this.scheduleCanvasSync(initialCanvas.file); this.selectRepresentativeWorkspace(); }
+    if (initialCanvas) {
+      this.lastCanvasPath = initialCanvas.file.path;
+      this.store.data.uiState.lastCanvasPath = initialCanvas.file.path;
+      this.miniPalette.mount();
+      this.scheduleCanvasSync(initialCanvas.file);
+      this.selectRepresentativeWorkspace(initialCanvas.file.path);
+    }
     this.canvasMetadata.refreshSoon();
   }
 
@@ -112,7 +129,7 @@ export default class CanvasPalettePlugin extends Plugin {
     return id ? this.store.data.workspaces[id] : undefined;
   }
 
-  currentCanvasPath(): string | null { return this.canvas.activeContext()?.file.path ?? null; }
+  currentCanvasPath(): string | null { return this.canvas.activeContext()?.file.path ?? this.lastCanvasPath; }
 
   workspaceDisplayName(workspace: PaletteWorkspace): string {
     const currentPath = this.currentCanvasPath();
@@ -133,16 +150,16 @@ export default class CanvasPalettePlugin extends Plugin {
 
   showWorkspaceMenu(anchor: HTMLElement): void {
     const menu = new Menu();
-    const context = this.canvas.activeContext();
+    const canvasPath = this.currentCanvasPath();
     menu.addItem((entry) => entry.setTitle("Create general Workspace…").setIcon("folder-plus").onClick(() => new TextPromptModal(this.app, "New general Workspace", "", (name) => {
       const workspace = this.store.createWorkspace(name, "general");
       this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed();
     }, "Workspace name").open()));
-    menu.addItem((entry) => entry.setTitle("Create Workspace for current Canvas…").setIcon("layout-dashboard").setDisabled(!context).onClick(() => {
-      if (!context) return;
-      const count = this.store.canvasWorkspaces(context.file.path).length;
-      new TextPromptModal(this.app, "New Canvas Workspace", `${this.canvasBaseName(context.file.path)} ${count + 1}`, (name) => {
-        const workspace = this.store.createWorkspace(name, "canvas", context.file.path, count === 0);
+    menu.addItem((entry) => entry.setTitle("Create Workspace for current Canvas…").setIcon("layout-dashboard").setDisabled(!canvasPath).onClick(() => {
+      if (!canvasPath) return;
+      const count = this.store.canvasWorkspaces(canvasPath).length;
+      new TextPromptModal(this.app, "New Canvas Workspace", `${this.canvasBaseName(canvasPath)} ${count + 1}`, (name) => {
+        const workspace = this.store.createWorkspace(name, "canvas", canvasPath, count === 0);
         this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed();
       }, "Workspace name").open();
     }));
@@ -150,10 +167,10 @@ export default class CanvasPalettePlugin extends Plugin {
     if (active) {
       menu.addSeparator();
       menu.addItem((entry) => entry.setTitle("Rename current Workspace…").setIcon("pencil").onClick(() => new TextPromptModal(this.app, "Rename Workspace", active.name, (name) => this.store.renameWorkspace(active.id, name), "Workspace name").open()));
-      const canRepresent = Boolean(context && active.kind === "canvas" && active.ownerCanvasPath === context.file.path);
-      const isRepresentative = Boolean(canRepresent && active.representativeCanvasPath === context?.file.path);
+      const canRepresent = Boolean(canvasPath && active.kind === "canvas" && active.ownerCanvasPath === canvasPath);
+      const isRepresentative = Boolean(canRepresent && active.representativeCanvasPath === canvasPath);
       menu.addItem((entry) => entry.setTitle(isRepresentative ? "Representative Workspace" : "Set as representative").setIcon("star").setChecked(isRepresentative).setDisabled(!canRepresent).onClick(() => {
-        if (context && this.store.setRepresentativeWorkspace(active.id, context.file.path)) new Notice(`${active.name} is now the representative Workspace.`);
+        if (canvasPath && this.store.setRepresentativeWorkspace(active.id, canvasPath)) new Notice(`${active.name} is now the representative Workspace.`);
       }));
     }
     const rect = anchor.getBoundingClientRect(); menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
@@ -526,17 +543,16 @@ export default class CanvasPalettePlugin extends Plugin {
 
   async openSidePalette(): Promise<void> { await this.activateSidePalette(); }
 
-  private selectRepresentativeWorkspace(): void {
-    const context = this.canvas.activeContext();
-    if (!context) return;
-    const workspace = this.ensureCurrentCanvasWorkspace();
+  private selectRepresentativeWorkspace(canvasPath = this.currentCanvasPath()): void {
+    if (!canvasPath) return;
+    const workspace = this.store.ensureCanvasWorkspace(canvasPath, this.canvasBaseName(canvasPath));
     if (workspace && workspace.id !== this.store.data.uiState.activeWorkspaceId) { this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed(); }
   }
 
   private ensureCurrentCanvasWorkspace(): PaletteWorkspace | undefined {
-    const context = this.canvas.activeContext();
-    if (!context) return undefined;
-    return this.store.ensureCanvasWorkspace(context.file.path, this.canvasBaseName(context.file.path));
+    const canvasPath = this.currentCanvasPath();
+    if (!canvasPath) return undefined;
+    return this.store.ensureCanvasWorkspace(canvasPath, this.canvasBaseName(canvasPath));
   }
 
   private canvasBaseName(path: string): string { return path.split("/").pop()?.replace(/\.canvas$/i, "") || "Canvas"; }

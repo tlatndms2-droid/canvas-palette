@@ -7,14 +7,14 @@ export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
 };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 15,
+  schemaVersion: 16,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
   collections: {},
   pendingItemIds: [],
   canvasNodeMetadata: {},
-  uiState: { activeWorkspaceId: null, selectedItemId: null, sideSelectedItemIds: [], sideItemFaces: {}, miniItemFaces: {}, quickEditor: { x: null, y: null, width: null, height: null }, miniPalette: {
+  uiState: { activeWorkspaceId: null, lastCanvasPath: null, selectedItemId: null, sideSelectedItemIds: [], sideItemFaces: {}, miniItemFaces: {}, quickEditor: { x: null, y: null, width: null, height: null }, miniPalette: {
     tab: "collect", isOpen: false, position: { x: 24, y: 62 }, size: { width: 1120, height: 720 },
     leftPaneOpen: true, rightPaneOpen: true, leftPaneWidth: 248, rightPaneWidth: 310,
     viewMode: "grid", sort: "modified-desc", selectedItemIds: []
@@ -37,7 +37,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 15,
+    schemaVersion: 16,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
       const repairedType = item.type === "markdown" && !item.origin?.filePath ? "card" : item.type;
       const supportsFaces = repairedType !== "group";
