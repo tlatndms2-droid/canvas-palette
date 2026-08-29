@@ -17,7 +17,7 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
   return button;
 }
 
-export type MarkdownSourceStatus = "linked" | "deleted" | "canvas-unlinked";
+export type MarkdownSourceStatus = "deleted";
 export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; dragItemIds?: string[]; currentFace?: CardFace; markdownSourceStatus?: MarkdownSourceStatus | null; onMarkdownSourceStatus?: (event: MouseEvent) => void; onToggleFace?: (face: CardFace) => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
 
 export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group"; }
@@ -47,11 +47,9 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
     if (options.markdownSourceStatus) {
       const source = options.markdownSourceStatus;
       const labels: Record<MarkdownSourceStatus, string> = {
-        linked: "Source Markdown connected",
-        deleted: "Source Markdown deleted. Click to restore.",
-        "canvas-unlinked": "Source Markdown is not placed on Canvas"
+        deleted: "원본 MD가 삭제되었습니다. 복구하거나 Palette에서 삭제할 수 있습니다."
       };
-      const icons: Record<MarkdownSourceStatus, string> = { linked: "link", deleted: "file-x-2", "canvas-unlinked": "unlink" };
+      const icons: Record<MarkdownSourceStatus, string> = { deleted: "file-x-2" };
       const state = actions.createEl("button", { cls: `clickable-icon cp-source-state cp-source-state--${source}`, attr: { type: "button", "aria-label": labels[source], title: labels[source] } });
       setIcon(state, icons[source]);
       state.addEventListener("pointerdown", (event) => event.stopPropagation());

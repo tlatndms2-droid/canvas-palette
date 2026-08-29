@@ -98,15 +98,19 @@ test("legacy Markdown without a source path becomes a normal Card", async () => 
   await cleanup();
 });
 
-test("cards expose only the three approved source states with icon-sized controls", async () => {
+test("cards expose only the deleted Markdown source state and keep existing Canvas-unlinked UI", async () => {
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
   const render = await readFile(new URL("../src/ui/render.ts", import.meta.url), "utf8");
   const styles = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(render, /"linked" \| "deleted" \| "canvas-unlinked"/);
+  assert.match(render, /MarkdownSourceStatus = "deleted"/);
   assert.doesNotMatch(render, /path-missing/);
-  assert.match(render, /linked: "link"/);
   assert.match(render, /deleted: "file-x-2"/);
-  assert.match(render, /"canvas-unlinked": "unlink"/);
+  assert.doesNotMatch(render, /linked: "link"/);
+  assert.doesNotMatch(render, /"canvas-unlinked": "unlink"/);
+  assert.match(render, /cp-item__link-state--unlinked/);
+  assert.match(main, /return null;\s*}\s*\n\s*showMarkdownSourceMenu/);
+  assert.match(main, /setTitle\("MD 복구"\)/);
+  assert.match(main, /setTitle\("Palette에서 삭제"\)/);
   assert.match(styles, /\.cp-source-state\{[^}]*width:22px;height:22px/);
   assert.match(styles, /\.cp-source-state svg\{width:13px;height:13px\}/);
   assert.match(main, /for \(const related of relatedItems\) await this\.canvas\.convertLinkedCardsToMarkdown/);

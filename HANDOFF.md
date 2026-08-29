@@ -2,14 +2,14 @@
 
 ## Current state
 
-- Version: `0.3.9`.
+- Version: `0.3.10`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release target: `0.3.9`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.9`.
-- Latest runtime change: `0.3.9`; Markdown file and folder renames automatically update Palette paths and every linked Canvas file node. The UI has only green connected, red source-deleted, and gray Canvas-unlinked icons, with no path-missing state. Deleted Markdown retains its last path and cached body for Canvas text fallback, `Restore Markdown`, or confirmed Palette deletion. Legacy pathless Markdown is repaired into an ordinary Card.
-- Automated baseline: 55 Node tests, including Markdown deletion/restore, shared-source reconnection, file/folder source and Canvas-link path tracking, legacy pathless-record repair, the three approved icon states and their compact sizing, plus all previous search, hierarchy, Outliner, link, metadata, Collection, editor, drag, and Canvas safeguards; plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
-- `0.3.9` runtime validation used only `Obsidian Sandbox`. A linked and an unlinked Markdown Item verified green/gray icon-only states, file rename and containing-folder rename updated the source path, Canvas file node, Item Canvas path, and Workspace Canvas path, source deletion preserved the last path/body and produced two red states plus a text-node fallback, and restoring one shared source reconnected both Items while converting the linked Canvas node back to the restored file. The captured error log was empty and all disposable Items/files were removed.
+- Latest release target: `0.3.10`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.10`.
+- Latest runtime change: `0.3.10`; normal Markdown cards no longer display a redundant green connected marker, and Canvas-unplaced Markdown reuses the existing generic Unlinked indicator instead of a second source-state UI. Only a deleted original Markdown displays the red deleted-file button. Its menu is `MD 복구` / `Palette에서 삭제`; cached body, last path, restore behavior, file/folder rename tracking, and linked Canvas restoration remain unchanged.
+- Automated baseline: 55 Node tests, including the single deleted-source state, preservation of the existing generic Unlinked UI, Markdown deletion/restore, shared-source reconnection, file/folder source and Canvas-link path tracking, legacy pathless-record repair, plus all previous search, hierarchy, Outliner, link, metadata, Collection, editor, drag, and Canvas safeguards; plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
+- `0.3.10` static validation passed all 55 Node tests, TypeScript no-emit, production bundling, generated-bundle syntax validation, JSON parsing, and exact source-state/menu assertions. Runtime UI validation was not claimed for this release.
 
 ## Start here on another PC
 

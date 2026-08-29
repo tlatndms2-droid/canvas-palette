@@ -257,24 +257,18 @@ export default class CanvasPalettePlugin extends Plugin {
     new Notice(`${items.length} Canvas item${items.length === 1 ? "" : "s"} saved to Side Palette.`);
   }
 
-  markdownSourceStatus(item: PaletteItem): "linked" | "deleted" | "canvas-unlinked" | null {
+  markdownSourceStatus(item: PaletteItem): "deleted" | null {
     if (item.type !== "markdown") return null;
     if (item.sourceDeletedAt) return "deleted";
-    return this.store.linkedCanvasLocations(item).length > 0 ? "linked" : "canvas-unlinked";
+    return null;
   }
 
   showMarkdownSourceMenu(item: PaletteItem, event: MouseEvent): void {
     const status = this.markdownSourceStatus(item);
     if (!status) return;
     const menu = new Menu();
-    if (status === "deleted") {
-      menu.addItem((entry) => entry.setTitle("Restore Markdown").setIcon("file-up").onClick(() => void this.restoreMarkdownSource(item.id)));
-      menu.addItem((entry) => entry.setTitle("Delete from Palette").setIcon("trash").onClick(() => new ConfirmDeleteModal(this.app, 1, () => this.store.removeItems([item.id])).open()));
-    } else {
-      menu.addItem((entry) => entry.setTitle("Open source file").setIcon("external-link").onClick(() => void this.openOriginal(item)));
-      if (status === "linked") menu.addItem((entry) => entry.setTitle("Find Canvas link").setIcon("locate-fixed").onClick(() => this.findLinkedCanvas(item)));
-      else menu.addItem((entry) => entry.setTitle("Drag this card onto an open Canvas").setIcon("mouse-pointer-2").setDisabled(true));
-    }
+    menu.addItem((entry) => entry.setTitle("MD 복구").setIcon("file-up").onClick(() => void this.restoreMarkdownSource(item.id)));
+    menu.addItem((entry) => entry.setTitle("Palette에서 삭제").setIcon("trash").onClick(() => new ConfirmDeleteModal(this.app, 1, () => this.store.removeItems([item.id])).open()));
     menu.showAtMouseEvent(event);
   }
 
