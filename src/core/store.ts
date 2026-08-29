@@ -36,8 +36,9 @@ export class PaletteStore {
 
   createWorkspace(name: string, kind: "general" | "canvas" = "general", ownerCanvasPath: string | null = null, representative = false): PaletteWorkspace {
     const id = createId("workspace");
+    const now = Date.now();
     const owner = kind === "canvas" ? ownerCanvasPath : null;
-    const workspace: PaletteWorkspace = { id, name, kind, ownerCanvasPath: owner, canvasPaths: owner ? [owner] : [], representativeCanvasPath: representative && owner ? owner : null, rootCollectionIds: [], looseItemIds: [], sideLayout: structuredClone(DEFAULT_SIDE_LAYOUT) };
+    const workspace: PaletteWorkspace = { id, name, kind, ownerCanvasPath: owner, canvasPaths: owner ? [owner] : [], representativeCanvasPath: representative && owner ? owner : null, rootCollectionIds: [], looseItemIds: [], sideLayout: structuredClone(DEFAULT_SIDE_LAYOUT), createdAt: now, modifiedAt: now };
     this.data.workspaces[id] = workspace;
     if (representative && owner) this.setRepresentativeWorkspace(id, owner, false);
     this.data.uiState.activeWorkspaceId ??= id;
@@ -65,7 +66,8 @@ export class PaletteStore {
   setRepresentativeWorkspace(workspaceId: string, canvasPath: string, notify = true): boolean {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace || workspace.kind !== "canvas" || workspace.ownerCanvasPath !== canvasPath) return false;
-    for (const candidate of this.canvasWorkspaces(canvasPath)) candidate.representativeCanvasPath = candidate.id === workspaceId ? canvasPath : null;
+    const now = Date.now();
+    for (const candidate of this.canvasWorkspaces(canvasPath)) { candidate.representativeCanvasPath = candidate.id === workspaceId ? canvasPath : null; candidate.modifiedAt = now; }
     if (notify) this.changed();
     return true;
   }
@@ -94,6 +96,34 @@ export class PaletteStore {
     const next = name.trim();
     if (!workspace || !next) return false;
     workspace.name = next;
+    workspace.modifiedAt = Date.now();
+    this.changed();
+    return true;
+  }
+
+  removeWorkspace(id: string): boolean {
+    const workspace = this.data.workspaces[id];
+    if (!workspace || Object.keys(this.data.workspaces).length <= 1) return false;
+    const itemIds = this.itemsForWorkspace(id).map((item) => item.id);
+    for (const itemId of itemIds) {
+      const item = this.data.items[itemId];
+      if (!item) continue;
+      if (item.origin.workspaceId === id) delete item.origin.workspaceId;
+      if (!this.data.pendingItemIds.includes(itemId)) this.data.pendingItemIds.push(itemId);
+    }
+    const removeCollection = (collectionId: string): void => {
+      const collection = this.data.collections[collectionId];
+      if (!collection) return;
+      for (const childId of collection.childCollectionIds) removeCollection(childId);
+      delete this.data.collections[collectionId];
+    };
+    for (const collectionId of workspace.rootCollectionIds) removeCollection(collectionId);
+    delete this.data.workspaces[id];
+    if (workspace.kind === "canvas" && workspace.ownerCanvasPath && workspace.representativeCanvasPath === workspace.ownerCanvasPath) {
+      const replacement = this.canvasWorkspaces(workspace.ownerCanvasPath)[0];
+      if (replacement) this.setRepresentativeWorkspace(replacement.id, workspace.ownerCanvasPath, false);
+    }
+    if (this.data.uiState.activeWorkspaceId === id) this.data.uiState.activeWorkspaceId = Object.keys(this.data.workspaces)[0] ?? null;
     this.changed();
     return true;
   }

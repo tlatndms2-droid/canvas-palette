@@ -7,14 +7,14 @@ export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
 };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 16,
+  schemaVersion: 17,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
   collections: {},
   pendingItemIds: [],
   canvasNodeMetadata: {},
-  uiState: { activeWorkspaceId: null, lastCanvasPath: null, selectedItemId: null, sideSelectedItemIds: [], sideItemFaces: {}, miniItemFaces: {}, quickEditor: { x: null, y: null, width: null, height: null }, miniPalette: {
+  uiState: { activeWorkspaceId: null, lastCanvasPath: null, selectedItemId: null, sideSelectedItemIds: [], sideItemFaces: {}, miniItemFaces: {}, quickEditor: { x: null, y: null, width: null, height: null }, workspaceExplorer: { viewMode: "details", sort: "modified-desc" }, miniPalette: {
     tab: "collect", isOpen: false, position: { x: 24, y: 62 }, size: { width: 1120, height: 720 },
     leftPaneOpen: true, rightPaneOpen: true, leftPaneWidth: 248, rightPaneWidth: 310,
     viewMode: "grid", sort: "modified-desc", selectedItemIds: []
@@ -26,18 +26,21 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
   const rawSettings = raw.settings as (Partial<PaletteData["settings"]> & { cardSize?: number }) | undefined;
   const { cardSize: _legacyCardSize, ...migratedSettings } = rawSettings ?? {};
   const legacyUi = (raw.uiState ?? {}) as Partial<PaletteData["uiState"]> & { miniTab?: "collect" | "storage"; leftPaneOpen?: boolean; rightPaneOpen?: boolean; leftPaneWidth?: number; rightPaneWidth?: number };
+  const migratedAt = Date.now();
   const workspaces = Object.fromEntries(Object.entries(raw.workspaces ?? {}).map(([id, workspace]) => [id, {
     ...workspace,
     kind: workspace.kind ?? "general",
     ownerCanvasPath: workspace.ownerCanvasPath ?? null,
     representativeCanvasPath: workspace.representativeCanvasPath ?? null,
-    sideLayout: { ...DEFAULT_SIDE_LAYOUT, ...workspace.sideLayout }
+    sideLayout: { ...DEFAULT_SIDE_LAYOUT, ...workspace.sideLayout },
+    createdAt: workspace.createdAt ?? migratedAt,
+    modifiedAt: workspace.modifiedAt ?? workspace.createdAt ?? migratedAt
   }]));
   return {
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 16,
+    schemaVersion: 17,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
       const repairedType = item.type === "markdown" && !item.origin?.filePath ? "card" : item.type;
       const supportsFaces = repairedType !== "group";
@@ -62,6 +65,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
       sideItemFaces: legacyUi.sideItemFaces ?? {},
       miniItemFaces: legacyUi.miniItemFaces ?? {},
       quickEditor: { ...DEFAULT_DATA.uiState.quickEditor, ...legacyUi.quickEditor },
+      workspaceExplorer: { ...DEFAULT_DATA.uiState.workspaceExplorer, ...legacyUi.workspaceExplorer },
       miniPalette: {
       ...DEFAULT_DATA.uiState.miniPalette, ...legacyUi.miniPalette,
       tab: legacyUi.miniPalette?.tab ?? legacyUi.miniTab ?? DEFAULT_DATA.uiState.miniPalette.tab,

@@ -125,7 +125,13 @@ export function renderPreviewInCard(service: PreviewService, parent: HTMLElement
 
 export function workspaceSelect(plugin: CanvasPalettePlugin, parent: HTMLElement, value: string | null, onChange: (id: string) => void): HTMLSelectElement {
   const select = parent.createEl("select", { cls: "dropdown cp-workspace-select" });
-  for (const workspace of Object.values(plugin.store.data.workspaces)) {
+  const currentCanvas = plugin.currentCanvasPath();
+  const workspaces = Object.values(plugin.store.data.workspaces).sort((a, b) => {
+    const aCurrent = a.kind === "canvas" && a.ownerCanvasPath === currentCanvas;
+    const bCurrent = b.kind === "canvas" && b.ownerCanvasPath === currentCanvas;
+    return Number(bCurrent) - Number(aCurrent) || a.name.localeCompare(b.name, undefined, { numeric: true });
+  });
+  for (const workspace of workspaces) {
     const option = select.createEl("option", { text: plugin.workspaceDisplayName(workspace), value: workspace.id });
     option.selected = workspace.id === value;
   }

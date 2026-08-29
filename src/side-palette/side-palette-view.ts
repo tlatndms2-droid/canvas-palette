@@ -76,7 +76,7 @@ export class SidePaletteView extends ItemView {
     const currentCanvas = selectorRow.createEl("button", { cls: "cp-current-canvas-workspace", attr: { title: "Open current Canvas Workspace", "aria-label": "Open current Canvas Workspace" } });
     setIcon(currentCanvas.createSpan(), "locate-fixed"); currentCanvas.createSpan({ text: "Current Canvas" });
     currentCanvas.addEventListener("click", () => this.plugin.openCurrentCanvasWorkspace()); currentCanvas.disabled = !this.plugin.currentCanvasPath();
-    const manageWorkspace = iconButton(selectorRow, "plus", "Create or manage Workspaces", () => this.plugin.showWorkspaceMenu(manageWorkspace));
+    const manageWorkspace = iconButton(selectorRow, "folder-cog", "Open Workspace Explorer", () => this.plugin.openWorkspaceExplorer());
     manageWorkspace.addClass("cp-workspace-manage");
     const searchWrap = root.createDiv({ cls: "cp-search-wrap" });
     const search = searchWrap.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search files, groups, tags, labels…", autocomplete: "off" }, value: this.query });

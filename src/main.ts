@@ -17,6 +17,7 @@ import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-
 import { ConfirmCanvasReplacementModal, ConfirmDeleteModal, ItemEditorModal, MetadataEditorModal, TextPromptModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 import { FindLinkModal } from "./ui/find-link-modal";
+import { WorkspaceExplorerModal } from "./ui/workspace-explorer-modal";
 
 export default class CanvasPalettePlugin extends Plugin {
   private readonly canvasSyncTimers = new Map<string, number>();
@@ -175,6 +176,8 @@ export default class CanvasPalettePlugin extends Plugin {
     }
     const rect = anchor.getBoundingClientRect(); menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
   }
+
+  openWorkspaceExplorer(): void { new WorkspaceExplorerModal(this.app, this).open(); }
 
   selectedItem(): PaletteItem | undefined {
     const id = this.store.data.uiState.selectedItemId;

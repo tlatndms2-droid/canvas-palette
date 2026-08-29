@@ -4,6 +4,8 @@ export type AccentMode = "obsidian" | "custom";
 export type AssetViewMode = "grid" | "list";
 export type CardFace = "front" | "back";
 export type WorkspaceKind = "general" | "canvas";
+export type WorkspaceExplorerViewMode = "list" | "details" | "icons";
+export type WorkspaceExplorerSort = "modified-desc" | "modified-asc" | "created-desc" | "created-asc" | "name-asc" | "name-desc";
 
 export interface TextSourceRange { from: { line: number; ch: number }; to: { line: number; ch: number }; }
 export interface ItemOrigin { canvasPath?: string; canvasNodeId?: string; workspaceId?: string; filePath?: string; textRange?: TextSourceRange; }
@@ -82,6 +84,8 @@ export interface PaletteWorkspace {
   rootCollectionIds: string[];
   looseItemIds: string[];
   sideLayout: SideLayoutState;
+  createdAt: number;
+  modifiedAt: number;
 }
 
 export interface PaletteSettings {
@@ -119,6 +123,7 @@ export interface UIState {
   miniItemFaces: Record<string, CardFace>;
   quickEditor: QuickEditorGeometry;
   miniPalette: MiniPaletteState;
+  workspaceExplorer: { viewMode: WorkspaceExplorerViewMode; sort: WorkspaceExplorerSort };
 }
 
 export interface PaletteData {

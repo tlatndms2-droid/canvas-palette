@@ -76,7 +76,36 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   assert.match(main, /this\.store\.data\.uiState\.lastCanvasPath = context\.file\.path/);
   assert.doesNotMatch(main, /else this\.miniPalette\.destroy\(\);\s*this\.selectRepresentativeWorkspace\(\)/);
   assert.match(side, /Open current Canvas Workspace/);
-  assert.match(side, /Create or manage Workspaces/);
+  assert.match(side, /Open Workspace Explorer/);
+  assert.match(side, /openWorkspaceExplorer/);
   assert.match(mini, /option\.disabled = Boolean\(workspace/);
   assert.match(mini, /only accepts items that exist in its own Canvas/);
+});
+
+test("Workspace Explorer prioritizes the current Canvas and offers search, dates, and Explorer views", async () => {
+  const explorer = await readFile(new URL("../src/ui/workspace-explorer-modal.ts", import.meta.url), "utf8");
+  const render = await readFile(new URL("../src/ui/render.ts", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(explorer, /Search Canvas or Workspace/);
+  assert.match(explorer, /Current Canvas ·/);
+  assert.match(explorer, /workspace\.ownerCanvasPath === currentCanvas/);
+  assert.match(explorer, /type: "date"/);
+  assert.match(explorer, /"icons"[\s\S]*"list"[\s\S]*"details"/);
+  assert.match(explorer, /Created: newest/);
+  assert.match(render, /Number\(bCurrent\) - Number\(aCurrent\)/);
+  assert.match(styles, /\.cp-workspace-explorer__body\.is-icons/);
+  assert.match(styles, /\.cp-workspace-explorer__columns/);
+});
+
+test("deleting a Workspace preserves its Palette items in Mini Palette storage", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  const target = store.createWorkspace("Delete me", "general");
+  store.createWorkspace("Keep me", "general");
+  store.addToWorkspace(target.id, item("preserved", "EP01.canvas"));
+  assert.equal(store.removeWorkspace(target.id), true);
+  assert.equal(store.data.items.preserved.displayTitle, "preserved");
+  assert.equal(store.data.items.preserved.origin.workspaceId, undefined);
+  assert.ok(store.data.pendingItemIds.includes("preserved"));
+  await cleanup();
 });
