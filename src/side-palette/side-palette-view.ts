@@ -73,6 +73,11 @@ export class SidePaletteView extends ItemView {
     const collectButton = header.createEl("button", { text: "Send to Mini Palette" }); collectButton.addEventListener("click", () => void this.plugin.collectCanvasSelection());
     const selectorRow = root.createDiv({ cls: "cp-workspace-row" }); selectorRow.createSpan({ text: "Current workspace" });
     workspaceSelect(this.plugin, selectorRow, workspace.id, (id) => { this.query = ""; this.plugin.store.data.uiState.activeWorkspaceId = id; this.plugin.store.changed(); });
+    const currentCanvas = selectorRow.createEl("button", { cls: "cp-current-canvas-workspace", attr: { title: "Open current Canvas Workspace", "aria-label": "Open current Canvas Workspace" } });
+    setIcon(currentCanvas.createSpan(), "locate-fixed"); currentCanvas.createSpan({ text: "Current Canvas" });
+    currentCanvas.addEventListener("click", () => this.plugin.openCurrentCanvasWorkspace()); currentCanvas.disabled = !this.plugin.currentCanvasPath();
+    const manageWorkspace = iconButton(selectorRow, "plus", "Create or manage Workspaces", () => this.plugin.showWorkspaceMenu(manageWorkspace));
+    manageWorkspace.addClass("cp-workspace-manage");
     const searchWrap = root.createDiv({ cls: "cp-search-wrap" });
     const search = searchWrap.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search files, groups, tags, labels…", autocomplete: "off" }, value: this.query });
     const refreshSearch = (): void => this.refreshSearchSurface(searchWrap, workspace.id);

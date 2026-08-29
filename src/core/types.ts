@@ -3,6 +3,7 @@ export type PaletteTheme = "obsidian" | "light" | "dark";
 export type AccentMode = "obsidian" | "custom";
 export type AssetViewMode = "grid" | "list";
 export type CardFace = "front" | "back";
+export type WorkspaceKind = "general" | "canvas";
 
 export interface TextSourceRange { from: { line: number; ch: number }; to: { line: number; ch: number }; }
 export interface ItemOrigin { canvasPath?: string; canvasNodeId?: string; workspaceId?: string; filePath?: string; textRange?: TextSourceRange; }
@@ -74,6 +75,8 @@ export interface SideLayoutState {
 export interface PaletteWorkspace {
   id: string;
   name: string;
+  kind: WorkspaceKind;
+  ownerCanvasPath: string | null;
   canvasPaths: string[];
   representativeCanvasPath: string | null;
   rootCollectionIds: string[];

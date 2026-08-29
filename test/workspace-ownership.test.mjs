@@ -1,0 +1,76 @@
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { pathToFileURL } from "node:url";
+import { build } from "esbuild";
+
+globalThis.window = globalThis;
+
+async function loadStore() {
+  const directory = await mkdtemp(join(tmpdir(), "canvas-palette-workspace-"));
+  const outfile = join(directory, "store.mjs");
+  await build({ entryPoints: [join(process.cwd(), "src/core/store.ts")], outfile, bundle: true, format: "esm", platform: "node" });
+  const module = await import(`${pathToFileURL(outfile).href}?${Date.now()}`);
+  return { PaletteStore: module.PaletteStore, cleanup: () => rm(directory, { recursive: true, force: true }) };
+}
+
+function item(id, canvasPath) {
+  return { id, type: "card", displayTitle: id, tags: [], label: "", caption: "", createdAt: 1, modifiedAt: 1, origin: { canvasPath }, canvasPlacements: [], content: id, backContent: "", facesEnabled: false };
+}
+
+test("one Canvas supports unlimited dedicated Workspaces with exactly one representative", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  const first = store.ensureCanvasWorkspace("EP01.canvas", "EP01");
+  const second = store.createWorkspace("EP01 Characters", "canvas", "EP01.canvas");
+  const third = store.createWorkspace("EP01 References", "canvas", "EP01.canvas");
+  assert.equal(store.canvasWorkspaces("EP01.canvas").length, 3);
+  assert.equal(store.representativeWorkspaceForCanvas("EP01.canvas")?.id, first.id);
+  assert.equal(store.setRepresentativeWorkspace(third.id, "EP01.canvas"), true);
+  assert.equal(store.representativeWorkspaceForCanvas("EP01.canvas")?.id, third.id);
+  assert.equal(store.canvasWorkspaces("EP01.canvas").filter((workspace) => workspace.representativeCanvasPath === "EP01.canvas").length, 1);
+  assert.equal(store.setRepresentativeWorkspace(second.id, "EP02.canvas"), false);
+  await cleanup();
+});
+
+test("dedicated Workspaces accept only own-Canvas items while general Workspaces accept all", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  const dedicated = store.createWorkspace("EP01", "canvas", "EP01.canvas", true);
+  const general = store.createWorkspace("Shared", "general");
+  assert.equal(store.addToWorkspace(dedicated.id, item("own", "EP01.canvas")), true);
+  assert.equal(store.addToWorkspace(dedicated.id, item("foreign", "EP02.canvas")), false);
+  assert.equal(store.addToWorkspace(general.id, item("shared", "EP02.canvas")), true);
+  const placed = item("placed", "EP02.canvas"); placed.canvasPlacements.push({ canvasPath: "EP01.canvas", nodeIds: ["node"], placedAt: 1 });
+  assert.equal(store.canStoreItem(dedicated.id, placed), true);
+  await cleanup();
+});
+
+test("pending import keeps rejected foreign items and Canvas renames follow ownership", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  const dedicated = store.createWorkspace("EP01", "canvas", "folder/EP01.canvas", true);
+  store.addPending(item("own", "folder/EP01.canvas")); store.addPending(item("foreign", "EP02.canvas"));
+  const result = store.importPending(dedicated.id, ["own", "foreign"]);
+  assert.deepEqual(result, { imported: ["own"], rejected: ["foreign"] });
+  assert.deepEqual(store.data.pendingItemIds, ["foreign"]);
+  store.renameCanvasPath("folder/EP01.canvas", "story/EP01.canvas");
+  assert.equal(dedicated.ownerCanvasPath, "story/EP01.canvas");
+  assert.equal(dedicated.representativeCanvasPath, "story/EP01.canvas");
+  await cleanup();
+});
+
+test("Side and Mini Palette expose Workspace ownership controls and restrictions", async () => {
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  const side = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
+  const mini = await readFile(new URL("../src/mini-palette/floating-mini-palette.ts", import.meta.url), "utf8");
+  assert.match(main, /ensureCurrentCanvasWorkspace/);
+  assert.match(main, /Create Workspace for current Canvas/);
+  assert.match(main, /Set as representative/);
+  assert.match(side, /Open current Canvas Workspace/);
+  assert.match(side, /Create or manage Workspaces/);
+  assert.match(mini, /option\.disabled = Boolean\(workspace/);
+  assert.match(mini, /only accepts items that exist in its own Canvas/);
+});

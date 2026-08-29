@@ -126,7 +126,7 @@ export function renderPreviewInCard(service: PreviewService, parent: HTMLElement
 export function workspaceSelect(plugin: CanvasPalettePlugin, parent: HTMLElement, value: string | null, onChange: (id: string) => void): HTMLSelectElement {
   const select = parent.createEl("select", { cls: "dropdown cp-workspace-select" });
   for (const workspace of Object.values(plugin.store.data.workspaces)) {
-    const option = select.createEl("option", { text: workspace.name, value: workspace.id });
+    const option = select.createEl("option", { text: plugin.workspaceDisplayName(workspace), value: workspace.id });
     option.selected = workspace.id === value;
   }
   select.addEventListener("change", () => onChange(select.value));

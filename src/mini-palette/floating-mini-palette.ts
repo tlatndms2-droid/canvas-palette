@@ -92,9 +92,20 @@ export class FloatingMiniPalette {
     const bottom = panel.createDiv({ cls: "cp-bottom cp-bottom--float" });
     const settings = iconButton(bottom, "settings-2", "Settings", () => this.plugin.openSettings());
     settings.addClass("cp-bottom__start");
-    workspaceSelect(this.plugin, bottom, this.plugin.store.data.uiState.activeWorkspaceId, () => undefined);
+    const destination = workspaceSelect(this.plugin, bottom, this.plugin.store.data.uiState.activeWorkspaceId, () => undefined);
+    const selectedItems = this.selectedIds().map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
+    for (const option of Array.from(destination.options)) {
+      const workspace = this.plugin.store.data.workspaces[option.value];
+      option.disabled = Boolean(workspace && selectedItems.some((item) => !this.plugin.store.canStoreItem(workspace.id, item)));
+    }
     const importButton = bottom.createEl("button", { cls: "mod-cta", text: "Import to workspace" }); importButton.disabled = this.selectedIds().length === 0;
-    importButton.addEventListener("click", () => { const select = bottom.querySelector("select"); if (select) this.plugin.store.importPending(select.value, this.selectedIds()); this.plugin.store.data.uiState.miniPalette.selectedItemIds = []; this.inspectorItemId = null; });
+    importButton.addEventListener("click", () => {
+      const select = bottom.querySelector("select"); if (!select) return;
+      const result = this.plugin.store.importPending(select.value, this.selectedIds());
+      if (result.rejected.length > 0) new Notice("A Canvas Workspace only accepts items that exist in its own Canvas.");
+      if (result.imported.length > 0) new Notice(`${result.imported.length} item${result.imported.length === 1 ? "" : "s"} imported.`);
+      this.plugin.store.data.uiState.miniPalette.selectedItemIds = result.rejected; this.inspectorItemId = null;
+    });
   }
 
   private renderPendingRow(parent: HTMLElement, item: PaletteItem): void {
@@ -122,7 +133,7 @@ export class FloatingMiniPalette {
 
   private renderLeftPane(parent: HTMLElement): void {
     const head = parent.createDiv({ cls: "cp-pane-heading" }); head.createEl("h4", { text: "Control panel" }); iconButton(head, "panel-left-close", "Close left pane", () => { this.plugin.store.data.uiState.miniPalette.leftPaneOpen = false; this.plugin.store.changed(); });
-    parent.createEl("label", { text: "Workspace" }); const all = parent.createEl("select", { cls: "dropdown" }); all.createEl("option", { value: "all", text: "All Workspaces" }); for (const workspace of Object.values(this.plugin.store.data.workspaces)) all.createEl("option", { value: workspace.id, text: workspace.name }); all.value = this.plugin.store.data.uiState.activeWorkspaceId ?? "all"; all.addEventListener("change", () => { this.plugin.store.data.uiState.activeWorkspaceId = all.value === "all" ? null : all.value; this.plugin.store.changed(); });
+    parent.createEl("label", { text: "Workspace" }); const all = parent.createEl("select", { cls: "dropdown" }); all.createEl("option", { value: "all", text: "All Workspaces" }); for (const workspace of Object.values(this.plugin.store.data.workspaces)) all.createEl("option", { value: workspace.id, text: this.plugin.workspaceDisplayName(workspace) }); all.value = this.plugin.store.data.uiState.activeWorkspaceId ?? "all"; all.addEventListener("change", () => { this.plugin.store.data.uiState.activeWorkspaceId = all.value === "all" ? null : all.value; this.plugin.store.changed(); });
     parent.createEl("label", { text: "Search" }); const search = parent.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Title, tag, caption" }, value: this.search }); search.addEventListener("input", () => { this.search = search.value; this.render(); });
     parent.createEl("label", { text: "Sort" }); const sort = parent.createEl("select", { cls: "dropdown" }); for (const [value, label] of [["modified-desc", "Modified (newest)"], ["modified-asc", "Modified (oldest)"], ["title-asc", "Title (A-Z)"], ["title-desc", "Title (Z-A)"]] as const) sort.createEl("option", { value, text: label }); sort.value = this.plugin.store.data.uiState.miniPalette.sort; sort.addEventListener("change", () => { this.plugin.store.data.uiState.miniPalette.sort = sort.value as typeof this.plugin.store.data.uiState.miniPalette.sort; this.plugin.store.changed(); });
     parent.createEl("label", { text: "View" }); const view = parent.createDiv({ cls: "cp-view-switch" }); for (const mode of ["grid", "list"] as const) { const button = view.createEl("button", { text: mode === "grid" ? "Grid" : "List", cls: this.plugin.store.data.uiState.miniPalette.viewMode === mode ? "is-active" : "" }); button.addEventListener("click", () => { this.plugin.store.data.uiState.miniPalette.viewMode = mode; this.plugin.store.changed(); }); }

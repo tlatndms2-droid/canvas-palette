@@ -34,13 +34,49 @@ export class PaletteStore {
     await this.plugin.saveData(this.data);
   }
 
-  createWorkspace(name: string): PaletteWorkspace {
+  createWorkspace(name: string, kind: "general" | "canvas" = "general", ownerCanvasPath: string | null = null, representative = false): PaletteWorkspace {
     const id = createId("workspace");
-    const workspace: PaletteWorkspace = { id, name, canvasPaths: [], representativeCanvasPath: null, rootCollectionIds: [], looseItemIds: [], sideLayout: structuredClone(DEFAULT_SIDE_LAYOUT) };
+    const owner = kind === "canvas" ? ownerCanvasPath : null;
+    const workspace: PaletteWorkspace = { id, name, kind, ownerCanvasPath: owner, canvasPaths: owner ? [owner] : [], representativeCanvasPath: representative && owner ? owner : null, rootCollectionIds: [], looseItemIds: [], sideLayout: structuredClone(DEFAULT_SIDE_LAYOUT) };
     this.data.workspaces[id] = workspace;
+    if (representative && owner) this.setRepresentativeWorkspace(id, owner, false);
     this.data.uiState.activeWorkspaceId ??= id;
     this.changed();
     return workspace;
+  }
+
+  ensureCanvasWorkspace(canvasPath: string, name: string): PaletteWorkspace {
+    const existing = this.canvasWorkspaces(canvasPath);
+    if (existing.length > 0) {
+      if (!existing.some((workspace) => workspace.representativeCanvasPath === canvasPath)) this.setRepresentativeWorkspace(existing[0].id, canvasPath);
+      return this.representativeWorkspaceForCanvas(canvasPath) ?? existing[0];
+    }
+    return this.createWorkspace(name, "canvas", canvasPath, true);
+  }
+
+  canvasWorkspaces(canvasPath: string): PaletteWorkspace[] {
+    return Object.values(this.data.workspaces).filter((workspace) => workspace.kind === "canvas" && workspace.ownerCanvasPath === canvasPath);
+  }
+
+  representativeWorkspaceForCanvas(canvasPath: string): PaletteWorkspace | undefined {
+    return this.canvasWorkspaces(canvasPath).find((workspace) => workspace.representativeCanvasPath === canvasPath);
+  }
+
+  setRepresentativeWorkspace(workspaceId: string, canvasPath: string, notify = true): boolean {
+    const workspace = this.data.workspaces[workspaceId];
+    if (!workspace || workspace.kind !== "canvas" || workspace.ownerCanvasPath !== canvasPath) return false;
+    for (const candidate of this.canvasWorkspaces(canvasPath)) candidate.representativeCanvasPath = candidate.id === workspaceId ? canvasPath : null;
+    if (notify) this.changed();
+    return true;
+  }
+
+  canStoreItem(workspaceId: string, item: PaletteItem): boolean {
+    const workspace = this.data.workspaces[workspaceId];
+    if (!workspace) return false;
+    if (workspace.kind === "general") return true;
+    const owner = workspace.ownerCanvasPath;
+    if (!owner) return false;
+    return item.origin.canvasPath === owner || item.canvasPlacements.some((placement) => placement.canvasPath === owner && placement.nodeIds.length > 0);
   }
 
   createCollection(workspaceId: string, name: string, parentId: string | null = null): Collection {
@@ -53,40 +89,54 @@ export class PaletteStore {
     return collection;
   }
 
+  renameWorkspace(id: string, name: string): boolean {
+    const workspace = this.data.workspaces[id];
+    const next = name.trim();
+    if (!workspace || !next) return false;
+    workspace.name = next;
+    this.changed();
+    return true;
+  }
+
   addPending(item: PaletteItem): void {
     this.data.items[item.id] = item;
     if (!this.data.pendingItemIds.includes(item.id)) this.data.pendingItemIds.push(item.id);
     this.changed();
   }
 
-  addToWorkspace(workspaceId: string, item: PaletteItem): void {
+  addToWorkspace(workspaceId: string, item: PaletteItem): boolean {
     const workspace = this.data.workspaces[workspaceId];
-    if (!workspace) return;
+    if (!workspace || !this.canStoreItem(workspaceId, item)) return false;
     item.origin.workspaceId = workspaceId;
     item.parentItemId ??= null;
     item.childItemIds ??= [];
     this.data.items[item.id] = item;
     if (!workspace.looseItemIds.includes(item.id)) workspace.looseItemIds.push(item.id);
     if (item.origin.canvasPath && !workspace.canvasPaths.includes(item.origin.canvasPath)) workspace.canvasPaths.push(item.origin.canvasPath);
-    if (item.origin.canvasPath && !workspace.representativeCanvasPath) workspace.representativeCanvasPath = item.origin.canvasPath;
+    if (workspace.kind === "general" && item.origin.canvasPath && !workspace.representativeCanvasPath) workspace.representativeCanvasPath = item.origin.canvasPath;
     this.changed();
+    return true;
   }
 
-  importPending(workspaceId: string, itemIds: string[]): void {
+  importPending(workspaceId: string, itemIds: string[]): { imported: string[]; rejected: string[] } {
     const workspace = this.data.workspaces[workspaceId];
-    if (!workspace) return;
+    if (!workspace) return { imported: [], rejected: [...itemIds] };
+    const imported: string[] = []; const rejected: string[] = [];
     for (const id of itemIds) {
       const item = this.data.items[id];
       if (!item) continue;
+      if (!this.canStoreItem(workspaceId, item)) { rejected.push(id); continue; }
       item.origin.workspaceId = workspaceId;
       item.parentItemId ??= null;
       item.childItemIds ??= [];
       if (item.origin.canvasPath && !workspace.canvasPaths.includes(item.origin.canvasPath)) workspace.canvasPaths.push(item.origin.canvasPath);
-      if (item.origin.canvasPath && !workspace.representativeCanvasPath) workspace.representativeCanvasPath = item.origin.canvasPath;
+      if (workspace.kind === "general" && item.origin.canvasPath && !workspace.representativeCanvasPath) workspace.representativeCanvasPath = item.origin.canvasPath;
       if (!workspace.looseItemIds.includes(id)) workspace.looseItemIds.push(id);
+      imported.push(id);
     }
-    this.data.pendingItemIds = this.data.pendingItemIds.filter((id) => !itemIds.includes(id));
+    this.data.pendingItemIds = this.data.pendingItemIds.filter((id) => !imported.includes(id));
     this.changed();
+    return { imported, rejected };
   }
 
   updateItem(id: string, changes: Pick<PaletteItem, "displayTitle" | "tags" | "label" | "caption"> & Partial<Pick<PaletteItem, "content" | "backContent" | "labelColor">>): void {
@@ -329,7 +379,9 @@ export class PaletteStore {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace) return;
     if (!workspace.canvasPaths.includes(canvasPath)) workspace.canvasPaths.push(canvasPath);
-    if (representative || !workspace.representativeCanvasPath) workspace.representativeCanvasPath = canvasPath;
+    if (workspace.kind === "canvas") {
+      if (representative && workspace.ownerCanvasPath === canvasPath) this.setRepresentativeWorkspace(workspaceId, canvasPath, false);
+    } else if (representative || !workspace.representativeCanvasPath) workspace.representativeCanvasPath = canvasPath;
     this.changed();
   }
 
@@ -442,6 +494,10 @@ export class PaletteStore {
       }
     }
     for (const workspace of Object.values(this.data.workspaces)) {
+      if (workspace.ownerCanvasPath) {
+        const next = moved(workspace.ownerCanvasPath);
+        if (next !== workspace.ownerCanvasPath) { workspace.ownerCanvasPath = next; changed = true; }
+      }
       const nextPaths = [...new Set(workspace.canvasPaths.map(moved))];
       if (nextPaths.some((path, index) => path !== workspace.canvasPaths[index]) || nextPaths.length !== workspace.canvasPaths.length) {
         workspace.canvasPaths = nextPaths;

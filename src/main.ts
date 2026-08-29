@@ -14,7 +14,7 @@ import { PreviewService } from "./preview/preview-service";
 import { SearchService } from "./search/search-service";
 import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
-import { ConfirmCanvasReplacementModal, ConfirmDeleteModal, ItemEditorModal, MetadataEditorModal } from "./ui/modal";
+import { ConfirmCanvasReplacementModal, ConfirmDeleteModal, ItemEditorModal, MetadataEditorModal, TextPromptModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 import { FindLinkModal } from "./ui/find-link-modal";
 
@@ -101,7 +101,7 @@ export default class CanvasPalettePlugin extends Plugin {
     this.registerEvent(workspaceEvents.on("layout-change", () => { this.canvasMetadata.refreshSoon(); this.canvasToolbar.refreshSoon(); }));
     this.addSettingTab(new CanvasPaletteSettingTab(this));
     const initialCanvas = this.canvas.activeContext();
-    if (initialCanvas) { this.miniPalette.mount(); this.scheduleCanvasSync(initialCanvas.file); }
+    if (initialCanvas) { this.miniPalette.mount(); this.scheduleCanvasSync(initialCanvas.file); this.selectRepresentativeWorkspace(); }
     this.canvasMetadata.refreshSoon();
   }
 
@@ -110,6 +110,53 @@ export default class CanvasPalettePlugin extends Plugin {
   activeWorkspace(): PaletteWorkspace | undefined {
     const id = this.store.data.uiState.activeWorkspaceId;
     return id ? this.store.data.workspaces[id] : undefined;
+  }
+
+  currentCanvasPath(): string | null { return this.canvas.activeContext()?.file.path ?? null; }
+
+  workspaceDisplayName(workspace: PaletteWorkspace): string {
+    const currentPath = this.currentCanvasPath();
+    const representative = Boolean(currentPath && workspace.kind === "canvas" && workspace.representativeCanvasPath === currentPath);
+    return `${representative ? "★ " : ""}${workspace.name}${workspace.kind === "canvas" ? " · Canvas" : ""}`;
+  }
+
+  workspaceAcceptsCanvas(workspace: PaletteWorkspace, canvasPath: string): boolean {
+    return workspace.kind === "general" || workspace.ownerCanvasPath === canvasPath;
+  }
+
+  openCurrentCanvasWorkspace(): void {
+    const workspace = this.ensureCurrentCanvasWorkspace();
+    if (!workspace) { new Notice("Open a Canvas first."); return; }
+    this.store.data.uiState.activeWorkspaceId = workspace.id;
+    this.store.changed();
+  }
+
+  showWorkspaceMenu(anchor: HTMLElement): void {
+    const menu = new Menu();
+    const context = this.canvas.activeContext();
+    menu.addItem((entry) => entry.setTitle("Create general Workspace…").setIcon("folder-plus").onClick(() => new TextPromptModal(this.app, "New general Workspace", "", (name) => {
+      const workspace = this.store.createWorkspace(name, "general");
+      this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed();
+    }, "Workspace name").open()));
+    menu.addItem((entry) => entry.setTitle("Create Workspace for current Canvas…").setIcon("layout-dashboard").setDisabled(!context).onClick(() => {
+      if (!context) return;
+      const count = this.store.canvasWorkspaces(context.file.path).length;
+      new TextPromptModal(this.app, "New Canvas Workspace", `${this.canvasBaseName(context.file.path)} ${count + 1}`, (name) => {
+        const workspace = this.store.createWorkspace(name, "canvas", context.file.path, count === 0);
+        this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed();
+      }, "Workspace name").open();
+    }));
+    const active = this.activeWorkspace();
+    if (active) {
+      menu.addSeparator();
+      menu.addItem((entry) => entry.setTitle("Rename current Workspace…").setIcon("pencil").onClick(() => new TextPromptModal(this.app, "Rename Workspace", active.name, (name) => this.store.renameWorkspace(active.id, name), "Workspace name").open()));
+      const canRepresent = Boolean(context && active.kind === "canvas" && active.ownerCanvasPath === context.file.path);
+      const isRepresentative = Boolean(canRepresent && active.representativeCanvasPath === context?.file.path);
+      menu.addItem((entry) => entry.setTitle(isRepresentative ? "Representative Workspace" : "Set as representative").setIcon("star").setChecked(isRepresentative).setDisabled(!canRepresent).onClick(() => {
+        if (context && this.store.setRepresentativeWorkspace(active.id, context.file.path)) new Notice(`${active.name} is now the representative Workspace.`);
+      }));
+    }
+    const rect = anchor.getBoundingClientRect(); menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
   }
 
   selectedItem(): PaletteItem | undefined {
@@ -155,9 +202,9 @@ export default class CanvasPalettePlugin extends Plugin {
 
   async createMemo(): Promise<void> {
     const now = Date.now();
-    const item: PaletteItem = { id: createId("card"), type: "card", displayTitle: "New memo", tags: [], label: "", caption: "", backContent: "", facesEnabled: false, createdAt: now, modifiedAt: now, origin: {}, canvasPlacements: [], content: "" };
-    this.store.addPending(item);
     const workspace = this.activeWorkspace();
+    const item: PaletteItem = { id: createId("card"), type: "card", displayTitle: "New memo", tags: [], label: "", caption: "", backContent: "", facesEnabled: false, createdAt: now, modifiedAt: now, origin: { canvasPath: workspace?.kind === "canvas" ? workspace.ownerCanvasPath ?? undefined : undefined }, canvasPlacements: [], content: "" };
+    this.store.addPending(item);
     if (workspace) this.store.importPending(workspace.id, [item.id]);
     this.selectItem(item.id);
   }
@@ -197,13 +244,15 @@ export default class CanvasPalettePlugin extends Plugin {
   private saveCanvasSelectionFromToolbar(anchor: HTMLElement): void {
     const workspaces = Object.values(this.store.data.workspaces);
     if (workspaces.length === 0) { new Notice("Create a Workspace before saving Canvas items."); return; }
-    if (workspaces.length === 1) { void this.collectCanvasSelectionToWorkspace(workspaces[0].id); return; }
+    const canvasPath = this.currentCanvasPath();
+    if (workspaces.length === 1 && canvasPath && this.workspaceAcceptsCanvas(workspaces[0], canvasPath)) { void this.collectCanvasSelectionToWorkspace(workspaces[0].id); return; }
     const currentId = this.store.data.uiState.activeWorkspaceId;
     const ordered = [...workspaces].sort((a, b) => Number(b.id === currentId) - Number(a.id === currentId));
     const menu = new Menu();
     for (const workspace of ordered) menu.addItem((item) => item
-      .setTitle(workspace.name)
+      .setTitle(this.workspaceDisplayName(workspace))
       .setIcon(workspace.id === currentId ? "check" : "panel-right")
+      .setDisabled(!canvasPath || !this.workspaceAcceptsCanvas(workspace, canvasPath))
       .onClick(() => void this.collectCanvasSelectionToWorkspace(workspace.id)));
     const rect = anchor.getBoundingClientRect();
     menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
@@ -218,10 +267,10 @@ export default class CanvasPalettePlugin extends Plugin {
     menu.addItem((item) => item.setTitle("Canvas Palette — collect selected text").setIcon("library-big").setIsLabel(true));
     menu.addItem((item) => item.setTitle("Collect text to Mini Palette").setIcon("inbox").onClick(() => this.collectCanvasTextToMini(text, context.file.path, range)));
     const currentWorkspace = this.activeWorkspace();
-    if (currentWorkspace) menu.addItem((item) => item.setTitle(`Save text directly to Side Palette — ${currentWorkspace.name}`).setIcon("panel-right").onClick(() => this.collectCanvasTextToWorkspace(text, context.file.path, range, currentWorkspace.id)));
+    if (currentWorkspace) menu.addItem((item) => item.setTitle(`Save text directly to Side Palette — ${currentWorkspace.name}`).setIcon("panel-right").setDisabled(!this.workspaceAcceptsCanvas(currentWorkspace, context.file.path)).onClick(() => this.collectCanvasTextToWorkspace(text, context.file.path, range, currentWorkspace.id)));
     for (const workspace of Object.values(this.store.data.workspaces)) {
       if (workspace.id === currentWorkspace?.id) continue;
-      menu.addItem((item) => item.setTitle(`Save text directly to Side Palette — ${workspace.name}`).setIcon("panel-right").onClick(() => this.collectCanvasTextToWorkspace(text, context.file.path, range, workspace.id)));
+      menu.addItem((item) => item.setTitle(`Save text directly to Side Palette — ${workspace.name}`).setIcon("panel-right").setDisabled(!this.workspaceAcceptsCanvas(workspace, context.file.path)).onClick(() => this.collectCanvasTextToWorkspace(text, context.file.path, range, workspace.id)));
     }
   }
 
@@ -239,7 +288,7 @@ export default class CanvasPalettePlugin extends Plugin {
 
   private collectCanvasTextToWorkspace(text: string, canvasPath: string, textRange: { from: { line: number; ch: number }; to: { line: number; ch: number } }, workspaceId: string): void {
     const item = this.textItem(text, canvasPath, textRange);
-    this.store.addToWorkspace(workspaceId, item);
+    if (!this.store.addToWorkspace(workspaceId, item)) { new Notice("This Canvas Workspace only accepts items from its own Canvas."); return; }
     this.store.data.uiState.activeWorkspaceId = workspaceId;
     this.selectItem(item.id);
     void this.openSidePalette();
@@ -249,12 +298,13 @@ export default class CanvasPalettePlugin extends Plugin {
   private async collectCanvasSelectionToWorkspace(workspaceId: string): Promise<void> {
     const items = await this.canvas.collectSelection();
     if (items.length === 0) return;
-    for (const item of items) this.store.addToWorkspace(workspaceId, item);
+    const accepted = items.filter((item) => this.store.addToWorkspace(workspaceId, item));
+    if (accepted.length === 0) { new Notice("This Canvas Workspace only accepts items from its own Canvas."); return; }
     this.store.data.uiState.activeWorkspaceId = workspaceId;
-    this.store.data.uiState.selectedItemId = items[0].id;
+    this.store.data.uiState.selectedItemId = accepted[0].id;
     this.store.changed();
     await this.openSidePalette();
-    new Notice(`${items.length} Canvas item${items.length === 1 ? "" : "s"} saved to Side Palette.`);
+    new Notice(`${accepted.length} Canvas item${accepted.length === 1 ? "" : "s"} saved to Side Palette.`);
   }
 
   markdownSourceStatus(item: PaletteItem): "deleted" | null {
@@ -479,9 +529,17 @@ export default class CanvasPalettePlugin extends Plugin {
   private selectRepresentativeWorkspace(): void {
     const context = this.canvas.activeContext();
     if (!context) return;
-    const workspace = Object.values(this.store.data.workspaces).find((candidate) => candidate.representativeCanvasPath === context.file.path);
+    const workspace = this.ensureCurrentCanvasWorkspace();
     if (workspace && workspace.id !== this.store.data.uiState.activeWorkspaceId) { this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed(); }
   }
+
+  private ensureCurrentCanvasWorkspace(): PaletteWorkspace | undefined {
+    const context = this.canvas.activeContext();
+    if (!context) return undefined;
+    return this.store.ensureCanvasWorkspace(context.file.path, this.canvasBaseName(context.file.path));
+  }
+
+  private canvasBaseName(path: string): string { return path.split("/").pop()?.replace(/\.canvas$/i, "") || "Canvas"; }
 
   private async activateSidePalette(): Promise<SidePaletteView | null> {
     const existing = this.app.workspace.getLeavesOfType(SIDE_PALETTE_VIEW)[0];
