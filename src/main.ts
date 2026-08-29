@@ -1,4 +1,4 @@
-import { Editor, EventRef, Menu, Notice, Plugin, TFile, TFolder, normalizePath } from "obsidian";
+import { Editor, EventRef, Menu, Notice, Plugin, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
 import { CanvasAdapter } from "./canvas/canvas-adapter";
 import { mergeCanvasNodeIds } from "./core/canvas-node-presence";
 import { CanvasMetadataController } from "./canvas/canvas-metadata-controller";
@@ -14,7 +14,7 @@ import { PreviewService } from "./preview/preview-service";
 import { SearchService } from "./search/search-service";
 import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
-import { ConfirmCanvasReplacementModal, ItemEditorModal, MetadataEditorModal } from "./ui/modal";
+import { ConfirmCanvasReplacementModal, ConfirmDeleteModal, ItemEditorModal, MetadataEditorModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 import { FindLinkModal } from "./ui/find-link-modal";
 
@@ -59,6 +59,7 @@ export default class CanvasPalettePlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.store.load();
+    this.reconcileLoadedMarkdownSources();
     this.register(this.dropController.mount(this.app.workspace.containerEl.ownerDocument));
     this.register(this.canvasToolbar.mount(this.app.workspace.containerEl.ownerDocument));
     this.registerEditorExtension(this.textScrapHighlights.extension());
@@ -82,9 +83,13 @@ export default class CanvasPalettePlugin extends Plugin {
     const workspaceEvents = this.app.workspace as unknown as { on: (name: string, callback: (...args: unknown[]) => unknown) => EventRef };
     this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor) => this.addCanvasTextCollectionMenu(menu, editor)));
     this.registerEvent(this.app.vault.on("modify", (file) => {
-      if (file instanceof TFile && file.extension.toLowerCase() === "canvas") this.scheduleCanvasSync(file);
+      if (!(file instanceof TFile)) return;
+      if (file.extension.toLowerCase() === "canvas") this.scheduleCanvasSync(file);
+      else if (file.extension.toLowerCase() === "md") void this.refreshMarkdownSource(file);
     }));
-    this.registerEvent(this.app.vault.on("delete", (file) => { if (file instanceof TFile) this.store.reconcileDeletedFile(file.path); }));
+    this.registerEvent(this.app.vault.on("delete", (file) => this.store.reconcileDeletedFile(file.path, file instanceof TFolder)));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => void this.handleVaultRename(file, oldPath)));
+    this.registerEvent(this.app.vault.on("create", (file) => { if (file instanceof TFile && file.extension.toLowerCase() === "md") void this.reconnectMovedMarkdown(file); }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
       const context = this.canvas.activeContext();
       if (context) { this.miniPalette.mount(); this.scheduleCanvasSync(context.file); }
@@ -250,6 +255,93 @@ export default class CanvasPalettePlugin extends Plugin {
     this.store.changed();
     await this.openSidePalette();
     new Notice(`${items.length} Canvas item${items.length === 1 ? "" : "s"} saved to Side Palette.`);
+  }
+
+  markdownSourceStatus(item: PaletteItem): "linked" | "deleted" | "canvas-unlinked" | null {
+    if (item.type !== "markdown") return null;
+    if (item.sourceDeletedAt) return "deleted";
+    return this.store.linkedCanvasLocations(item).length > 0 ? "linked" : "canvas-unlinked";
+  }
+
+  showMarkdownSourceMenu(item: PaletteItem, event: MouseEvent): void {
+    const status = this.markdownSourceStatus(item);
+    if (!status) return;
+    const menu = new Menu();
+    if (status === "deleted") {
+      menu.addItem((entry) => entry.setTitle("Restore Markdown").setIcon("file-up").onClick(() => void this.restoreMarkdownSource(item.id)));
+      menu.addItem((entry) => entry.setTitle("Delete from Palette").setIcon("trash").onClick(() => new ConfirmDeleteModal(this.app, 1, () => this.store.removeItems([item.id])).open()));
+    } else {
+      menu.addItem((entry) => entry.setTitle("Open source file").setIcon("external-link").onClick(() => void this.openOriginal(item)));
+      if (status === "linked") menu.addItem((entry) => entry.setTitle("Find Canvas link").setIcon("locate-fixed").onClick(() => this.findLinkedCanvas(item)));
+      else menu.addItem((entry) => entry.setTitle("Drag this card onto an open Canvas").setIcon("mouse-pointer-2").setDisabled(true));
+    }
+    menu.showAtMouseEvent(event);
+  }
+
+  async restoreMarkdownSource(itemId: string): Promise<boolean> {
+    const item = this.store.data.items[itemId];
+    const path = item?.origin.filePath;
+    if (!item || item.type !== "markdown" || !path) return false;
+    const relatedItems = this.store.allItems().filter((candidate) => candidate.type === "markdown" && candidate.origin.filePath === path);
+    try {
+      const existing = this.app.vault.getAbstractFileByPath(path);
+      if (existing && !(existing instanceof TFile)) { new Notice(`Cannot restore Markdown at ${path}.`); return false; }
+      if (!existing) {
+        const slash = path.lastIndexOf("/");
+        await this.ensureVaultFolder(slash >= 0 ? path.slice(0, slash) : "");
+        const restoredContent = item.content ?? "";
+        await this.app.vault.create(path, restoredContent);
+      }
+      const restored = this.store.restoreSource(item.id, path);
+      if (!restored) return false;
+      for (const related of relatedItems) await this.canvas.convertLinkedCardsToMarkdown(this.store.linkedCanvasNodes(related), path);
+      new Notice(`Restored ${path} and reconnected its Canvas cards.`);
+      return true;
+    } catch (error) {
+      console.error("Canvas Palette failed to restore a deleted Markdown source", error);
+      new Notice("Could not restore the Markdown source.");
+      return false;
+    }
+  }
+
+  private reconcileLoadedMarkdownSources(): void {
+    for (const item of this.store.allItems()) {
+      if (item.type !== "markdown" || !item.origin.filePath) continue;
+      const file = this.app.vault.getAbstractFileByPath(item.origin.filePath);
+      if (!(file instanceof TFile)) this.store.reconcileDeletedFile(item.origin.filePath);
+      else if (item.sourceDeletedAt) this.store.restoreSource(item.id, file.path);
+    }
+  }
+
+  private async refreshMarkdownSource(file: TFile): Promise<void> {
+    try { this.store.updateMarkdownSource(file.path, await this.app.vault.cachedRead(file)); }
+    catch (error) { console.error("Canvas Palette failed to refresh a Markdown source", error); }
+  }
+
+  private async handleVaultRename(file: TAbstractFile, oldPath: string): Promise<void> {
+    this.store.renameCanvasPath(oldPath, file.path, file instanceof TFolder);
+    const changedItems = this.store.renameSourcePath(oldPath, file.path, file instanceof TFolder);
+    for (const item of changedItems) {
+      const path = item.origin.filePath;
+      if (path) await this.canvas.renameLinkedFileNodes(this.store.linkedCanvasNodes(item), path);
+    }
+    if (file instanceof TFile && file.extension.toLowerCase() === "md") await this.refreshMarkdownSource(file);
+  }
+
+  private async reconnectMovedMarkdown(file: TFile): Promise<void> {
+    const deleted = this.store.allItems().filter((item) => item.type === "markdown" && Boolean(item.sourceDeletedAt) && Boolean(item.origin.filePath));
+    if (deleted.length === 0) return;
+    try {
+      const content = await this.app.vault.cachedRead(file);
+      const matches = deleted.filter((item) => item.content === content && item.origin.filePath?.split("/").pop()?.toLocaleLowerCase() === file.name.toLocaleLowerCase());
+      const previousPaths = [...new Set(matches.map((item) => item.origin.filePath).filter((path): path is string => Boolean(path)))];
+      if (previousPaths.length !== 1) return;
+      const relatedItems = deleted.filter((item) => item.origin.filePath === previousPaths[0]);
+      const item = this.store.restoreSource(matches[0].id, file.path);
+      if (!item) return;
+      for (const related of relatedItems) await this.canvas.renameLinkedFileNodes(this.store.linkedCanvasNodes(related), file.path);
+      new Notice(`Canvas Palette followed ${file.name} to its new folder.`);
+    } catch (error) { console.error("Canvas Palette failed to reconnect a moved Markdown source", error); }
   }
 
   async openOriginal(item: PaletteItem): Promise<void> {

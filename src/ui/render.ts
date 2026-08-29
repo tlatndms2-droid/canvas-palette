@@ -17,7 +17,8 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
   return button;
 }
 
-export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; dragItemIds?: string[]; currentFace?: CardFace; onToggleFace?: (face: CardFace) => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
+export type MarkdownSourceStatus = "linked" | "deleted" | "canvas-unlinked";
+export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; dragItemIds?: string[]; currentFace?: CardFace; markdownSourceStatus?: MarkdownSourceStatus | null; onMarkdownSourceStatus?: (event: MouseEvent) => void; onToggleFace?: (face: CardFace) => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
 
 export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group"; }
 
@@ -41,9 +42,22 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
     const label = header.createSpan({ cls: "cp-label", text: item.label });
     if (item.labelColor) label.style.setProperty("--cp-label-color", item.labelColor);
   }
-  if (unlinked || options.onToggleFace) {
+  if (unlinked || options.onToggleFace || options.markdownSourceStatus) {
     const actions = header.createSpan({ cls: "cp-item__header-actions" });
-    if (unlinked) {
+    if (options.markdownSourceStatus) {
+      const source = options.markdownSourceStatus;
+      const labels: Record<MarkdownSourceStatus, string> = {
+        linked: "Source Markdown connected",
+        deleted: "Source Markdown deleted. Click to restore.",
+        "canvas-unlinked": "Source Markdown is not placed on Canvas"
+      };
+      const icons: Record<MarkdownSourceStatus, string> = { linked: "link", deleted: "file-x-2", "canvas-unlinked": "unlink" };
+      const state = actions.createEl("button", { cls: `clickable-icon cp-source-state cp-source-state--${source}`, attr: { type: "button", "aria-label": labels[source], title: labels[source] } });
+      setIcon(state, icons[source]);
+      state.addEventListener("pointerdown", (event) => event.stopPropagation());
+      state.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); options.onMarkdownSourceStatus?.(event); });
+      state.addEventListener("dblclick", (event) => event.stopPropagation());
+    } else if (unlinked) {
       const unlinkedBadge = actions.createSpan({ cls: "cp-item__link-state cp-item__link-state--unlinked", attr: { "aria-label": "Unlinked from Canvas", title: "Unlinked from Canvas" } });
       setIcon(unlinkedBadge, "unlink");
     }

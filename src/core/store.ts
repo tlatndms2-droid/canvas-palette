@@ -103,6 +103,7 @@ export class PaletteStore {
     if (!item || item.type !== "card") return false;
     item.type = "markdown";
     item.origin.filePath = filePath;
+    delete item.sourceDeletedAt;
     delete item.origin.textRange;
     item.modifiedAt = Date.now();
     this.changed();
@@ -400,9 +401,93 @@ export class PaletteStore {
     if (changed) this.changed();
   }
 
-  reconcileDeletedFile(path: string): void {
-    let changed = path.toLocaleLowerCase().endsWith(".canvas") ? this.reconcileCanvasLinks(path, new Set()) : false;
-    for (const item of this.allItems()) if (item.origin.filePath === path) { delete item.origin.filePath; changed = true; }
+  reconcileDeletedFile(path: string, folder = false): void {
+    let changed = !folder && path.toLocaleLowerCase().endsWith(".canvas") ? this.reconcileCanvasLinks(path, new Set()) : false;
+    const prefix = `${path}/`;
+    for (const item of this.allItems()) {
+      if (!item.origin.filePath || (folder ? !item.origin.filePath.startsWith(prefix) : item.origin.filePath !== path)) continue;
+      item.sourceDeletedAt = Date.now();
+      changed = true;
+    }
+    if (changed) this.changed();
+  }
+
+  renameSourcePath(oldPath: string, newPath: string, folder = false): PaletteItem[] {
+    const changedItems: PaletteItem[] = [];
+    const prefix = `${oldPath}/`;
+    for (const item of this.allItems()) {
+      const current = item.origin.filePath;
+      if (!current || (folder ? !current.startsWith(prefix) : current !== oldPath)) continue;
+      item.origin.filePath = folder ? `${newPath}/${current.slice(prefix.length)}` : newPath;
+      delete item.sourceDeletedAt;
+      item.modifiedAt = Date.now();
+      changedItems.push(item);
+    }
+    if (changedItems.length > 0) this.changed();
+    return changedItems;
+  }
+
+  renameCanvasPath(oldPath: string, newPath: string, folder = false): void {
+    const prefix = `${oldPath}/`;
+    const moved = (path: string): string => folder && path.startsWith(prefix) ? `${newPath}/${path.slice(prefix.length)}` : path === oldPath ? newPath : path;
+    let changed = false;
+    for (const item of this.allItems()) {
+      if (item.origin.canvasPath) {
+        const next = moved(item.origin.canvasPath);
+        if (next !== item.origin.canvasPath) { item.origin.canvasPath = next; changed = true; }
+      }
+      for (const placement of item.canvasPlacements) {
+        const next = moved(placement.canvasPath);
+        if (next !== placement.canvasPath) { placement.canvasPath = next; changed = true; }
+      }
+    }
+    for (const workspace of Object.values(this.data.workspaces)) {
+      const nextPaths = [...new Set(workspace.canvasPaths.map(moved))];
+      if (nextPaths.some((path, index) => path !== workspace.canvasPaths[index]) || nextPaths.length !== workspace.canvasPaths.length) {
+        workspace.canvasPaths = nextPaths;
+        changed = true;
+      }
+      if (workspace.representativeCanvasPath) {
+        const next = moved(workspace.representativeCanvasPath);
+        if (next !== workspace.representativeCanvasPath) { workspace.representativeCanvasPath = next; changed = true; }
+      }
+    }
+    for (const [canvasPath, metadata] of Object.entries(this.data.canvasNodeMetadata)) {
+      const next = moved(canvasPath);
+      if (next === canvasPath) continue;
+      this.data.canvasNodeMetadata[next] = { ...(this.data.canvasNodeMetadata[next] ?? {}), ...metadata };
+      delete this.data.canvasNodeMetadata[canvasPath];
+      changed = true;
+    }
+    if (changed) this.changed();
+  }
+
+  restoreSource(itemId: string, filePath: string): PaletteItem | null {
+    const item = this.data.items[itemId];
+    if (!item || item.type !== "markdown") return null;
+    const previousPath = item.origin.filePath;
+    const now = Date.now();
+    for (const candidate of this.allItems()) {
+      if (candidate.type !== "markdown" || candidate.origin.filePath !== previousPath) continue;
+      candidate.origin.filePath = filePath;
+      delete candidate.sourceDeletedAt;
+      candidate.modifiedAt = now;
+    }
+    this.changed();
+    return item;
+  }
+
+  updateMarkdownSource(path: string, content: string): void {
+    let changed = false;
+    for (const item of this.allItems()) {
+      if (item.type !== "markdown" || item.origin.filePath !== path) continue;
+      if (item.content !== content || item.sourceDeletedAt) {
+        item.content = content;
+        delete item.sourceDeletedAt;
+        item.modifiedAt = Date.now();
+        changed = true;
+      }
+    }
     if (changed) this.changed();
   }
 

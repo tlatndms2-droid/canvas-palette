@@ -48,6 +48,7 @@ export interface PaletteItem {
   createdAt: number;
   modifiedAt: number;
   origin: ItemOrigin;
+  sourceDeletedAt?: number;
   canvasPlacements: CanvasPlacement[];
   content?: string;
   backContent: string;

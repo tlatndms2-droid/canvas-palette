@@ -455,11 +455,14 @@ export class CanvasAdapter {
   }
 
   private nodeForItem(item: PaletteItem, x: number, y: number): CanvasNodeSnapshot {
-    if ((item.type === "markdown" || item.type === "image") && item.origin.filePath) return { id: createId("node"), type: "file", file: item.origin.filePath, x, y, width: item.type === "image" ? 360 : 280, height: item.type === "image" ? 240 : 180 };
+    if ((item.type === "markdown" || item.type === "image") && item.origin.filePath && !item.sourceDeletedAt) return { id: createId("node"), type: "file", file: item.origin.filePath, x, y, width: item.type === "image" ? 360 : 280, height: item.type === "image" ? 240 : 180 };
     return { id: createId("node"), type: "text", text: item.content ?? item.displayTitle, x, y, width: 280, height: 180 };
   }
 
   private restoreNodeForItem(item: PaletteItem, x: number, y: number): CanvasNodeSnapshot | null {
+    if (item.type === "markdown" && item.sourceDeletedAt) {
+      return { id: createId("node"), type: "text", text: item.content ?? item.displayTitle, x, y, width: 280, height: 180 };
+    }
     if (item.type === "markdown" || item.type === "image") {
       const file = item.origin.filePath ? this.app.vault.getAbstractFileByPath(item.origin.filePath) : null;
       if (!(file instanceof TFile)) { new Notice(`Original file for ${item.displayTitle} is unavailable.`); return null; }
