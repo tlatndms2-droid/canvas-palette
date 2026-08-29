@@ -214,47 +214,17 @@ export class SidePaletteView extends ItemView {
       const remove = iconButton(header, "trash-2", `Delete ${selectedIds.length} selected item${selectedIds.length === 1 ? "" : "s"}`, () => this.confirmDelete(selectedIds));
       remove.addClass("mod-warning", "cp-selection-delete");
     }
-    const filters = parent.createDiv({ cls: "cp-viewport-filterbar" });
-    const filterButton = filters.createEl("button", { cls: "cp-filter-menu-button", attr: { "aria-label": "Open filters", "aria-haspopup": "menu" } });
-    setIcon(filterButton.createSpan({ cls: "cp-filter-menu-button__icon" }), "list-filter");
-    filterButton.createSpan({ text: "필터" });
-    setIcon(filterButton.createSpan({ cls: "cp-filter-menu-button__chevron" }), "chevron-down");
+    const filters = parent.createDiv({ cls: "cp-viewport-filters" });
     const typeFilters = [["All", null], ["Image", "image"], ["MD", "markdown"], ["Card", "card"], ["Group", "group"]] as const;
+    for (const [label, type] of typeFilters) {
+      const token = type ? `type:${type}` : null;
+      const active = token ? this.plugin.search.hasToken(this.query, token) : !/\btype:/i.test(this.query);
+      const button = filters.createEl("button", { text: label, cls: active ? "is-active" : "", attr: { "aria-pressed": String(active) } });
+      button.addEventListener("click", () => { this.query = this.plugin.search.setFacet(this.query, "type", active ? null : token); this.render(); });
+    }
     const unlinkedActive = this.plugin.search.hasToken(this.query, "unlinked");
-    filterButton.addEventListener("click", (event) => {
-      const menu = new Menu();
-      menu.addItem((entry) => entry.setTitle("종류").setIsLabel(true));
-      for (const [label, type] of typeFilters) {
-        const token = type ? `type:${type}` : null;
-        const active = token ? this.plugin.search.hasToken(this.query, token) : !/\btype:/i.test(this.query);
-        menu.addItem((entry) => entry.setTitle(label).setChecked(active).onClick(() => {
-          this.query = this.plugin.search.setFacet(this.query, "type", token);
-          this.render();
-        }));
-      }
-      menu.addSeparator();
-      menu.addItem((entry) => entry.setTitle("상태").setIsLabel(true));
-      menu.addItem((entry) => entry.setTitle("Unlinked").setIcon("unlink").setChecked(unlinkedActive).onClick(() => {
-        this.query = this.plugin.search.toggleToken(this.query, "unlinked");
-        this.render();
-      }));
-      menu.addSeparator();
-      menu.addItem((entry) => entry.setTitle("Linked spaces").setIcon("network").onClick(() => this.openLinkedSpaces(workspaceId)));
-      menu.showAtMouseEvent(event);
-    });
-    const activeChips = filters.createDiv({ cls: "cp-active-filter-chips" });
-    for (const [label, type] of typeFilters.slice(1)) {
-      const token = `type:${type}`;
-      if (!this.plugin.search.hasToken(this.query, token)) continue;
-      const chip = activeChips.createEl("button", { cls: "cp-active-filter-chip", attr: { "aria-label": `Remove ${label} filter` } });
-      chip.createSpan({ text: label }); setIcon(chip.createSpan(), "x");
-      chip.addEventListener("click", () => { this.query = this.plugin.search.setFacet(this.query, "type", null); this.render(); });
-    }
-    if (unlinkedActive) {
-      const chip = activeChips.createEl("button", { cls: "cp-active-filter-chip", attr: { "aria-label": "Remove Unlinked filter" } });
-      chip.createSpan({ text: "Unlinked" }); setIcon(chip.createSpan(), "x");
-      chip.addEventListener("click", () => { this.query = this.plugin.search.toggleToken(this.query, "unlinked"); this.render(); });
-    }
+    const unlinked = filters.createEl("button", { text: "Unlinked", cls: unlinkedActive ? "is-active cp-unlinked-filter" : "cp-unlinked-filter", attr: { "aria-pressed": String(unlinkedActive), title: "Show items with no Canvas link" } });
+    unlinked.addEventListener("click", () => { this.query = this.plugin.search.toggleToken(this.query, "unlinked"); this.render(); });
     const spaces = filters.createEl("button", { text: "Linked spaces", cls: /\bspace:/i.test(this.query) ? "is-active cp-linked-spaces-button" : "cp-linked-spaces-button" });
     spaces.addEventListener("click", () => this.openLinkedSpaces(workspaceId));
     const tools = parent.createDiv({ cls: "cp-viewport-tools" });

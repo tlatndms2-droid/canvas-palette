@@ -2,13 +2,14 @@
 
 ## Current state
 
-- Version: `0.3.12`.
+- Version: `0.3.13`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release target: `0.3.12`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.12`.
-- Latest runtime change: `0.3.12`; Viewport's wide row of type/status buttons is replaced by one compact `필터` menu. Active type and Unlinked filters appear as removable chips, Linked spaces remains directly accessible, selection deletion is a small trash icon, `+ Memo` remains visible beside View settings, and Grid/List stays inside View settings. Outliner retains all hierarchy, metadata, drag/drop, create, rename, and delete behavior while using denser aligned rows and compact actions.
-- Automated baseline: 58 Node tests, including compact toolbar/menu/chip structure and retained Viewport/Outliner actions, plus all previous deleted-source, search, hierarchy, link, metadata, Collection, editor, drag, and Canvas safeguards; plus TypeScript no-emit, production bundling, generated-bundle syntax validation, and JSON parsing.
+- Latest release target: `0.3.13`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.13`.
+- Latest runtime change: `0.3.13`; Viewport filtering returns to the immediately visible `All / Image / MD / Card / Group / Unlinked / Linked spaces` buttons because the compact popover added extra mental overhead. The small selection trash action, persistent Viewport Memo button, Grid/List inside View settings, and dense aligned Outliner from `0.3.12` remain unchanged.
+- Automated baseline: 58 Node tests, including direct Viewport filters and retained compact Viewport/Outliner actions, plus all previous deleted-source, search, hierarchy, link, metadata, Collection, editor, drag, and Canvas safeguards; plus TypeScript no-emit, production bundling, generated-bundle syntax validation, and JSON parsing.
+- `0.3.13` runtime validation used the installed build in the current `secondbrain` Vault without modifying Palette content. The real DOM confirmed exactly `All`, `Image`, `MD`, `Card`, `Group`, `Unlinked`, and `Linked spaces` as direct buttons, no filter popover, and the persistent Viewport Memo action. Clicking Image wrote `type:image` and activated Image; clicking All cleared the query.
 - `0.3.12` runtime validation used the installed build in the current `secondbrain` Vault without creating or modifying Palette Items. The real DOM and screenshot confirmed the compact filter control, permanent Viewport Memo action, small selected-item trash action, dense aligned Outliner rows, and both Outliner create buttons at the narrow saved panel width. Opening the menu exposed `종류`, All/Image/MD/Card/Group, `상태`, Unlinked, and Linked spaces; choosing Image wrote `type:image`, created one removable Image chip, and removing that chip cleared the visible query. No user content was changed.
 
 ## Start here on another PC

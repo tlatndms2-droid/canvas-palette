@@ -5,13 +5,13 @@ import test from "node:test";
 const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
 const styles = await readFile(new URL("../styles.css", import.meta.url), "utf8");
 
-test("Viewport uses one compact filter menu and removable active chips", () => {
-  assert.match(source, /cp-filter-menu-button/);
-  assert.match(source, /setTitle\("종류"\)\.setIsLabel\(true\)/);
-  assert.match(source, /setTitle\("상태"\)\.setIsLabel\(true\)/);
-  assert.match(source, /cp-active-filter-chip/);
-  assert.match(source, /aria-label": `Remove \$\{label\} filter`/);
-  assert.doesNotMatch(source, /const filters = parent\.createDiv\(\{ cls: "cp-viewport-filters"/);
+test("Viewport keeps the direct type and status filter buttons", () => {
+  assert.match(source, /const filters = parent\.createDiv\(\{ cls: "cp-viewport-filters"/);
+  assert.match(source, /\[\["All", null\], \["Image", "image"\], \["MD", "markdown"\], \["Card", "card"\], \["Group", "group"\]\]/);
+  assert.match(source, /text: "Unlinked"/);
+  assert.match(source, /text: "Linked spaces"/);
+  assert.doesNotMatch(source, /cp-filter-menu-button/);
+  assert.doesNotMatch(source, /cp-active-filter-chip/);
 });
 
 test("Viewport keeps Memo and view modes while compacting selected-item deletion", () => {
