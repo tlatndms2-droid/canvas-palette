@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.11**
+Current version: **0.3.12**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
@@ -21,6 +21,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - Separate Collect review and Storage management experiences; Collect uses an attached Inspector drawer that does not resize its parent.
 - PDF-aligned docked three-pane Storage layout with independent left/right toggle and divider resize.
 - Side Palette with representative workspaces, search, Card/List Viewport, Outliner, nested collections, Tag Index, Label Index, and independent scroll regions.
+- The Viewport toolbar is compact: one `필터` menu contains type and Unlinked choices, active filters appear as removable chips, Linked spaces remains directly accessible, selected-item deletion uses a small trash action, and `+ Memo` remains visible beside View settings. Grid/List remains available inside View settings. The Outliner keeps every existing hierarchy and Collection action while using denser rows, aligned disclosure arrows, icons, metadata, and action buttons.
 - Side Palette selection keeps the Viewport, Outliner, Tag Index, and Label Index scroll positions stable. The visible selection count and Delete action occupy a fixed status slot, so selecting cards never inserts content that pushes the asset list downward; the redundant batch metadata action is removed.
 - Side Palette selection follows Windows File Explorer conventions: plain click selects one Card, Ctrl/Cmd-click toggles individual Cards, Shift-click selects a visible range, blank-space click clears selection, and dragging from blank grid space draws a live selection rectangle. A single selection uses only the Card border; check markers appear only when two or more Cards are selected. The Viewport `Unlinked` toggle filters the current results to Items that have no remaining Canvas node link and composes with search and type filters.
 - Selected Card/Markdown previews constrain standard iframe/video embeds and MX-style Shadow DOM video players to the actual Viewport width as complete 16:9 media blocks. Media blocks participate in internal scroll snapping instead of remaining wider than the Card and being clipped.

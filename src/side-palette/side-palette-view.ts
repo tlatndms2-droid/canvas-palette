@@ -211,31 +211,63 @@ export class SidePaletteView extends ItemView {
     const selectedIds = this.sideSelectedIds().filter((id) => this.plugin.store.data.items[id]);
     if (selectedIds.length > 0) {
       header.createSpan({ cls: "cp-selection-count", text: `Selected ${selectedIds.length}` });
-      const remove = header.createEl("button", { text: "Delete", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmDelete(selectedIds));
-    } else {
-      const memo = header.createEl("button", { text: "+ Memo" }); memo.addEventListener("click", () => void this.plugin.createMemo());
-      const grid = header.createEl("button", { text: "Grid", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "grid" ? "is-active" : "" });
-      const list = header.createEl("button", { text: "List", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "list" ? "is-active" : "" });
-      grid.addEventListener("click", () => this.setSideView("grid")); list.addEventListener("click", () => this.setSideView("list"));
+      const remove = iconButton(header, "trash-2", `Delete ${selectedIds.length} selected item${selectedIds.length === 1 ? "" : "s"}`, () => this.confirmDelete(selectedIds));
+      remove.addClass("mod-warning", "cp-selection-delete");
     }
-    const filters = parent.createDiv({ cls: "cp-viewport-filters" });
+    const filters = parent.createDiv({ cls: "cp-viewport-filterbar" });
+    const filterButton = filters.createEl("button", { cls: "cp-filter-menu-button", attr: { "aria-label": "Open filters", "aria-haspopup": "menu" } });
+    setIcon(filterButton.createSpan({ cls: "cp-filter-menu-button__icon" }), "list-filter");
+    filterButton.createSpan({ text: "필터" });
+    setIcon(filterButton.createSpan({ cls: "cp-filter-menu-button__chevron" }), "chevron-down");
     const typeFilters = [["All", null], ["Image", "image"], ["MD", "markdown"], ["Card", "card"], ["Group", "group"]] as const;
-    for (const [label, type] of typeFilters) {
-      const token = type ? `type:${type}` : null;
-      const active = token ? this.plugin.search.hasToken(this.query, token) : !/\btype:/i.test(this.query);
-      const button = filters.createEl("button", { text: label, cls: active ? "is-active" : "", attr: { "aria-pressed": String(active) } });
-      button.addEventListener("click", () => { this.query = this.plugin.search.setFacet(this.query, "type", active ? null : token); this.render(); });
-    }
     const unlinkedActive = this.plugin.search.hasToken(this.query, "unlinked");
-    const unlinked = filters.createEl("button", { text: "Unlinked", cls: unlinkedActive ? "is-active cp-unlinked-filter" : "cp-unlinked-filter", attr: { "aria-pressed": String(unlinkedActive), title: "Show items with no Canvas link" } });
-    unlinked.addEventListener("click", () => { this.query = this.plugin.search.toggleToken(this.query, "unlinked"); this.render(); });
+    filterButton.addEventListener("click", (event) => {
+      const menu = new Menu();
+      menu.addItem((entry) => entry.setTitle("종류").setIsLabel(true));
+      for (const [label, type] of typeFilters) {
+        const token = type ? `type:${type}` : null;
+        const active = token ? this.plugin.search.hasToken(this.query, token) : !/\btype:/i.test(this.query);
+        menu.addItem((entry) => entry.setTitle(label).setChecked(active).onClick(() => {
+          this.query = this.plugin.search.setFacet(this.query, "type", token);
+          this.render();
+        }));
+      }
+      menu.addSeparator();
+      menu.addItem((entry) => entry.setTitle("상태").setIsLabel(true));
+      menu.addItem((entry) => entry.setTitle("Unlinked").setIcon("unlink").setChecked(unlinkedActive).onClick(() => {
+        this.query = this.plugin.search.toggleToken(this.query, "unlinked");
+        this.render();
+      }));
+      menu.addSeparator();
+      menu.addItem((entry) => entry.setTitle("Linked spaces").setIcon("network").onClick(() => this.openLinkedSpaces(workspaceId)));
+      menu.showAtMouseEvent(event);
+    });
+    const activeChips = filters.createDiv({ cls: "cp-active-filter-chips" });
+    for (const [label, type] of typeFilters.slice(1)) {
+      const token = `type:${type}`;
+      if (!this.plugin.search.hasToken(this.query, token)) continue;
+      const chip = activeChips.createEl("button", { cls: "cp-active-filter-chip", attr: { "aria-label": `Remove ${label} filter` } });
+      chip.createSpan({ text: label }); setIcon(chip.createSpan(), "x");
+      chip.addEventListener("click", () => { this.query = this.plugin.search.setFacet(this.query, "type", null); this.render(); });
+    }
+    if (unlinkedActive) {
+      const chip = activeChips.createEl("button", { cls: "cp-active-filter-chip", attr: { "aria-label": "Remove Unlinked filter" } });
+      chip.createSpan({ text: "Unlinked" }); setIcon(chip.createSpan(), "x");
+      chip.addEventListener("click", () => { this.query = this.plugin.search.toggleToken(this.query, "unlinked"); this.render(); });
+    }
     const spaces = filters.createEl("button", { text: "Linked spaces", cls: /\bspace:/i.test(this.query) ? "is-active cp-linked-spaces-button" : "cp-linked-spaces-button" });
-    spaces.addEventListener("click", () => new LinkedSpacesModal(this.app, this.items(workspaceId), this.query, (token) => this.plugin.search.hasToken(this.query, token), (token) => { this.query = this.plugin.search.setFacet(this.query, "space", token); this.render(); }, (itemIds, path) => this.plugin.store.unlinkItemsFromCanvas(itemIds, path)).open());
-    const options = parent.createEl("details", { cls: "cp-view-options" });
+    spaces.addEventListener("click", () => this.openLinkedSpaces(workspaceId));
+    const tools = parent.createDiv({ cls: "cp-viewport-tools" });
+    const options = tools.createEl("details", { cls: "cp-view-options" });
     options.open = this.viewSettingsOpen;
     options.addEventListener("toggle", () => { this.viewSettingsOpen = options.open; });
     options.createEl("summary", { text: "View settings" });
     const controls = options.createDiv({ cls: "cp-view-options__controls" });
+    const viewSwitch = controls.createDiv({ cls: "cp-view-switch" });
+    const grid = viewSwitch.createEl("button", { text: "Grid", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "grid" ? "is-active" : "" });
+    const list = viewSwitch.createEl("button", { text: "List", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "list" ? "is-active" : "" });
+    grid.addEventListener("click", () => this.setSideView("grid")); list.addEventListener("click", () => this.setSideView("list"));
+    const memo = tools.createEl("button", { text: "+ Memo", cls: "cp-viewport-memo" }); memo.addEventListener("click", () => void this.plugin.createMemo());
     const listEl = parent.createDiv({ cls: `cp-grid cp-grid--${this.plugin.activeWorkspace()?.sideLayout.viewMode ?? "grid"}` });
     const applyViewSettings = (): void => {
       listEl.style.setProperty("--cp-card-height", `${this.plugin.store.data.settings.cardHeight}px`);
@@ -462,6 +494,13 @@ export class SidePaletteView extends ItemView {
     const collectionIds = focused?.childCollectionIds ?? workspace.rootCollectionIds; const itemIds = focused?.itemIds ?? workspace.looseItemIds;
     for (const id of collectionIds) this.renderCollection(parent, this.plugin.store.data.collections[id], 0);
     for (const item of itemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item))) this.renderOutlineItem(parent, item, 0, focused?.id ?? null);
+  }
+
+  private openLinkedSpaces(workspaceId: string): void {
+    new LinkedSpacesModal(this.app, this.items(workspaceId), this.query, (token) => this.plugin.search.hasToken(this.query, token), (token) => {
+      this.query = this.plugin.search.setFacet(this.query, "space", token);
+      this.render();
+    }, (itemIds, path) => this.plugin.store.unlinkItemsFromCanvas(itemIds, path)).open();
   }
 
   private renderCollection(parent: HTMLElement, collection: Collection | undefined, depth: number): void {

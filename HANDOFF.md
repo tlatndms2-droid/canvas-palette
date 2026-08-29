@@ -2,14 +2,14 @@
 
 ## Current state
 
-- Version: `0.3.11`.
+- Version: `0.3.12`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release target: `0.3.11`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.11`.
-- Latest runtime change: `0.3.11`; the deleted-source button now uses Obsidian's available `file-x` icon rather than the unsupported blank `file-x-2` slot. The theme-aware red icon, subtle red surface/border, and strict 22×22px button footprint match the existing Unlinked and Front/Back header controls. Normal and Canvas-unplaced behavior from `0.3.10` remains unchanged.
-- Automated baseline: 55 Node tests, including the single deleted-source state, preservation of the existing generic Unlinked UI, Markdown deletion/restore, shared-source reconnection, file/folder source and Canvas-link path tracking, legacy pathless-record repair, plus all previous search, hierarchy, Outliner, link, metadata, Collection, editor, drag, and Canvas safeguards; plus TypeScript no-emit, production bundling, and generated-bundle syntax validation.
-- `0.3.11` runtime validation used the installed build in the current `secondbrain` Vault with isolated `CP-UI-Verify` fixtures. The real DOM and screenshot confirmed a visible `lucide-file-x` SVG, 22×22px button, 13×13px SVG, theme red `rgb(233,49,71)`, and subtle red background/border. Clicking the icon exposed exactly `MD 복구` and `Palette에서 삭제`. Restore created the cached Markdown body, removed the deleted marker, and returned to the existing Unlinked icon; confirmed Palette deletion removed the second fixture. All fixture Items/files/folders were removed. The only TypeError observed during cleanup belonged to `auto-note-mover`; after clearing logs and reloading Canvas Palette, no Canvas Palette error was captured.
+- Latest release target: `0.3.12`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.12`.
+- Latest runtime change: `0.3.12`; Viewport's wide row of type/status buttons is replaced by one compact `필터` menu. Active type and Unlinked filters appear as removable chips, Linked spaces remains directly accessible, selection deletion is a small trash icon, `+ Memo` remains visible beside View settings, and Grid/List stays inside View settings. Outliner retains all hierarchy, metadata, drag/drop, create, rename, and delete behavior while using denser aligned rows and compact actions.
+- Automated baseline: 58 Node tests, including compact toolbar/menu/chip structure and retained Viewport/Outliner actions, plus all previous deleted-source, search, hierarchy, link, metadata, Collection, editor, drag, and Canvas safeguards; plus TypeScript no-emit, production bundling, generated-bundle syntax validation, and JSON parsing.
+- `0.3.12` runtime validation used the installed build in the current `secondbrain` Vault without creating or modifying Palette Items. The real DOM and screenshot confirmed the compact filter control, permanent Viewport Memo action, small selected-item trash action, dense aligned Outliner rows, and both Outliner create buttons at the narrow saved panel width. Opening the menu exposed `종류`, All/Image/MD/Card/Group, `상태`, Unlinked, and Linked spaces; choosing Image wrote `type:image`, created one removable Image chip, and removing that chip cleared the visible query. No user content was changed.
 
 ## Start here on another PC
 
