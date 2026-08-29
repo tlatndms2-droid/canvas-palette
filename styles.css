@@ -126,3 +126,26 @@
 .cp-workspace-explorer__body.is-icons .cp-workspace-file{min-width:0}
 .cp-workspace-explorer__body.is-icons .cp-workspace-file__name,.cp-workspace-explorer__body.is-icons .cp-workspace-file__name>div{width:100%;min-width:0}
 .cp-workspace-explorer__body.is-icons .cp-workspace-file__name>div>span:last-child{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Mini Palette desktop interaction fixes. */
+.cp-mini-float__header{cursor:move;user-select:none}
+.cp-mini-float__header :is(button,input,select){cursor:pointer}
+.cp-inspector-drawer{top:46px;right:0;left:auto;width:min(420px,90%);height:calc(100% - 46px);border:0;border-left:1px solid var(--cp-border);border-radius:0 0 13px 0;box-shadow:-12px 0 28px rgb(0 0 0 / 14%)}
+.cp-window-resize{position:absolute;z-index:8;background:transparent}
+.cp-window-resize::after{display:none}
+.cp-window-resize--n{top:-4px;right:10px;left:10px;height:8px;width:auto;cursor:ns-resize}
+.cp-window-resize--s{right:10px;bottom:-4px;left:10px;height:8px;width:auto;cursor:ns-resize}
+.cp-window-resize--e{top:10px;right:-4px;bottom:10px;width:8px;height:auto;cursor:ew-resize}
+.cp-window-resize--w{top:10px;bottom:10px;left:-4px;width:8px;height:auto;cursor:ew-resize}
+.cp-window-resize--ne,.cp-window-resize--nw,.cp-window-resize--se,.cp-window-resize--sw{width:14px;height:14px}
+.cp-window-resize--ne{top:-5px;right:-5px;bottom:auto;left:auto;cursor:nesw-resize}
+.cp-window-resize--nw{top:-5px;right:auto;bottom:auto;left:-5px;cursor:nwse-resize}
+.cp-window-resize--se{top:auto;right:-5px;bottom:-5px;left:auto;cursor:nwse-resize}
+.cp-window-resize--sw{top:auto;right:auto;bottom:-5px;left:-5px;cursor:nesw-resize}
+.cp-asset-grid .cp-item{min-height:min(var(--cp-mini-card-height,220px),320px)}
+.cp-asset-grid--list{display:flex;flex-direction:column;gap:5px}
+.cp-asset-grid--list .cp-item{display:grid;grid-template-columns:minmax(170px,28%) minmax(0,1fr) auto;min-height:82px;max-height:118px;padding:8px 10px}
+.cp-asset-grid--list .cp-item__header{grid-column:1;align-self:start}
+.cp-asset-grid--list .cp-item__body{grid-column:2;grid-row:1 / span 3;min-height:0;max-height:88px;overflow:hidden}
+.cp-asset-grid--list .cp-item__footer{grid-column:3;grid-row:1 / span 3;display:flex;align-self:end}
+.cp-asset-grid--list .cp-item__canvas-links{grid-column:1}
+.cp-asset-grid--list .cp-item__caption{display:none}

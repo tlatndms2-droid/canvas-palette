@@ -15,8 +15,10 @@ export class FloatingMiniPalette {
   private typeFilter: TypeFilter = "all";
   private tagFilter = "";
   private labelFilter = "";
+  private dateFilter: "all" | "today" | "week" | "month" = "all";
   private inspectorItemId: string | null = null;
   private hoverItemId: string | null = null;
+  private rightPane?: HTMLElement;
   private detachDrop?: () => void;
 
   constructor(private readonly plugin: CanvasPalettePlugin) {}
@@ -34,6 +36,8 @@ export class FloatingMiniPalette {
     this.attach(canvas); this.plugin.store.data.uiState.miniPalette.isOpen = true; this.plugin.store.changed(); this.render();
   }
 
+  toggle(): void { if (this.plugin.store.data.uiState.miniPalette.isOpen) this.close(); else this.open(); }
+
   close(): void { this.plugin.store.data.uiState.miniPalette.isOpen = false; this.plugin.store.changed(); this.destroyPanel(); }
   refresh(): void { if (this.panel) this.render(); }
   destroy(): void { this.destroyPanel(); this.host?.remove(); this.host = undefined; this.unsubscribe?.(); this.unsubscribe = undefined; this.detachDrop?.(); this.detachDrop = undefined; }
@@ -43,9 +47,6 @@ export class FloatingMiniPalette {
     this.destroy();
     canvas.addClass("cp-canvas-host");
     this.host = canvas.createDiv({ cls: "cp-mini-host" });
-    const trigger = this.host.createDiv({ cls: "cp-mini-trigger", attr: { "aria-label": "Open Mini Palette" } });
-    setIcon(trigger, "panels-top-left"); trigger.createSpan({ text: "Mini Palette" });
-    trigger.addEventListener("mouseenter", () => this.open()); trigger.addEventListener("click", () => this.open());
     this.unsubscribe = this.plugin.store.subscribe(() => this.refresh());
     const onDragOver = (event: DragEvent) => { if (event.dataTransfer?.types.includes("application/x-canvas-palette-item")) { event.preventDefault(); event.stopPropagation(); if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"; } };
     const onDrop = (event: DragEvent) => { const id = event.dataTransfer?.getData("application/x-canvas-palette-item"); if (!id) return; event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); const item = this.plugin.store.data.items[id]; if (item) void this.plugin.canvas.restoreItem(item, event.clientX, event.clientY); };
@@ -53,7 +54,7 @@ export class FloatingMiniPalette {
     this.detachDrop = () => { canvas.removeEventListener("dragover", onDragOver, true); canvas.removeEventListener("drop", onDrop, true); canvas.removeClass("cp-canvas-host"); };
   }
 
-  private destroyPanel(): void { this.panel?.remove(); this.panel = undefined; this.inspectorItemId = null; this.hoverItemId = null; }
+  private destroyPanel(): void { this.panel?.remove(); this.panel = undefined; this.rightPane = undefined; this.inspectorItemId = null; this.hoverItemId = null; }
 
   private render(): void {
     if (!this.host || !this.plugin.store.data.uiState.miniPalette.isOpen) return;
@@ -65,14 +66,16 @@ export class FloatingMiniPalette {
     panel.style.setProperty("--cp-left-pane-width", `${state.leftPaneWidth}px`); panel.style.setProperty("--cp-right-pane-width", `${state.rightPaneWidth}px`);
     this.applyAccent(panel);
     const header = panel.createDiv({ cls: "cp-mini-float__header" });
-    const handle = header.createDiv({ cls: "cp-window-handle" }); setIcon(handle, "grip-vertical"); handle.createSpan({ text: "Mini Palette" }); this.makeDraggable(handle, panel);
+    const handle = header.createDiv({ cls: "cp-window-handle" }); setIcon(handle, "grip-vertical"); handle.createSpan({ text: "Mini Palette" }); this.makeDraggable(header, panel);
     const tabs = header.createDiv({ cls: "cp-tabs" }); this.tabButton(tabs, "collect", `Collect (${this.plugin.store.data.pendingItemIds.length})`); this.tabButton(tabs, "storage", `Storage (${this.plugin.store.allItems().length})`);
     const actions = header.createDiv({ cls: "cp-window-actions" });
     iconButton(actions, "settings", "Canvas Palette settings", () => this.plugin.openSettings());
-    iconButton(actions, "pin", "Pin Mini Palette", () => new Notice("Mini Palette position is saved for this session."));
     iconButton(actions, "x", "Close Mini Palette", () => this.close());
     if (state.tab === "collect") this.renderCollect(panel); else this.renderStorage(panel);
-    const resize = panel.createDiv({ cls: "cp-window-resize" }); this.makeResizable(resize, panel);
+    for (const direction of ["n", "ne", "e", "se", "s", "sw", "w", "nw"] as const) {
+      const resize = panel.createDiv({ cls: `cp-window-resize cp-window-resize--${direction}` });
+      this.makeResizable(resize, panel, direction);
+    }
     if (this.inspectorItemId) this.renderInspector();
   }
 
@@ -83,12 +86,12 @@ export class FloatingMiniPalette {
 
   private renderCollect(panel: HTMLElement): void {
     const body = panel.createDiv({ cls: "cp-collect-screen" });
-    const search = body.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search pending items…" }, value: this.search }); search.addEventListener("input", () => { this.search = search.value; this.render(); });
+    const search = body.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search pending items…" }, value: this.search });
     const summary = body.createDiv({ cls: "cp-collect-summary" }); summary.createSpan({ text: `Pending ${this.plugin.store.data.pendingItemIds.length}` });
     const all = summary.createEl("button", { text: "Select all" }); all.addEventListener("click", () => { this.plugin.store.data.uiState.miniPalette.selectedItemIds = this.plugin.store.data.pendingItemIds.slice(); this.plugin.store.changed(); });
     const list = body.createDiv({ cls: "cp-pending-list" });
-    for (const item of this.filtered(this.plugin.store.data.pendingItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item)))) this.renderPendingRow(list, item);
-    if (list.childElementCount === 0) list.createDiv({ cls: "cp-empty", text: "Canvas scraps will wait here for review." });
+    const update = () => { list.empty(); for (const item of this.filtered(this.plugin.store.data.pendingItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item)))) this.renderPendingRow(list, item); if (list.childElementCount === 0) list.createDiv({ cls: "cp-empty", text: "Canvas scraps will wait here for review." }); };
+    search.addEventListener("input", () => { this.search = search.value; update(); }); update();
     const bottom = panel.createDiv({ cls: "cp-bottom cp-bottom--float" });
     const settings = iconButton(bottom, "settings-2", "Settings", () => this.plugin.openSettings());
     settings.addClass("cp-bottom__start");
@@ -121,45 +124,49 @@ export class FloatingMiniPalette {
   private renderStorage(panel: HTMLElement): void {
     const state = this.plugin.store.data.uiState.miniPalette;
     const shell = panel.createDiv({ cls: `cp-storage-shell${state.leftPaneOpen ? " has-left" : ""}${state.rightPaneOpen ? " has-right" : ""}` });
-    if (state.leftPaneOpen) { const left = shell.createDiv({ cls: "cp-storage-left" }); this.renderLeftPane(left); const divider = shell.createDiv({ cls: "cp-divider cp-divider--vertical" }); makeHorizontalDivider(divider, (x) => { const rect = panel.getBoundingClientRect(); state.leftPaneWidth = Math.max(190, Math.min(390, x - rect.left)); this.plugin.store.changed(); }); }
+    if (state.leftPaneOpen) { const left = shell.createDiv({ cls: "cp-storage-left" }); this.renderLeftPane(left); const divider = shell.createDiv({ cls: "cp-divider cp-divider--vertical" }); makeHorizontalDivider(divider, (x) => { const rect = panel.getBoundingClientRect(); state.leftPaneWidth = Math.max(190, Math.min(390, x - rect.left)); panel.style.setProperty("--cp-left-pane-width", `${state.leftPaneWidth}px`); }, () => this.plugin.store.changed()); }
     const main = shell.createDiv({ cls: "cp-storage-main" }); this.renderStorageMain(main);
-    if (state.rightPaneOpen) { const divider = shell.createDiv({ cls: "cp-divider cp-divider--vertical" }); makeHorizontalDivider(divider, (x) => { const rect = panel.getBoundingClientRect(); state.rightPaneWidth = Math.max(240, Math.min(460, rect.right - x)); this.plugin.store.changed(); }); const right = shell.createDiv({ cls: "cp-storage-right" }); this.renderRightPane(right); }
+    if (state.rightPaneOpen) { const divider = shell.createDiv({ cls: "cp-divider cp-divider--vertical" }); makeHorizontalDivider(divider, (x) => { const rect = panel.getBoundingClientRect(); state.rightPaneWidth = Math.max(240, Math.min(460, rect.right - x)); panel.style.setProperty("--cp-right-pane-width", `${state.rightPaneWidth}px`); }, () => this.plugin.store.changed()); const right = shell.createDiv({ cls: "cp-storage-right" }); this.rightPane = right; this.renderRightPane(right); }
     const bottom = panel.createDiv({ cls: "cp-bottom cp-bottom--float" }); bottom.createSpan({ text: `Total ${this.storageItems().length} · Selected ${this.selectedIds().length}` });
     const exportButton = bottom.createEl("button", { text: "Export" }); exportButton.addEventListener("click", () => void this.plugin.exportActiveWorkspace());
     const tagEdit = bottom.createEl("button", { text: "Edit metadata" }); tagEdit.addEventListener("click", () => this.editSelectedMetadata());
     const remove = bottom.createEl("button", { text: "Delete" }); remove.addEventListener("click", () => { this.plugin.store.removeItems(this.selectedIds()); this.plugin.store.data.uiState.miniPalette.selectedItemIds = []; });
-    bottom.createEl("button", { text: "More", attr: { disabled: "true", title: "Reserved for a user-defined action" } });
   }
 
   private renderLeftPane(parent: HTMLElement): void {
     const head = parent.createDiv({ cls: "cp-pane-heading" }); head.createEl("h4", { text: "Control panel" }); iconButton(head, "panel-left-close", "Close left pane", () => { this.plugin.store.data.uiState.miniPalette.leftPaneOpen = false; this.plugin.store.changed(); });
     parent.createEl("label", { text: "Workspace" }); const all = parent.createEl("select", { cls: "dropdown" }); all.createEl("option", { value: "all", text: "All Workspaces" }); for (const workspace of Object.values(this.plugin.store.data.workspaces)) all.createEl("option", { value: workspace.id, text: this.plugin.workspaceDisplayName(workspace) }); all.value = this.plugin.store.data.uiState.activeWorkspaceId ?? "all"; all.addEventListener("change", () => { this.plugin.store.data.uiState.activeWorkspaceId = all.value === "all" ? null : all.value; this.plugin.store.changed(); });
-    parent.createEl("label", { text: "Search" }); const search = parent.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Title, tag, caption" }, value: this.search }); search.addEventListener("input", () => { this.search = search.value; this.render(); });
+    parent.createEl("label", { text: "Search" }); const search = parent.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Title, tag, caption" }, value: this.search }); search.addEventListener("input", () => { this.search = search.value; this.refreshStorageItems(); });
     parent.createEl("label", { text: "Sort" }); const sort = parent.createEl("select", { cls: "dropdown" }); for (const [value, label] of [["modified-desc", "Modified (newest)"], ["modified-asc", "Modified (oldest)"], ["title-asc", "Title (A-Z)"], ["title-desc", "Title (Z-A)"]] as const) sort.createEl("option", { value, text: label }); sort.value = this.plugin.store.data.uiState.miniPalette.sort; sort.addEventListener("change", () => { this.plugin.store.data.uiState.miniPalette.sort = sort.value as typeof this.plugin.store.data.uiState.miniPalette.sort; this.plugin.store.changed(); });
-    parent.createEl("label", { text: "View" }); const view = parent.createDiv({ cls: "cp-view-switch" }); for (const mode of ["grid", "list"] as const) { const button = view.createEl("button", { text: mode === "grid" ? "Grid" : "List", cls: this.plugin.store.data.uiState.miniPalette.viewMode === mode ? "is-active" : "" }); button.addEventListener("click", () => { this.plugin.store.data.uiState.miniPalette.viewMode = mode; this.plugin.store.changed(); }); }
     parent.createEl("label", { text: "Columns" }); const columns = parent.createEl("input", { attr: { type: "range", min: "2", max: "6", value: String(this.plugin.store.data.settings.columns) } }); columns.addEventListener("input", () => { this.plugin.store.data.settings.columns = Number(columns.value); this.plugin.store.changed(); });
+    parent.createEl("label", { text: "Card size" }); const cardSize = parent.createEl("input", { attr: { type: "range", min: "140", max: "320", step: "10", value: String(this.plugin.store.data.uiState.miniPalette.cardHeight) } }); cardSize.addEventListener("input", () => { this.plugin.store.data.uiState.miniPalette.cardHeight = Number(cardSize.value); this.panel?.style.setProperty("--cp-mini-card-height", `${cardSize.value}px`); }); cardSize.addEventListener("change", () => this.plugin.store.changed());
+    parent.createEl("label", { text: "Date" }); const date = parent.createEl("select", { cls: "dropdown" }); for (const [value, text] of [["all", "All dates"], ["today", "Today"], ["week", "Last 7 days"], ["month", "Last 30 days"]] as const) date.createEl("option", { value, text }); date.value = this.dateFilter; date.addEventListener("change", () => { this.dateFilter = date.value as typeof this.dateFilter; this.refreshStorageItems(); });
     parent.createEl("label", { text: "Filter type" }); const types = parent.createDiv({ cls: "cp-filter-chips" }); for (const type of ["all", "card", "markdown", "image", "group"] as const) { const button = types.createEl("button", { text: type === "all" ? "All" : type, cls: this.typeFilter === type ? "is-active" : "" }); button.addEventListener("click", () => { this.typeFilter = type; this.render(); }); }
-    parent.createEl("label", { text: "Tag filter" }); const tag = parent.createEl("input", { attr: { placeholder: "#tag" }, value: this.tagFilter }); tag.addEventListener("input", () => { this.tagFilter = tag.value.replace(/^#/, ""); this.render(); });
-    parent.createEl("label", { text: "Label filter" }); const label = parent.createEl("input", { attr: { placeholder: "Label" }, value: this.labelFilter }); label.addEventListener("input", () => { this.labelFilter = label.value; this.render(); });
+    parent.createEl("label", { text: "Tag filter" }); const tag = parent.createEl("input", { attr: { placeholder: "#tag" }, value: this.tagFilter }); tag.addEventListener("input", () => { this.tagFilter = tag.value.replace(/^#/, ""); this.refreshStorageItems(); });
+    parent.createEl("label", { text: "Label filter" }); const label = parent.createEl("input", { attr: { placeholder: "Label" }, value: this.labelFilter }); label.addEventListener("input", () => { this.labelFilter = label.value; this.refreshStorageItems(); });
   }
 
   private renderStorageMain(parent: HTMLElement): void {
     const heading = parent.createDiv({ cls: "cp-storage-heading" });
     if (!this.plugin.store.data.uiState.miniPalette.leftPaneOpen) iconButton(heading, "panel-left-open", "Open left pane", () => { this.plugin.store.data.uiState.miniPalette.leftPaneOpen = true; this.plugin.store.changed(); });
-    heading.createSpan({ text: "Assets" }); if (!this.plugin.store.data.uiState.miniPalette.rightPaneOpen) iconButton(heading, "panel-right-open", "Open preview pane", () => { this.plugin.store.data.uiState.miniPalette.rightPaneOpen = true; this.plugin.store.changed(); });
+    heading.createSpan({ text: "Assets" });
+    for (const [mode, icon, label] of [["grid", "layout-grid", "Grid view"], ["list", "list", "List view"]] as const) { const button = iconButton(heading, icon, label, () => { this.plugin.store.data.uiState.miniPalette.viewMode = mode; this.plugin.store.changed(); }); if (this.plugin.store.data.uiState.miniPalette.viewMode === mode) button.addClass("is-active"); }
+    if (!this.plugin.store.data.uiState.miniPalette.rightPaneOpen) iconButton(heading, "panel-right-open", "Open preview pane", () => { this.plugin.store.data.uiState.miniPalette.rightPaneOpen = true; this.plugin.store.changed(); });
     const grid = parent.createDiv({ cls: `cp-asset-grid cp-asset-grid--${this.plugin.store.data.uiState.miniPalette.viewMode}` }); grid.style.setProperty("--cp-columns", String(this.plugin.store.data.settings.columns));
+    grid.style.setProperty("--cp-mini-card-height", `${this.plugin.store.data.uiState.miniPalette.cardHeight}px`);
     for (const item of this.storageItems()) {
       const facesEnabled = supportsFrontBack(item) && item.facesEnabled;
       const face = facesEnabled ? this.plugin.store.data.uiState.miniItemFaces[item.id] ?? "front" : "front";
       const card = renderItem(grid, item, { selected: this.selectedIds().includes(item.id), currentFace: face, markdownSourceStatus: this.plugin.markdownSourceStatus(item), onMarkdownSourceStatus: (event) => this.plugin.showMarkdownSourceMenu(item, event), onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("mini", item.id, next) : undefined, draggable: true, onSelect: (event) => this.selectStorage(item.id, event.ctrlKey || event.metaKey), onOpen: () => face === "back" ? void this.plugin.editorManager.openBack(item.id) : void this.plugin.openItemEditor(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), onContextMenu: (event) => { event.preventDefault(); this.itemMenu(item); } });
       const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body) void this.plugin.preview.render(body, item, true, 360, face);
-      card.addEventListener("mousemove", (event) => { if (event.ctrlKey && this.hoverItemId !== item.id) { this.hoverItemId = item.id; this.render(); } });
-      card.addEventListener("mouseleave", () => { if (this.hoverItemId === item.id) { this.hoverItemId = null; this.render(); } });
+      card.addEventListener("mousemove", (event) => { if (event.ctrlKey && this.hoverItemId !== item.id) { this.hoverItemId = item.id; if (this.rightPane) this.renderRightPane(this.rightPane); } });
+      card.addEventListener("mouseleave", () => { if (this.hoverItemId === item.id) { this.hoverItemId = null; if (this.rightPane) this.renderRightPane(this.rightPane); } });
     }
     if (grid.childElementCount === 0) grid.createDiv({ cls: "cp-empty", text: "No items match these filters." });
   }
 
   private renderRightPane(parent: HTMLElement): void {
+    parent.empty();
     const head = parent.createDiv({ cls: "cp-pane-heading" }); head.createEl("h4", { text: this.hoverItemId ? "Temporary preview" : "Preview" }); iconButton(head, "panel-right-close", "Close preview pane", () => { this.plugin.store.data.uiState.miniPalette.rightPaneOpen = false; this.plugin.store.changed(); });
     const item = this.plugin.store.data.items[this.hoverItemId ?? this.plugin.store.data.uiState.selectedItemId ?? ""];
     if (!item) { parent.createDiv({ cls: "cp-empty", text: "Select an item to preview it." }); return; }
@@ -181,13 +188,14 @@ export class FloatingMiniPalette {
   private selectedIds(): string[] { return this.plugin.store.data.uiState.miniPalette.selectedItemIds; }
   private selectPending(id: string, multiple: boolean): void { const ids = this.selectedIds(); this.plugin.store.data.uiState.miniPalette.selectedItemIds = multiple ? (ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]) : [id]; this.plugin.selectItem(id); }
   private selectStorage(id: string, multiple: boolean): void { const ids = this.selectedIds(); this.plugin.store.data.uiState.miniPalette.selectedItemIds = multiple ? (ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]) : [id]; this.plugin.selectItem(id); }
-  private storageItems(): PaletteItem[] { const active = this.plugin.store.data.uiState.activeWorkspaceId; const candidates = active ? this.plugin.store.itemsForWorkspace(active) : this.plugin.store.allItems().filter((item) => !this.plugin.store.data.pendingItemIds.includes(item.id)); return this.sort(this.filtered(candidates)); }
+  private storageItems(): PaletteItem[] { const active = this.plugin.store.data.uiState.activeWorkspaceId; const candidates = active ? this.plugin.store.itemsForWorkspace(active) : this.plugin.store.allItems().filter((item) => !this.plugin.store.data.pendingItemIds.includes(item.id)); const now = Date.now(); const cutoff = this.dateFilter === "today" ? new Date().setHours(0, 0, 0, 0) : this.dateFilter === "week" ? now - 7 * 86400000 : this.dateFilter === "month" ? now - 30 * 86400000 : 0; return this.sort(this.filtered(candidates).filter((item) => item.modifiedAt >= cutoff)); }
   private filtered(items: PaletteItem[]): PaletteItem[] { return this.plugin.search.filter(items, this.search).filter((item) => (this.typeFilter === "all" || item.type === this.typeFilter) && (!this.tagFilter || item.tags.some((tag) => tag.toLocaleLowerCase().includes(this.tagFilter.toLocaleLowerCase()))) && (!this.labelFilter || item.label.toLocaleLowerCase().includes(this.labelFilter.toLocaleLowerCase()))); }
+  private refreshStorageItems(): void { const main = this.panel?.querySelector<HTMLElement>(".cp-storage-main"); if (!main) return; main.empty(); this.renderStorageMain(main); const total = this.panel?.querySelector<HTMLElement>(".cp-bottom--float > span"); if (total) total.setText(`Total ${this.storageItems().length} · Selected ${this.selectedIds().length}`); }
   private sort(items: PaletteItem[]): PaletteItem[] { const mode = this.plugin.store.data.uiState.miniPalette.sort; return [...items].sort((a, b) => mode === "modified-desc" ? b.modifiedAt - a.modifiedAt : mode === "modified-asc" ? a.modifiedAt - b.modifiedAt : mode === "title-desc" ? b.displayTitle.localeCompare(a.displayTitle) : a.displayTitle.localeCompare(b.displayTitle)); }
   private workspaceName(id?: string): string { return id ? this.plugin.store.data.workspaces[id]?.name ?? "Unknown workspace" : "Pending"; }
   private itemMenu(item: PaletteItem): void { const menu = new Menu(); menu.addItem((entry) => entry.setTitle("Edit metadata").setIcon("tags").onClick(() => new TagLabelModal(this.plugin.app, this.plugin, [item.id]).open())); menu.addItem((entry) => entry.setTitle("Open original").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item))); if (item.origin.canvasPath && item.origin.canvasNodeId) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => void this.plugin.locateItemOnCanvas(item))); menu.addItem((entry) => entry.setTitle("Delete").setIcon("trash").onClick(() => this.plugin.store.removeItems([item.id]))); menu.showAtPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 }); }
   private editSelectedMetadata(): void { const ids = this.selectedIds().filter((id) => this.plugin.store.data.items[id]); if (ids.length === 0) { new Notice("Select items first."); return; } new TagLabelModal(this.plugin.app, this.plugin, ids).open(); }
   private applyAccent(panel: HTMLElement): void { const settings = this.plugin.store.data.settings; if (settings.accentMode === "custom") panel.style.setProperty("--cp-accent", settings.accentColor); }
-  private makeDraggable(handle: HTMLElement, panel: HTMLElement): void { handle.addEventListener("pointerdown", (event) => { if (event.target instanceof HTMLButtonElement) return; event.preventDefault(); handle.setPointerCapture(event.pointerId); const state = this.plugin.store.data.uiState.miniPalette; const start = { x: event.clientX, y: event.clientY, left: state.position.x, top: state.position.y }; const move = (pointer: PointerEvent) => { state.position = { x: Math.max(0, start.left + pointer.clientX - start.x), y: Math.max(0, start.top + pointer.clientY - start.y) }; panel.style.left = `${state.position.x}px`; panel.style.top = `${state.position.y}px`; }; const end = () => { handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", end); handle.removeEventListener("pointercancel", end); this.plugin.store.changed(); }; handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", end); handle.addEventListener("pointercancel", end); }); }
-  private makeResizable(handle: HTMLElement, panel: HTMLElement): void { handle.addEventListener("pointerdown", (event) => { event.preventDefault(); handle.setPointerCapture(event.pointerId); const state = this.plugin.store.data.uiState.miniPalette; const start = { x: event.clientX, y: event.clientY, width: state.size.width, height: state.size.height }; const move = (pointer: PointerEvent) => { state.size = { width: Math.max(680, start.width + pointer.clientX - start.x), height: Math.max(420, start.height + pointer.clientY - start.y) }; panel.style.width = `${state.size.width}px`; panel.style.height = `${state.size.height}px`; }; const end = () => { handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", end); handle.removeEventListener("pointercancel", end); this.plugin.store.changed(); }; handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", end); handle.addEventListener("pointercancel", end); }); }
+  private makeDraggable(handle: HTMLElement, panel: HTMLElement): void { handle.addEventListener("pointerdown", (event) => { if ((event.target as HTMLElement).closest("button,input,select")) return; event.preventDefault(); handle.setPointerCapture(event.pointerId); const state = this.plugin.store.data.uiState.miniPalette; const start = { x: event.clientX, y: event.clientY, left: state.position.x, top: state.position.y }; const move = (pointer: PointerEvent) => { const host = this.host?.getBoundingClientRect(); const maxLeft = Math.max(0, (host?.width ?? window.innerWidth) - panel.offsetWidth); const maxTop = Math.max(0, (host?.height ?? window.innerHeight) - panel.offsetHeight); state.position = { x: Math.max(0, Math.min(maxLeft, start.left + pointer.clientX - start.x)), y: Math.max(0, Math.min(maxTop, start.top + pointer.clientY - start.y)) }; panel.style.left = `${state.position.x}px`; panel.style.top = `${state.position.y}px`; }; const end = () => { handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", end); handle.removeEventListener("pointercancel", end); this.plugin.store.changed(); }; handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", end); handle.addEventListener("pointercancel", end); }); }
+  private makeResizable(handle: HTMLElement, panel: HTMLElement, direction: string): void { handle.addEventListener("pointerdown", (event) => { event.preventDefault(); event.stopPropagation(); handle.setPointerCapture(event.pointerId); const state = this.plugin.store.data.uiState.miniPalette; const start = { x: event.clientX, y: event.clientY, left: state.position.x, top: state.position.y, width: state.size.width, height: state.size.height }; const move = (pointer: PointerEvent) => { const dx = pointer.clientX - start.x; const dy = pointer.clientY - start.y; const host = this.host?.getBoundingClientRect(); const hostWidth = host?.width ?? window.innerWidth; const hostHeight = host?.height ?? window.innerHeight; let left = start.left; let top = start.top; let width = start.width; let height = start.height; if (direction.includes("e")) width = start.width + dx; if (direction.includes("s")) height = start.height + dy; if (direction.includes("w")) { width = start.width - dx; left = start.left + dx; } if (direction.includes("n")) { height = start.height - dy; top = start.top + dy; } if (width < 680) { if (direction.includes("w")) left -= 680 - width; width = 680; } if (height < 420) { if (direction.includes("n")) top -= 420 - height; height = 420; } left = Math.max(0, left); top = Math.max(0, top); width = Math.min(width, Math.max(680, hostWidth - left)); height = Math.min(height, Math.max(420, hostHeight - top)); state.position = { x: left, y: top }; state.size = { width, height }; panel.style.left = `${left}px`; panel.style.top = `${top}px`; panel.style.width = `${width}px`; panel.style.height = `${height}px`; }; const end = () => { handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", end); handle.removeEventListener("pointercancel", end); this.plugin.store.changed(); }; handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", end); handle.addEventListener("pointercancel", end); }); }
 }

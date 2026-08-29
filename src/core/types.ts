@@ -108,6 +108,7 @@ export interface MiniPaletteState {
   leftPaneWidth: number;
   rightPaneWidth: number;
   viewMode: AssetViewMode;
+  cardHeight: number;
   sort: "modified-desc" | "modified-asc" | "title-asc" | "title-desc";
   selectedItemIds: string[];
 }

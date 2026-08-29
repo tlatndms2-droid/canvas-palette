@@ -17,7 +17,7 @@ export const DEFAULT_DATA: PaletteData = {
   uiState: { activeWorkspaceId: null, lastCanvasPath: null, selectedItemId: null, sideSelectedItemIds: [], sideItemFaces: {}, miniItemFaces: {}, quickEditor: { x: null, y: null, width: null, height: null }, workspaceExplorer: { viewMode: "details", sort: "modified-desc" }, miniPalette: {
     tab: "collect", isOpen: false, position: { x: 24, y: 62 }, size: { width: 1120, height: 720 },
     leftPaneOpen: true, rightPaneOpen: true, leftPaneWidth: 248, rightPaneWidth: 310,
-    viewMode: "grid", sort: "modified-desc", selectedItemIds: []
+    viewMode: "grid", cardHeight: 220, sort: "modified-desc", selectedItemIds: []
   } }
 };
 

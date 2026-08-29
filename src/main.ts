@@ -69,9 +69,9 @@ export default class CanvasPalettePlugin extends Plugin {
     this.register(this.store.subscribe(() => { this.textScrapHighlights.refreshVisibleEditors(); this.canvasMetadata.refreshSoon(); this.canvasToolbar.refreshSoon(); }));
     this.registerView(SIDE_PALETTE_VIEW, (leaf) => new SidePaletteView(leaf, this));
     this.addRibbonIcon("library-big", "Open Canvas Palette", () => void this.activateSidePalette());
-    this.addRibbonIcon("panels-top-left", "Open Canvas Mini Palette", () => this.miniPalette.open());
+    this.addRibbonIcon("panels-top-left", "Toggle Canvas Mini Palette", () => this.miniPalette.toggle());
     this.addCommand({ id: "open-side-palette", name: "Open Side Palette", callback: () => void this.activateSidePalette() });
-    this.addCommand({ id: "open-mini-palette", name: "Open Mini Palette on Canvas", callback: () => this.miniPalette.open() });
+    this.addCommand({ id: "open-mini-palette", name: "Toggle Mini Palette on Canvas", callback: () => this.miniPalette.toggle() });
     this.addCommand({ id: "collect-canvas-selection", name: "Collect selected Canvas items", callback: () => void this.collectCanvasSelection() });
     this.addCommand({ id: "collect-selected-text", name: "Collect selected text as card", editorCheckCallback: (checking, editor, view) => {
       const selection = editor.getSelection();
