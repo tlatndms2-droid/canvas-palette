@@ -49,7 +49,7 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
       const labels: Record<MarkdownSourceStatus, string> = {
         deleted: "원본 MD가 삭제되었습니다. 복구하거나 Palette에서 삭제할 수 있습니다."
       };
-      const icons: Record<MarkdownSourceStatus, string> = { deleted: "file-x-2" };
+      const icons: Record<MarkdownSourceStatus, string> = { deleted: "file-x" };
       const state = actions.createEl("button", { cls: `clickable-icon cp-source-state cp-source-state--${source}`, attr: { type: "button", "aria-label": labels[source], title: labels[source] } });
       setIcon(state, icons[source]);
       state.addEventListener("pointerdown", (event) => event.stopPropagation());
