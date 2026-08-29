@@ -60,7 +60,10 @@
 - Keep `manifest.json`, `package.json`, `versions.json`, README, HANDOFF, Git tag, and GitHub Release version aligned.
 - Publish from `main` as a public, non-draft, non-prerelease GitHub Release suitable for BRAT.
 - Attach `main.js`, `manifest.json`, and `styles.css` as separate release assets. A zip is optional unless the user requests it.
-- Verify local HEAD, remote `main`, and the release tag resolve to the same commit. Re-fetch the public release and confirm all required asset names.
+- Keep implementation verification strong: run the affected tests, run the full automated suite once before release, and validate the changed behavior in the installed Obsidian build whenever that behavior can be exercised safely.
+- Use lightweight release verification by default for ordinary patches: confirm the version, public non-draft/non-prerelease release, tag, and required asset names. Do not routinely download the release assets again or compare SHA256 hashes.
+- Use full distribution verification only for a large feature release, an important public milestone, a BRAT/update failure, a suspected wrong upload, or any release process that produced an error. Full verification compares local HEAD, remote `main`, and the peeled release tag, then re-downloads the assets and compares their hashes.
+- Prefer time spent on actual Obsidian behavior over repeated distribution checks. Do not run the same full test suite twice in one ordinary patch unless the code changed after the first run or a failure requires it.
 - Do not report release completion from a locally created tag or draft page. The public release and downloadable assets must already exist.
 
 ### Completion report
@@ -267,4 +270,4 @@ Focused release checks are recorded above, but a future change touching shared i
 
 ## Release checklist
 
-Use the complete release and GitHub verification rules in `Development operating instructions`. The short form is: build, Sandbox-test the affected paths when possible, bump the next sequential patch version unless the user requested a minor bump, update README/HANDOFF, commit, push, publish `main.js`, `manifest.json`, and `styles.css`, and verify the public release and matching Git refs. The user explicitly requires a release after every implemented modification.
+Use the complete release and GitHub verification rules in `Development operating instructions`. The short form is: implement, run focused tests, run the complete suite once, verify the affected behavior in Obsidian when safe, bump the next sequential patch version unless the user requested a minor bump, update README/HANDOFF, commit, push, publish `main.js`, `manifest.json`, and `styles.css`, then confirm the public release and asset names. Reserve re-download, SHA256, and repeated Git-ref comparison for large, important, failed, or suspicious releases. The user explicitly requires a release after every implemented product modification.
