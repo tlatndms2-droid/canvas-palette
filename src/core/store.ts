@@ -124,6 +124,7 @@ export class PaletteStore {
       if (replacement) this.setRepresentativeWorkspace(replacement.id, workspace.ownerCanvasPath, false);
     }
     if (this.data.uiState.activeWorkspaceId === id) this.data.uiState.activeWorkspaceId = Object.keys(this.data.workspaces)[0] ?? null;
+    if (this.data.uiState.miniPalette.storageWorkspaceFilter === id) this.data.uiState.miniPalette.storageWorkspaceFilter = null;
     this.changed();
     return true;
   }

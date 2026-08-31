@@ -25,7 +25,7 @@ test("Image Front Back remains opt-in instead of being enabled by item type", as
     }
   });
 
-  assert.equal(data.schemaVersion, 18);
+  assert.equal(data.schemaVersion, 19);
   assert.equal(data.items.ordinary.facesEnabled, false);
   assert.equal(data.items.chosen.facesEnabled, true);
   assert.equal(data.items.chosen.backContent, "Image notes");

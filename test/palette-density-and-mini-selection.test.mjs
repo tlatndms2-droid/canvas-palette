@@ -35,3 +35,18 @@ test("Mini batch actions use selected IDs and guarded Canvas placement", async (
   assert.match(mini, /application\/x-canvas-palette-items/);
   assert.match(canvas, /async restoreItems\(items: PaletteItem\[\], screenX: number, screenY: number\)/);
 });
+
+test("Mini Storage workspace filter is independent from the active Side workspace", async () => {
+  const types = await readFile(new URL("../src/core/types.ts", import.meta.url), "utf8");
+  const defaults = await readFile(new URL("../src/core/defaults.ts", import.meta.url), "utf8");
+  const store = await readFile(new URL("../src/core/store.ts", import.meta.url), "utf8");
+  const mini = await readFile(new URL("../src/mini-palette/floating-mini-palette.ts", import.meta.url), "utf8");
+  assert.match(types, /storageWorkspaceFilter: string \| null/);
+  assert.match(defaults, /hasStorageWorkspaceFilter = Object\.prototype\.hasOwnProperty\.call/);
+  assert.match(defaults, /hasStorageWorkspaceFilter \? legacyUi\.miniPalette\?\.storageWorkspaceFilter \?\? null : legacyUi\.activeWorkspaceId \?\? null/);
+  assert.match(defaults, /requestedStorageWorkspaceFilter && workspaces\[requestedStorageWorkspaceFilter\]/);
+  assert.match(mini, /miniPalette\.storageWorkspaceFilter = all\.value === "all" \? null : all\.value/);
+  assert.match(mini, /const filter = this\.plugin\.store\.data\.uiState\.miniPalette\.storageWorkspaceFilter/);
+  assert.doesNotMatch(mini, /activeWorkspaceId = all\.value === "all"/);
+  assert.match(store, /miniPalette\.storageWorkspaceFilter === id/);
+});

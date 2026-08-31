@@ -2,12 +2,13 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.18**
+Current version: **0.3.19**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
+- Mini Storage now owns an independent Workspace filter. Choosing `All Workspaces` or a specific Mini filter no longer changes the Side Palette/Canvas active Workspace, and schema 19 preserves the former Mini filter on upgrade while keeping an explicitly selected `All Workspaces` value independent.
 - Mini Palette and Side Palette now share a seven-step Windows File Explorer-style asset density system. One Item size control changes card width, height, responsive column count, preview detail, and the final List/Details layout in sequence; each palette restores its own saved density after reload.
 - Mini Palette Collect and Storage keep independent selection sets and anchors. Both support plain, Ctrl/Cmd, Shift, and Ctrl/Cmd+Shift selection; Storage also supports blank-space clearing and rectangle selection. Single selection uses the border only, while multi-selection adds check markers.
 - Mini Palette batch actions operate on the visible selection: filtered Select all, multi-item metadata, confirmed deletion, multi-item drag payloads, and `Place on Canvas` for selected items only. Workspace mind-map Export remains a Side Palette responsibility. Closing the Mini left pane keeps quick Search, Type filter, and Item size controls above Assets.

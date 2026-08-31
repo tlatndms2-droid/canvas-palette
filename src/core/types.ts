@@ -101,6 +101,8 @@ export interface PaletteSettings {
 
 export interface MiniPaletteState {
   tab: "collect" | "storage";
+  /** Mini Storage-only workspace filter. null means All Workspaces. */
+  storageWorkspaceFilter: string | null;
   isOpen: boolean;
   position: { x: number; y: number };
   size: { width: number; height: number };
