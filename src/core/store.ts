@@ -13,10 +13,14 @@ export class PaletteStore {
   constructor(private readonly plugin: CanvasPalettePlugin) {}
 
   async load(): Promise<void> {
-    this.data = migrateData(await this.plugin.loadData() as Partial<PaletteData> | null);
+    const raw = await this.plugin.loadData() as Partial<PaletteData> | null;
+    // Capture this before normalization stamps the current schema version.
+    const isLegacyForeignTransferData = (raw?.schemaVersion ?? 0) < 22;
+    this.data = migrateData(raw);
+    const repairedTransfers = isLegacyForeignTransferData && this.repairLegacyForeignWorkspaceTransfers();
     const repairedDuplicates = this.repairDuplicateCanvasItems();
     if (Object.keys(this.data.workspaces).length === 0) this.createWorkspace("My Workspace");
-    else if (repairedDuplicates) await this.flush();
+    else if (repairedTransfers || repairedDuplicates) await this.flush();
   }
 
   subscribe(listener: Listener): () => void {
@@ -796,6 +800,35 @@ export class PaletteStore {
     delete item.origin.canvasPath;
     delete item.origin.canvasNodeId;
     item.canvasPlacements = [];
+  }
+
+  /** Migrates old cross-representative transfers without touching general Workspace reuse. */
+  private repairLegacyForeignWorkspaceTransfers(): boolean {
+    let changed = false;
+    for (const workspace of Object.values(this.data.workspaces)) {
+      const owner = workspace.kind === "canvas" ? workspace.ownerCanvasPath : null;
+      if (!owner) continue;
+      // Some older files kept ownership only on the item origin, so inspect both
+      // the visible workspace containers and that original ownership record.
+      const items = new Map<string, PaletteItem>();
+      for (const item of this.itemsForWorkspace(workspace.id)) items.set(item.id, item);
+      for (const item of this.allItems()) if (item.origin.workspaceId === workspace.id) items.set(item.id, item);
+      for (const item of items.values()) {
+        const ownerNodeIds = this.linkedCanvasNodes(item).filter((location) => location.canvasPath === owner).map((location) => location.nodeId);
+        const hasForeignLink = this.linkedCanvasNodes(item).some((location) => location.canvasPath !== owner);
+        if (!hasForeignLink) continue;
+        if (ownerNodeIds.length === 0) {
+          this.detachCanvasLinks(item);
+        } else {
+          item.origin.canvasPath = owner;
+          item.origin.canvasNodeId = ownerNodeIds[0];
+          const remaining = [...new Set(ownerNodeIds.slice(1))];
+          item.canvasPlacements = remaining.length > 0 ? [{ canvasPath: owner, nodeIds: remaining, placedAt: Date.now() }] : [];
+        }
+        changed = true;
+      }
+    }
+    return changed;
   }
 
   private repairDuplicateCanvasItems(): boolean {

@@ -155,6 +155,27 @@ test("Side explicitly adds and removes a Mini relay link without changing Worksp
   await cleanup();
 });
 
+test("schema 21 repairs old foreign representative links but keeps the destination Canvas link", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const target = { id: "target", name: "Target", kind: "canvas", ownerCanvasPath: "Target.canvas", canvasPaths: ["Target.canvas"], representativeCanvasPath: "Target.canvas", rootCollectionIds: [], looseItemIds: ["unplaced", "placed"], sideLayout: {}, createdAt: 1, modifiedAt: 1 };
+  const raw = { schemaVersion: 21, workspaces: { target }, items: {
+    unplaced: item("unplaced", "Old.canvas"),
+    placed: { ...item("placed", "Old.canvas"), canvasPlacements: [{ canvasPath: "Target.canvas", nodeIds: ["target-node"], placedAt: 1 }] }
+  } };
+  raw.items.unplaced.origin.canvasNodeId = "old-node";
+  raw.items.placed.origin.canvasNodeId = "old-placed-node";
+  raw.items.unplaced.origin.workspaceId = target.id;
+  raw.items.placed.origin.workspaceId = target.id;
+  const store = new PaletteStore({ loadData: async () => raw, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  await store.load();
+  assert.equal(store.data.items.unplaced.origin.canvasPath, undefined);
+  assert.deepEqual(store.data.items.unplaced.canvasPlacements, []);
+  assert.equal(store.data.items.placed.origin.canvasPath, "Target.canvas");
+  assert.equal(store.data.items.placed.origin.canvasNodeId, "target-node");
+  assert.deepEqual(store.data.items.placed.canvasPlacements, []);
+  await cleanup();
+});
+
 test("Mini import keeps an already stored Collect item and reports it as a duplicate", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });

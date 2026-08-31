@@ -8,7 +8,7 @@ export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
 };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 21,
+  schemaVersion: 22,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
@@ -43,7 +43,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 21,
+    schemaVersion: 22,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
       const repairedType = item.type === "markdown" && !item.origin?.filePath ? "card" : item.type;
       const supportsFaces = repairedType !== "group";
