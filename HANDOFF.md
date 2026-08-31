@@ -2,12 +2,12 @@
 
 ## Current state
 
-- Version: `0.3.39`.
+- Version: `0.3.41`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Pending release target: `0.3.39`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`; actual UI validation is still required before publication.
+- Latest validated release target: `0.3.41`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
 - Latest release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.38`.
-- Latest runtime change: `0.3.39`; sending an Item from Canvas directly or importing it through Mini Collect into another Canvas representative now removes every prior Canvas-node relationship. The Item enters the destination as `Unlinked`; only a later placement on that destination Canvas creates its new Canvas link.
+- Latest runtime change: `0.3.41`; dropping Mini Collect items on Canvas completes them out of Collect while retaining the linked Palette item, Storage placements stay in Storage, multi-group placement does not overlap, and the Mini window can cross Canvas and Side Palette areas with smaller width limits.
 - Latest runtime change: `0.3.35`; Mini Collect no longer has the generic `Edit selected` action. It now shows separate actions: `Open selected item settings` is enabled only for exactly one selected Item and opens the right drawer; `Multiple selection editing` is enabled only for two or more Items and opens the batch Tag, Label, and Caption modal. The Collect context menu uses the same terms.
 - Latest runtime change: `0.3.34`; selecting a Mini Palette Collect row no longer opens the right `Selected item settings` drawer. Right-click the row and choose `Open selected item settings` to open that drawer deliberately. Collect multi-selection retains its batch `Edit metadata` modal. Runtime validation in Obsidian Sandbox confirmed a normal click selects without a drawer; the context menu exposes the new command; selecting it opens the drawer with Title, Tag, Label, Label color, Caption, and Original preview; no runtime error was captured.
 - Latest runtime change: `0.3.33`; navigation is consistent across Mini Collect, Mini Storage, Side Palette, and item detail panels. Canvas-linked Items use `Locate on Canvas`; Items with only a Vault source use `Open source file`; ambiguous `Open original` entries are removed. Feature 2 has not started.

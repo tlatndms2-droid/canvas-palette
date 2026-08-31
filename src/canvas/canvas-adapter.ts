@@ -364,11 +364,10 @@ export class CanvasAdapter {
     if (!context || items.length === 0) { if (!context) new Notice("Open a Canvas before placing items."); return false; }
     const point = context.runtime.posFromClient?.({ x: screenX, y: screenY });
     if (!point) { new Notice("Unable to calculate the Canvas position."); return false; }
-    const columns = Math.max(1, Math.ceil(Math.sqrt(items.length)));
+    const positions = this.batchRestorePositions(items, point);
     let restored = 0;
     for (let index = 0; index < items.length; index += 1) {
-      const position = { x: point.x + (index % columns) * 320, y: point.y + Math.floor(index / columns) * 220 };
-      if (await this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, items[index], position))) restored += 1;
+      if (await this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, items[index], positions[index]))) restored += 1;
     }
     if (items.length > 1) new Notice(`${restored} of ${items.length} items added to Canvas.`);
     return restored > 0;
@@ -387,14 +386,25 @@ export class CanvasAdapter {
     if (!context || items.length === 0) return false;
     const point = context.runtime.posFromEvt?.(event);
     if (!point) { new Notice("Unable to calculate the Canvas drop position."); return false; }
+    const positions = this.batchRestorePositions(items, point);
     let restored = 0;
     for (let index = 0; index < items.length; index++) {
-      const columns = Math.max(1, Math.ceil(Math.sqrt(items.length)));
-      const position = { x: point.x + (index % columns) * 320, y: point.y + Math.floor(index / columns) * 220 };
-      if (await this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, items[index], position))) restored++;
+      if (await this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, items[index], positions[index]))) restored++;
     }
     if (items.length > 1) new Notice(`${restored} of ${items.length} items added to Canvas.`);
     return restored > 0;
+  }
+
+  private batchRestorePositions(items: PaletteItem[], point: { x: number; y: number }): Array<{ x: number; y: number }> {
+    const sizeFor = (item: PaletteItem): { width: number; height: number } => item.type === "group"
+      ? { width: Math.max(280, item.group?.bounds.width ?? 280), height: Math.max(180, item.group?.bounds.height ?? 180) }
+      : item.type === "image" ? { width: 360, height: 240 } : { width: 280, height: 180 };
+    const sizes = items.map(sizeFor);
+    // Group snapshots can be much larger than ordinary cards, so a one-column batch guarantees their bounds never overlap.
+    const columns = items.some((item) => item.type === "group") ? 1 : Math.max(1, Math.ceil(Math.sqrt(items.length)));
+    const columnWidth = Math.max(...sizes.map((size) => size.width)) + 56;
+    const rowHeight = Math.max(...sizes.map((size) => size.height)) + 56;
+    return items.map((_item, index) => ({ x: point.x + (index % columns) * columnWidth, y: point.y + Math.floor(index / columns) * rowHeight }));
   }
 
   async exportCollection(name: string, nodes: Array<{ id: string; name: string; depth: number; item?: PaletteItem }>): Promise<TFile | null> {

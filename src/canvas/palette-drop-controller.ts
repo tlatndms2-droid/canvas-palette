@@ -4,6 +4,7 @@ import type { CanvasAdapter } from "./canvas-adapter";
 const ITEM_MIME = "application/x-canvas-palette-item";
 const TYPE_MIME = "application/x-canvas-palette-type";
 const ITEMS_MIME = "application/x-canvas-palette-items";
+const MINI_COLLECT_MIME = "application/x-canvas-palette-mini-collect";
 
 export class PaletteDropController {
   constructor(private readonly store: PaletteStore, private readonly canvas: CanvasAdapter) {}
@@ -38,6 +39,9 @@ export class PaletteDropController {
     let itemIds = [itemId];
     try { const parsed = JSON.parse(event.dataTransfer.getData(ITEMS_MIME)); if (Array.isArray(parsed)) itemIds = parsed.filter((id): id is string => typeof id === "string" && Boolean(this.store.data.items[id])); } catch { /* single-item legacy payload */ }
     const items = itemIds.map((id) => this.store.data.items[id]).filter((candidate): candidate is typeof item => Boolean(candidate));
-    void this.canvas.restoreItemsFromDrop(items, event);
+    const removeFromCollect = event.dataTransfer.getData(MINI_COLLECT_MIME) === "true";
+    void this.canvas.restoreItemsFromDrop(items, event).then((restored) => {
+      if (restored && removeFromCollect) this.store.completePendingCanvasPlacement(items.map((item) => item.id));
+    });
   };
 }

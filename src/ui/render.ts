@@ -18,7 +18,7 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
 }
 
 export type MarkdownSourceStatus = "deleted";
-export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; dragItemIds?: string[]; currentFace?: CardFace; unlinked?: boolean; markdownSourceStatus?: MarkdownSourceStatus | null; onMarkdownSourceStatus?: (event: MouseEvent) => void; onToggleFace?: (face: CardFace) => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
+export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; dragItemIds?: string[]; miniCollect?: boolean; currentFace?: CardFace; unlinked?: boolean; markdownSourceStatus?: MarkdownSourceStatus | null; onMarkdownSourceStatus?: (event: MouseEvent) => void; onToggleFace?: (face: CardFace) => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
 
 export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group"; }
 
@@ -101,6 +101,7 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
         event.dataTransfer.setData("application/x-canvas-palette-item", item.id);
         event.dataTransfer.setData("application/x-canvas-palette-items", JSON.stringify(draggedIds));
         event.dataTransfer.setData("application/x-canvas-palette-type", item.type);
+        if (options.miniCollect) event.dataTransfer.setData("application/x-canvas-palette-mini-collect", "true");
         event.dataTransfer.effectAllowed = "copyMove";
         if (draggedIds.length > 1) {
           const dragImage = document.body.createDiv({ cls: "cp-multi-drag-image" }); dragImage.createSpan({ text: item.displayTitle || "Selected items" }); dragImage.createEl("strong", { text: String(draggedIds.length) });

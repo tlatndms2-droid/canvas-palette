@@ -742,6 +742,16 @@ export class PaletteStore {
     else this.changed();
   }
 
+  completePendingCanvasPlacement(itemIds: string[]): void {
+    const completed = new Set(itemIds.filter((id) => this.data.pendingItemIds.includes(id)));
+    if (completed.size === 0) return;
+    this.data.pendingItemIds = this.data.pendingItemIds.filter((id) => !completed.has(id));
+    this.data.uiState.miniPalette.collectSelectedItemIds = this.data.uiState.miniPalette.collectSelectedItemIds.filter((id) => !completed.has(id));
+    if (this.data.uiState.miniPalette.collectSelectionAnchorId && completed.has(this.data.uiState.miniPalette.collectSelectionAnchorId)) this.data.uiState.miniPalette.collectSelectionAnchorId = null;
+    if (this.data.uiState.miniPalette.focusedItemId && completed.has(this.data.uiState.miniPalette.focusedItemId)) this.data.uiState.miniPalette.focusedItemId = null;
+    this.changed();
+  }
+
   private wouldCreateCycle(id: string, parentId: string | null): boolean {
     let cursor = parentId;
     while (cursor) {
