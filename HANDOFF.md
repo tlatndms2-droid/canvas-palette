@@ -2,11 +2,13 @@
 
 ## Current state
 
-- Version: `0.3.26`.
+- Version: `0.3.27`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release target: `0.3.26`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.26`.
+- Latest release target: `0.3.27`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.27`.
+- Latest runtime change: `0.3.27`; before direct Canvas-to-Side saving or Mini Collect import proceeds to another Canvas's representative Workspace, the user is told that the destination belongs to another Canvas and that the Item will be stored without a link to that destination Canvas. `취소` leaves the Item unchanged; `저장` continues the existing unlinked save. Current-Canvas representatives and general Workspaces do not show this confirmation.
+- `0.3.27` runtime validation used the existing `Obsidian Sandbox`. The real confirmation dialog named `Other representative`, described the other Canvas representative and unlinked save result, remained unchanged before confirmation, and after `저장` placed the Card in that Workspace with no link to its owner Canvas. The original Sandbox plugin data was restored and reload captured no error.
 - Latest runtime change: `0.3.26`; Side Palette's Workspace selector uses `★` for the current Canvas representative and `☆` for every other Canvas representative. General Workspaces have no star. Feature 2 has not started.
 - `0.3.26` runtime validation used the existing `Obsidian Sandbox`. A disposable Workspace fixture rendered `★ Current representative · Canvas`, `General workspace`, and `☆ Other representative · Canvas` in the real selector. The original Sandbox plugin data was restored and plugin reload captured no error.
 - Latest runtime change: `0.3.25`; Canvas `Collect to Mini Palette` always targets Collect. Existing canonical Items reuse the same ID in Collect without creating a duplicate or adding Mini Storage membership. Removing a re-collected existing Item from Collect preserves its Side Workspace, existing Mini Storage membership, Canvas links, and Vault source. Side `Send to Mini Palette` remains the explicit Storage route. Feature 2 has not started.
@@ -73,6 +75,7 @@
 | `0.3.24` | `6f51180` | Separated canonical identity checks from Mini membership. Existing Canvas/Side Items entered Mini Storage and the Side header sent Side selection. | Historical behavior superseded by `0.3.25`: Canvas Collect must target Collect, not Storage. |
 | `0.3.25` | release tag | Corrected Canvas collection so both new and existing Canvas Items always enter Collect; existing Items retain one canonical identity and gain no Storage membership. | Side Send remains the only explicit route to Mini Storage. |
 | `0.3.26` | release tag | Added visually distinct representative marks in the Side Palette Workspace selector. | `★` is the active Canvas representative; `☆` is another Canvas representative; general Workspaces have no mark. |
+| `0.3.27` | release tag | Added a confirmation before saving to another Canvas's representative Workspace. | The same confirmation protects Canvas direct save and Mini-to-Workspace import; accepted Items remain unlinked to the destination Canvas. |
 
 ### Feature 1 behavior currently implemented
 

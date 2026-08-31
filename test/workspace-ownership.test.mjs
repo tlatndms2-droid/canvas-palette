@@ -42,6 +42,9 @@ test("dedicated Workspaces accept only own-Canvas items while general Workspaces
   const general = store.createWorkspace("Shared", "general");
   assert.equal(store.addToWorkspace(dedicated.id, item("own", "EP01.canvas")), true);
   assert.equal(store.addToWorkspace(dedicated.id, item("foreign", "EP02.canvas")), false);
+  assert.equal(store.addToWorkspaceAsUnlinked(dedicated.id, item("confirmed-foreign", "EP02.canvas")), true);
+  assert.equal(store.data.items["confirmed-foreign"].origin.workspaceId, dedicated.id);
+  assert.equal(dedicated.looseItemIds.includes("confirmed-foreign"), true);
   assert.equal(store.addToWorkspace(general.id, item("shared", "EP02.canvas")), true);
   const placed = item("placed", "EP02.canvas"); placed.canvasPlacements.push({ canvasPath: "EP01.canvas", nodeIds: ["node"], placedAt: 1 });
   assert.equal(store.canStoreItem(dedicated.id, placed), true);
@@ -80,6 +83,10 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   assert.match(main, /Create Workspace for current Canvas/);
   assert.match(main, /Set as representative/);
   assert.match(main, /representativePath === currentPath \? "★ " : "☆ "/);
+  assert.match(main, /ConfirmForeignCanvasWorkspaceModal/);
+  assert.match(main, /isOtherCanvasRepresentativeWorkspace/);
+  assert.match(main, /addToWorkspaceAsUnlinked/);
+  assert.match(mini, /confirmWorkspaceSave\(select\.value/);
   assert.match(main, /const changedCanvas = context\.file\.path !== this\.lastCanvasPath/);
   assert.match(main, /if \(changedCanvas\) this\.selectRepresentativeWorkspace\(context\.file\.path\)/);
   assert.match(main, /activeContext\(\)\?\.file\.path \?\? this\.lastCanvasPath/);

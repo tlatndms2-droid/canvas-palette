@@ -114,10 +114,12 @@ export class FloatingMiniPalette {
     const importButton = bottom.createEl("button", { cls: "mod-cta", text: "Import to workspace" }); importButton.disabled = this.collectSelectedIds().length === 0;
     importButton.addEventListener("click", () => {
       const select = bottom.querySelector("select"); if (!select) return;
-      const result = this.plugin.store.importPending(select.value, this.collectSelectedIds());
-      if (result.rejected.length > 0) new Notice("Some items could not be imported because the selected Workspace is unavailable.");
-      if (result.imported.length > 0) new Notice(`${result.imported.length} item${result.imported.length === 1 ? "" : "s"} imported.`);
-      this.setCollectSelectedIds(result.rejected); this.plugin.store.data.uiState.miniPalette.focusedItemId = null; this.inspectorItemId = null;
+      this.plugin.confirmWorkspaceSave(select.value, () => {
+        const result = this.plugin.store.importPending(select.value, this.collectSelectedIds());
+        if (result.rejected.length > 0) new Notice("Some items could not be imported because the selected Workspace is unavailable.");
+        if (result.imported.length > 0) new Notice(`${result.imported.length} item${result.imported.length === 1 ? "" : "s"} imported.`);
+        this.setCollectSelectedIds(result.rejected); this.plugin.store.data.uiState.miniPalette.focusedItemId = null; this.inspectorItemId = null;
+      });
     });
   }
 

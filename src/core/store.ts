@@ -150,9 +150,17 @@ export class PaletteStore {
   }
 
   addToWorkspace(workspaceId: string, item: PaletteItem): boolean {
+    return this.addToWorkspaceWithCanvasOverride(workspaceId, item, false);
+  }
+
+  addToWorkspaceAsUnlinked(workspaceId: string, item: PaletteItem): boolean {
+    return this.addToWorkspaceWithCanvasOverride(workspaceId, item, true);
+  }
+
+  private addToWorkspaceWithCanvasOverride(workspaceId: string, item: PaletteItem, allowForeignCanvas: boolean): boolean {
     item = this.existingCollectedItem(item) ?? item;
     const workspace = this.data.workspaces[workspaceId];
-    if (!workspace || !this.canStoreItem(workspaceId, item)) return false;
+    if (!workspace || (!allowForeignCanvas && !this.canStoreItem(workspaceId, item))) return false;
     this.detachWorkspaceLinks(item.id);
     item.origin.workspaceId = workspaceId;
     item.parentItemId ??= null;

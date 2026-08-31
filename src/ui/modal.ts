@@ -70,6 +70,20 @@ export class ConfirmMiniStorageRemovalModal extends Modal {
   onClose(): void { this.contentEl.empty(); }
 }
 
+export class ConfirmForeignCanvasWorkspaceModal extends Modal {
+  constructor(app: App, private readonly workspaceName: string, private readonly onConfirm: () => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-confirm-modal");
+    this.contentEl.createEl("h2", { text: "다른 Canvas의 대표 Workspace에 저장할까요?" });
+    this.contentEl.createEl("p", { text: `“${this.workspaceName}”은 현재 Canvas가 아닌 다른 Canvas의 대표 Workspace입니다.` });
+    this.contentEl.createEl("p", { text: "선택한 항목은 현재 Canvas와 연결되지 않은 상태로 저장됩니다." });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "취소" }).addEventListener("click", () => this.close());
+    actions.createEl("button", { text: "저장", cls: "mod-cta" }).addEventListener("click", () => { this.onConfirm(); this.close(); });
+  }
+  onClose(): void { this.contentEl.empty(); }
+}
+
 export class ConfirmDeleteCollectionModal extends Modal {
   constructor(app: App, private readonly name: string, private readonly destination: string, private readonly itemCount: number, private readonly childCount: number, private readonly onConfirm: () => void) { super(app); }
   onOpen(): void {
