@@ -79,6 +79,7 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   assert.match(main, /ensureCurrentCanvasWorkspace/);
   assert.match(main, /Create Workspace for current Canvas/);
   assert.match(main, /Set as representative/);
+  assert.match(main, /representativePath === currentPath \? "★ " : "☆ "/);
   assert.match(main, /const changedCanvas = context\.file\.path !== this\.lastCanvasPath/);
   assert.match(main, /if \(changedCanvas\) this\.selectRepresentativeWorkspace\(context\.file\.path\)/);
   assert.match(main, /activeContext\(\)\?\.file\.path \?\? this\.lastCanvasPath/);

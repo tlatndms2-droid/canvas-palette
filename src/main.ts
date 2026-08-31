@@ -134,8 +134,9 @@ export default class CanvasPalettePlugin extends Plugin {
 
   workspaceDisplayName(workspace: PaletteWorkspace): string {
     const currentPath = this.currentCanvasPath();
-    const representative = Boolean(currentPath && workspace.kind === "canvas" && workspace.representativeCanvasPath === currentPath);
-    return `${representative ? "★ " : ""}${workspace.name}${workspace.kind === "canvas" ? " · Canvas" : ""}`;
+    const representativePath = workspace.kind === "canvas" ? workspace.representativeCanvasPath : null;
+    const representativeMark = representativePath ? representativePath === currentPath ? "★ " : "☆ " : "";
+    return `${representativeMark}${workspace.name}${workspace.kind === "canvas" ? " · Canvas" : ""}`;
   }
 
   workspaceAcceptsCanvas(workspace: PaletteWorkspace, canvasPath: string): boolean {
