@@ -90,12 +90,12 @@ export class FloatingMiniPalette {
     const body = panel.createDiv({ cls: "cp-collect-screen" });
     const search = body.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search pending items…" }, value: this.search });
     const summary = body.createDiv({ cls: "cp-collect-summary" });
-    const list = body.createDiv({ cls: "cp-pending-list" });
+    const list = body.createDiv({ cls: "cp-pending-list cp-asset-grid" });
     const update = () => {
       list.empty(); summary.empty();
-      const density = this.plugin.store.data.uiState.miniPalette.densityLevel;
-      list.dataset.density = String(density);
-      list.style.setProperty("--cp-collect-row-height", `${96 + density * 28}px`);
+      const state = this.plugin.store.data.uiState.miniPalette;
+      state.densityLevel = applyAssetDensity(list, state.densityLevel, "cp-asset-grid");
+      state.viewMode = state.densityLevel === 0 ? "list" : "grid";
       const visible = this.collectItems();
       const selected = this.collectSelectedIds();
       summary.createSpan({ text: `Pending ${this.plugin.store.data.pendingItemIds.length} · Selected ${selected.length}` });
@@ -111,7 +111,7 @@ export class FloatingMiniPalette {
         multiEdit.addEventListener("click", () => { if (selected.length > 1) new TagLabelModal(this.plugin.app, this.plugin, selected).open(); });
         const remove = summary.createEl("button", { text: "Delete selected", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmPendingDelete(selected));
       }
-      for (const item of visible) this.renderPendingRow(list, item, visible.map((entry) => entry.id));
+      for (const item of visible) this.renderPendingCard(list, item, visible.map((entry) => entry.id));
       if (list.childElementCount === 0) list.createDiv({ cls: "cp-empty", text: "Canvas scraps will wait here for review." });
     };
     search.addEventListener("input", () => { this.search = search.value; update(); });
@@ -134,17 +134,6 @@ export class FloatingMiniPalette {
     });
   }
 
-  private renderPendingRow(parent: HTMLElement, item: PaletteItem, orderedIds: string[]): void {
-    const selected = this.collectSelectedIds().includes(item.id);
-    const row = parent.createDiv({ cls: `cp-pending-row cp-pending-row--${item.type}${selected ? " is-selected" : ""}` });
-    row.dataset.itemId = item.id;
-    row.createSpan({ cls: "cp-type-marker", text: item.type.toUpperCase() });
-    const text = row.createDiv({ cls: "cp-pending-row__text" }); text.createEl("strong", { text: item.displayTitle }); text.createEl("small", { text: (item.content ?? item.origin.filePath ?? `${item.group?.nodes.length ?? 0} nodes`).slice(0, 80) });
-    row.createSpan({ cls: "cp-pending-row__time", text: new Date(item.modifiedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) });
-    const actions = row.createEl("button", { cls: "clickable-icon cp-icon-button", attr: { "aria-label": "Item actions" } }); setIcon(actions, "more-horizontal"); actions.addEventListener("click", (event) => { event.stopPropagation(); this.openMiniItemMenu(event, item, "collect"); });
-    row.addEventListener("click", (event) => { if (event.target instanceof HTMLButtonElement) return; this.selectPending(item.id, event, orderedIds); this.inspectorItemId = null; this.render(); });
-    row.addEventListener("contextmenu", (event) => { event.preventDefault(); this.openMiniItemMenu(event, item, "collect"); });
-  }
 
   private renderStorage(panel: HTMLElement): void {
     const state = this.plugin.store.data.uiState.miniPalette;
@@ -292,6 +281,11 @@ export class FloatingMiniPalette {
     if (tab === "collect") menu.addItem((entry) => entry.setTitle(`Delete ${targetIds.length} pending item${targetIds.length === 1 ? "" : "s"}`).setIcon("trash").onClick(() => this.confirmPendingDelete(targetIds)));
     else menu.addItem((entry) => entry.setTitle(`Remove ${targetIds.length} link${targetIds.length === 1 ? "" : "s"} from Mini`).setIcon("unlink").onClick(() => this.confirmMiniStorageRemoval(targetIds)));
     menu.showAtMouseEvent(event);
+  }
+  private renderPendingCard(parent: HTMLElement, item: PaletteItem, orderedIds: string[]): void {
+    const selected = this.collectSelectedIds();
+    const card = renderItem(parent, item, { selected: selected.includes(item.id), showSelectionMarker: selected.length > 1, dragItemIds: selected, draggable: true, onSelect: (event) => { this.selectPending(item.id, event, orderedIds); this.inspectorItemId = null; this.render(); }, onOpen: () => void this.plugin.openItemEditor(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), onContextMenu: (event) => this.openMiniItemMenu(event, item, "collect") });
+    const preview = card.querySelector<HTMLElement>(".cp-item__body"); if (preview) void this.plugin.preview.render(preview, item, true, 360);
   }
   private openCollectInspector(itemId: string): void {
     this.plugin.store.data.uiState.miniPalette.focusedItemId = itemId;
