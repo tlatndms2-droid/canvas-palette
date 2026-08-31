@@ -276,7 +276,7 @@ export class FloatingMiniPalette {
   private confirmPendingDelete(ids: string[]): void {
     const valid = ids.filter((id) => Boolean(this.plugin.store.data.items[id]) && this.plugin.store.data.pendingItemIds.includes(id)); if (valid.length === 0) return;
     new ConfirmDeleteModal(this.plugin.app, valid.length, () => {
-      this.plugin.store.removeItems(valid);
+      this.plugin.store.removePendingItems(valid);
       this.setCollectSelectedIds([]); this.inspectorItemId = null; this.plugin.store.data.uiState.miniPalette.focusedItemId = null;
     }).open();
   }

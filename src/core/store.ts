@@ -137,6 +137,18 @@ export class PaletteStore {
     this.changed();
   }
 
+  collectCanvasItems(items: PaletteItem[]): string[] {
+    const collected: string[] = [];
+    for (const captured of items) {
+      const item = this.existingCollectedItem(captured) ?? captured;
+      if (!this.data.items[item.id]) this.data.items[item.id] = item;
+      if (!this.data.pendingItemIds.includes(item.id)) this.data.pendingItemIds.push(item.id);
+      if (!collected.includes(item.id)) collected.push(item.id);
+    }
+    this.changed();
+    return collected;
+  }
+
   addToWorkspace(workspaceId: string, item: PaletteItem): boolean {
     item = this.existingCollectedItem(item) ?? item;
     const workspace = this.data.workspaces[workspaceId];
@@ -709,6 +721,15 @@ export class PaletteStore {
     this.data.uiState.miniPalette.storageSelectedItemIds = this.data.uiState.miniPalette.storageSelectedItemIds.filter((id) => !removed.has(id));
     if (this.data.uiState.selectedItemId && removed.has(this.data.uiState.selectedItemId)) this.data.uiState.selectedItemId = null;
     this.changed();
+  }
+
+  removePendingItems(itemIds: string[]): void {
+    const pending = new Set(itemIds.filter((id) => this.data.pendingItemIds.includes(id)));
+    if (pending.size === 0) return;
+    this.data.pendingItemIds = this.data.pendingItemIds.filter((id) => !pending.has(id));
+    const disposable = [...pending].filter((id) => !this.workspaceForItem(id) && !this.miniStorageHas(id));
+    if (disposable.length > 0) this.removeItems(disposable);
+    else this.changed();
   }
 
   private wouldCreateCycle(id: string, parentId: string | null): boolean {

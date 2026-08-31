@@ -59,16 +59,23 @@ test("a dropped Card becomes a linked placement with shared metadata", async () 
   await cleanup();
 });
 
-test("collecting one linked Canvas node again reuses its canonical Palette item", async () => {
+test("collecting one linked Canvas node again reuses its canonical Palette item in Collect", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
   store.data = fixture();
+  store.data.uiState.miniPalette.storageItemIds = [];
   const duplicate = { ...structuredClone(store.data.items.card), id: "duplicate", createdAt: 2, modifiedAt: 2 };
 
   assert.equal(store.existingCollectedItem(duplicate)?.id, "card");
-  store.addPending(duplicate);
+  assert.deepEqual(store.collectCanvasItems([duplicate]), ["card"]);
   assert.equal(store.data.items.duplicate, undefined);
+  assert.deepEqual(store.data.pendingItemIds, ["card"]);
+  assert.deepEqual(store.data.uiState.miniPalette.storageItemIds, []);
+
+  store.removePendingItems(["card"]);
   assert.deepEqual(store.data.pendingItemIds, []);
+  assert.equal(store.data.items.card.id, "card");
+  assert.deepEqual(store.data.workspaces.workspace.looseItemIds, ["card"]);
 
   await cleanup();
 });

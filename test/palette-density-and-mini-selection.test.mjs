@@ -53,3 +53,13 @@ test("Mini Storage is workspace-independent and removes relay links without dele
   assert.match(store, /removeMiniStorageItems\(itemIds: string\[\]\)/);
   assert.match(store, /storageItemIds = \[\.\.\.linked\]/);
 });
+
+test("Canvas Collect always opens Collect and never redirects existing items to Storage", async () => {
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  const start = main.indexOf("async collectCanvasSelection()");
+  const end = main.indexOf("\n  sendItemsToMini", start);
+  const collect = main.slice(start, end);
+  assert.match(collect, /store\.collectCanvasItems\(items\)/);
+  assert.match(collect, /miniPalette\.tab = "collect"/);
+  assert.doesNotMatch(collect, /addMiniStorageItems|tab = "storage"|sent to Mini Storage/);
+});

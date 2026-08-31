@@ -244,14 +244,10 @@ export default class CanvasPalettePlugin extends Plugin {
   async collectCanvasSelection(): Promise<void> {
     const items = await this.canvas.collectSelection();
     if (items.length === 0) return;
-    const existingIds = [...new Set(items.flatMap((item) => this.store.existingCollectedItem(item)?.id ?? []))];
-    const newItems = items.filter((item) => !this.store.existingCollectedItem(item));
-    for (const item of newItems) this.store.addPending(item);
-    const sent = this.store.addMiniStorageItems(existingIds);
-    this.store.data.uiState.miniPalette.tab = newItems.length > 0 ? "collect" : "storage";
+    const collected = this.store.collectCanvasItems(items);
+    this.store.data.uiState.miniPalette.tab = "collect";
     this.miniPalette.open();
-    if (newItems.length > 0) new Notice(`${newItems.length} new Canvas item${newItems.length === 1 ? "" : "s"} collected${sent.length > 0 ? `; ${sent.length} existing item${sent.length === 1 ? "" : "s"} sent to Mini Storage` : ""}.`);
-    else new Notice(sent.length > 0 ? `${sent.length} existing Palette item${sent.length === 1 ? "" : "s"} sent to Mini Storage.` : "The selected items are already in Mini Palette.");
+    new Notice(`${collected.length} Canvas item${collected.length === 1 ? "" : "s"} collected in Mini Palette.`);
   }
 
   sendItemsToMini(itemIds: string[]): void {
