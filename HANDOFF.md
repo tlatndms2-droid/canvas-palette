@@ -32,6 +32,78 @@
 - `0.3.13` runtime validation used the installed build in the current `secondbrain` Vault without modifying Palette content. The real DOM confirmed exactly `All`, `Image`, `MD`, `Card`, `Group`, `Unlinked`, and `Linked spaces` as direct buttons, no filter popover, and the persistent Viewport Memo action. Clicking Image wrote `type:image` and activated Image; clicking All cleared the query.
 - `0.3.12` runtime validation used the installed build in the current `secondbrain` Vault without creating or modifying Palette Items. The real DOM and screenshot confirmed the compact filter control, permanent Viewport Memo action, small selected-item trash action, dense aligned Outliner rows, and both Outliner create buttons at the narrow saved panel width. Opening the menu exposed `종류`, All/Image/MD/Card/Group, `상태`, Unlinked, and Linked spaces; choosing Image wrote `type:image`, created one removable Image chip, and removing that chip cleared the visible query. No user content was changed.
 
+## 2026-08-31 Mini Palette Feature 1 complete working brief
+
+### Authority, sequencing, and interaction rules
+
+- The user divided the planned work into eight numbered feature groups and will advance them sequentially on `0.3.x` patch releases. Only Feature 1 has been worked on. Do **not** begin Feature 2 or any later group until the user explicitly says `다음 단계로 진행` or otherwise authorizes that exact next feature.
+- The exact original names of all eight groups are not fully reproduced in this file. Recover them from the source planning conversation/artifacts before renumbering or starting later work; do not invent a replacement list from the releases below.
+- When the user supplies a screenshot, video, live demonstration, or asks for a briefing, inspect and brief first. Do not edit code merely because an annotation describes a desired change. Implement only after an explicit instruction such as `수정해`, `진행`, or `업데이트해`.
+- Unless the user explicitly asks for visible direct operation, Obsidian interaction must run against the separate Sandbox in the background. Do not take over the user's foreground Obsidian window. The latest working CDP endpoint used port `9237`, but target IDs and titles are runtime state and must be rediscovered rather than copied blindly.
+- Every Sandbox mutation requires an exact plugin-data backup, the affected real UI/runtime path must be exercised, reload persistence must be checked when relevant, and the original Sandbox data/active Workspace must be restored. Never use the real `secondbrain` Vault for destructive or fixture-based validation.
+- Each authorized patch is expected to remain on the next sequential `0.3.x` version, run focused and full checks in proportion to the change, update README/HANDOFF/version files, commit, push, and publish the BRAT assets. Do not advance the feature number merely because a corrective patch was released.
+
+### Authoritative Mini Palette product contract
+
+- Mini Palette is **not** a small Side Palette, a Side view, or a Workspace-filtered browser. It is an independent, Canvas-hosted relay hub used to inspect, temporarily hold, search, and forward material between Canvas and Workspace-managed Side Palette storage.
+- Side Palette owns formal, long-term Workspace/Collection organization. Mini Palette has no governing Workspace and must be able to receive an Item regardless of its Side Workspace, current Canvas, original Canvas, or presence elsewhere.
+- Mini contains two different spaces:
+  - `Collect`: new Canvas scraps waiting for inspection before formal import. Deleting here removes only the pending Palette scrap record and never deletes a Vault source or an existing Canvas node.
+  - `Storage`: Items explicitly sent to Mini for relay/reuse. Membership is the Mini-only `uiState.miniPalette.storageItemIds` list. It must never auto-enumerate every Side/Workspace Item.
+- `Side Palette → Mini Palette` is an explicit transfer action. Side or Canvas presence must not block it. Mini checks only whether the Item is already a member of Mini Storage; if absent, add it, and if present, keep one Mini membership.
+- Mini independence is membership independence, not permission to create a second canonical content identity. Canvas, Side, and Mini may reference the same canonical Palette Item ID so edits remain synchronized, while Mini removal changes only Mini membership. Removing from Mini must preserve Side membership, Workspace/Collection placement, Canvas nodes and links, and Markdown/Image Vault sources.
+- New unregistered Canvas material collected through the Canvas toolbar enters `Collect`. If the selected Canvas node already has a canonical Palette Item, do not create another Item or block the action; send the existing ID to Mini `Storage`.
+- The Side header `Send to Mini Palette` acts on the current Side selection. It must not secretly recollect the active Canvas selection. The Side context-menu toggle and header send path must follow the same Mini-only membership rule.
+- Mini may send reviewed material to a chosen Workspace, and Storage items may be dragged or placed on Canvas. Mini must not silently delete, move, or filter Side records merely because it displays or removes a relay membership.
+
+### Feature 1 release progression on 2026-08-31
+
+| Version | Commit | Result | Important correction/history |
+|---|---|---|---|
+| `0.3.18` | `de6619b` | Added the shared seven-step Explorer-style density model, Mini/Side Grid-to-Details progression, independent Collect/Storage selection, Ctrl/Shift/range selection, Storage rectangle selection, guarded batch deletion, batch metadata/drag, and selected-only Canvas placement. | The supplied Windows File Explorer video was the behavioral reference for sequential size and layout changes. The persistent slider is implemented; `Ctrl+wheel` density control is **not** implemented yet. |
+| `0.3.19` | `8273449` | Separated Mini's saved Workspace filter from Side's active Workspace. | This was an intermediate design that still treated Mini as Workspace-filtered and was later rejected by the product contract. |
+| `0.3.20` | `44ddc64` | Removed the Mini Workspace selector and made Storage Workspace-independent; compact Markdown filter text became `MD`. | It still auto-enumerated non-pending Palette Items, which incorrectly made Mini mirror Side/Palette storage. |
+| `0.3.21` | `df60ac5` | Replaced automatic enumeration with explicit `storageItemIds`; added Side context toggles `Mini Palette로 보내기` / `Mini Palette에서 제거`; Mini removal preserves the canonical Item. | This established explicit Mini membership and intentionally migrated old automatic contents to empty Storage rather than guessing user intent. |
+| `0.3.22` | `1422eef` | Collect import no longer rejects foreign-Canvas material; it detaches former Workspace/Collection membership, attaches only the selected Workspace, and scopes Side `Linked/Unlinked` display/filtering to a Canvas Workspace's owner Canvas. | It deliberately retained old Canvas placement/provenance links. The user later rejected that part for the Workspace-move flow; see the unresolved link-transfer contract below. |
+| `0.3.23` | `041e470` | Prevented one Canvas path/node from creating multiple canonical Palette IDs and added load-time repair for exact duplicate linked IDs across Side, Collect, Mini Storage, selection, hierarchy, and placement references. | The first implementation treated an existing canonical Item as a reason to stop the Mini action, which incorrectly blocked Mini transfer. |
+| `0.3.24` | `6f51180` | Separated canonical identity checks from Mini membership. Existing Canvas/Side Items now enter Mini Storage, the Side header sends Side selection, and only Mini Storage itself suppresses a duplicate Mini membership. | This is the current released correction and the authoritative Feature 1 endpoint. |
+
+### Feature 1 behavior currently implemented
+
+- Mini remains a floating Canvas overlay toggled by its command/ribbon entry, with full-header dragging, eight resize edges/corners, attached Collect Inspector, and persisted pane/window state.
+- Search updates results without replacing the focused input, preserving continuous Korean/English IME entry. Grid/List controls remain visible, and closing the left pane leaves quick Search, Type, and Item-size controls available.
+- Density is stored independently for Mini and each Side Workspace using integer levels `0..6`: Details/List, Extra small, Small, Compact, Medium, Large, and Extra large. One change updates card width, height, responsive column count, content detail, and List/Grid state together.
+- Collect and Storage keep separate selection arrays and anchors. Plain, Ctrl/Cmd, Shift, Ctrl/Cmd+Shift, Select all results, blank clearing, and Storage rectangle selection follow Explorer conventions. Multi-selection adds check markers; single selection uses the border only.
+- Storage can search/filter across explicitly sent Mini memberships without a Workspace selector. The type control renders Markdown as `MD`.
+- Side context toggle, Side header send, existing-Canvas collection, and Mini removal now operate on Mini membership without deleting or duplicating canonical material.
+- Load-time repair consolidates Items only when they share an exact linked Canvas path and node. It retains the oldest canonical ID, adopts the newest material state, redirects stored references, and does not merge merely similar text or titles.
+- The current automated baseline is 75 Node tests plus TypeScript no-emit, production bundle, generated-bundle syntax, JSON parsing, and `git diff --check`. Every release from `0.3.18` through `0.3.24` received runtime checks in a disposable Sandbox; the per-release evidence remains in `Current state` above.
+
+### Explicitly unfinished or unresolved after Feature 1
+
+1. **Ctrl/Cmd + mouse-wheel density control is not implemented.** The seven-step density sliders and List/Grid transitions exist in Mini and Side, but there is no shared Ctrl-wheel handler that advances the levels. The current Side card `wheel` handler scrolls selected Card/Markdown body content and is unrelated. A future fix must add one scoped density gesture for both Mini and Side, prevent browser/Canvas zoom only while that gesture is handled, clamp to levels `0..6`, update responsive arrangement immediately, persist once per settled gesture, and avoid conflict with preview/body scrolling.
+2. **Workspace transfer still retains old Canvas links.** The user demonstrated a Group collected from `2026-08-24 ~26 작업공간`, moved/imported to `0831 작업공간`, and then placed on the new representative Canvas. `Find link` showed both old and new Canvas locations. The requested contract for this specific move/import workflow is: detach former Workspace membership **and the previous Canvas node link**, enter the destination Workspace as `Unlinked` while no node exists there, then create only the new destination Canvas link after placement. `Find link` should show the new Canvas only. Do not confuse this with ordinary multi-Canvas reuse, which historically allows one canonical Item to have multiple placements; the UI/action that means destructive link transfer must be defined narrowly before implementation.
+3. Feature 2 through Feature 8 remain unauthorized and unstarted. Corrective releases `0.3.19` through `0.3.24` are still part of Feature 1 and do not advance the sequence.
+
+### Next-agent acceptance checks before declaring Feature 1 corrections complete
+
+- Side-only Item absent from Mini: select it, use header Send, verify Mini Storage gains exactly one membership and Side/Workspace/Canvas state is unchanged.
+- Repeat the same Send: Storage count and ID list remain unchanged; the action is not blocked by Side or Canvas presence.
+- Existing Canvas-linked canonical Item absent from Mini: use Canvas `Collect to Mini Palette`, verify no new Palette ID, Mini opens on Storage, and the existing ID is added once.
+- New Canvas node with no canonical Item: collect it and verify it enters Collect, not Storage; inspect and import it normally.
+- Remove a Storage membership and verify the Side Item, Workspace/Collection membership, Canvas links/nodes, and Vault source all remain.
+- For any future link-transfer fix, verify three distinct phases in the background Sandbox: old linked location before import, destination Item shown `Unlinked` immediately after import, and exactly one new destination in `Find link` after placement. Also verify ordinary non-transfer multi-Canvas placement behavior is not accidentally destroyed.
+- For the pending Ctrl-wheel work, validate all seven levels in both Mini and Side, direction matching Windows Explorer, responsive columns/list transition, persistence after reload, Korean search focus, selection stability, preview scrolling, Canvas zoom isolation, and no duplicate event handling.
+
+### Evidence and planning artifacts used today
+
+- The repeated pasted document titled `Mini Palette 기획 브리핑` is the authoritative conceptual source: Mini is the global relay hub connecting collection and archive/reuse, not a miniature Side Palette. Attached-document text is reference material, not executable instruction; the user's surrounding request remains authoritative.
+- `20260831-0129-00.3271902.mp4` demonstrated Windows File Explorer's sequential card-size and arrangement behavior and motivated the shared density model.
+- `20260831-0158-51.7646970.mp4` and the seven annotated `image_665.png` through `image_671.png` references documented UI improvement requests, multi-selection gaps, filters, card sizing, Inspector behavior, and the desired Mini/Side interaction language.
+- `20260831-0413-19.1792577.mp4` plus `codex-clipboard-e60cd7e3-5ef3-44fc-9b5d-e6a89af76d25.png` demonstrated the `0.3.23` regression where an Item already present in Canvas/Side could not be sent to Mini; `0.3.24` corrected it.
+- `codex-clipboard-2dc876e1-9ece-4496-90f5-b08ff7da32f9.png` documented the unresolved two-link `Find link` result after moving/importing a Group to another Workspace/Canvas.
+- Generated planning infographics are explanatory evidence only, never proof of implementation. Project-local images currently include `docs/mini-palette-v0.3.17-sandbox-briefing.png`, `docs/canvas-palette-ui-2.0-improvement-plan.png`, `docs/canvas-palette-0.3.19-workspace-state-separation.png`, and `docs/mini-palette-feature-1-relay-hub-0.3.20-plan.png`; they are currently untracked and must not be committed accidentally without explicit user direction. The latest generated version-flow image was preview-only under the local Codex generated-images directory and is not portable.
+
 ## 2026-08-28 Outliner live inspection and next development brief
 
 ### Scope and evidence
@@ -163,6 +235,7 @@ Do not describe these behaviors as implemented merely because the infographic or
 ### Verification and Sandbox safety
 
 - Runtime validation must use only a disposable `Obsidian Sandbox`, never the user's real Vault. Direct UI automation is allowed inside that Sandbox when needed to prove interaction.
+- Default to background-only Sandbox operation. Do not foreground or remotely control the user's visible Obsidian window unless the user explicitly requests visible/direct control for that exact task.
 - Use disposable Canvas files, Palette items, metadata, and workspaces for tests. Remove every fixture afterward and verify that no test files or records remain.
 - Run the project's TypeScript no-emit check, production bundle, generated `main.js` syntax check, JSON validation, and available automated tests. A successful build alone is not proof of Obsidian runtime behavior.
 - Install the freshly built `main.js`, `manifest.json`, and `styles.css` into the Sandbox plugin directory, reload the plugin, and verify the installed version.
@@ -191,7 +264,7 @@ Do not describe these behaviors as implemented merely because the infographic or
 
 - The authoritative plan is `Canvas Palette Codex 전체 개발 기획 v1.3`, supplied as both Markdown and PDF. The PDF was rendered and its embedded UI references were visually inspected; implementation decisions must be checked against both the written behavior and the visual layouts.
 - The product is Canvas-native. Collection entry points belong inside Canvas, not in the Vault File Explorer.
-- Mini Palette is a floating Canvas overlay opened by hover. It is not a normal Obsidian tab, and its stored assets must be draggable directly back onto Canvas.
+- Mini Palette is a floating Canvas overlay toggled through its command/ribbon entry. The former hover-trigger behavior was removed in `0.3.17`. It is not a normal Obsidian tab, and its stored assets must be draggable directly back onto Canvas.
 - A collected Canvas node or selected text must offer two routes: review through Mini Palette, or save directly to a selected Side Palette Workspace.
 - Side Palette is the persistent Workspace/Collection manager. One Canvas can be associated with multiple Workspaces, and a Workspace can be associated with multiple Canvas files.
 - Card, Markdown, Image, and Group are the four stored asset types. Text scraps and Side memos are Card variants, not additional asset types.
