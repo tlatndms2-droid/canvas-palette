@@ -162,6 +162,7 @@ export class PaletteStore {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace || (!allowForeignCanvas && !this.canStoreItem(workspaceId, item))) return false;
     this.detachWorkspaceLinks(item.id);
+    if (allowForeignCanvas) this.detachCanvasLinks(item);
     item.origin.workspaceId = workspaceId;
     item.parentItemId ??= null;
     item.childItemIds ??= [];
@@ -173,7 +174,7 @@ export class PaletteStore {
     return true;
   }
 
-  importPending(workspaceId: string, itemIds: string[]): { imported: string[]; rejected: string[]; alreadySaved: string[] } {
+  importPending(workspaceId: string, itemIds: string[], asUnlinked = false): { imported: string[]; rejected: string[]; alreadySaved: string[] } {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace) return { imported: [], rejected: [...itemIds], alreadySaved: [] };
     const imported: string[] = []; const rejected: string[] = []; const alreadySaved: string[] = [];
@@ -182,6 +183,7 @@ export class PaletteStore {
       if (!item) continue;
       if (this.workspaceForItem(id)?.id === workspaceId) { alreadySaved.push(id); continue; }
       this.detachWorkspaceLinks(id);
+      if (asUnlinked) this.detachCanvasLinks(item);
       item.origin.workspaceId = workspaceId;
       item.parentItemId = null;
       item.childItemIds ??= [];
@@ -787,6 +789,13 @@ export class PaletteStore {
     for (const workspace of Object.values(this.data.workspaces)) workspace.looseItemIds = workspace.looseItemIds.filter((id) => id !== itemId);
     for (const collection of Object.values(this.data.collections)) collection.itemIds = collection.itemIds.filter((id) => id !== itemId);
     for (const item of Object.values(this.data.items)) if (item.id !== itemId) item.childItemIds = (item.childItemIds ?? []).filter((id) => id !== itemId);
+  }
+
+  /** Keeps the saved item content, but removes every Canvas-node relationship. */
+  private detachCanvasLinks(item: PaletteItem): void {
+    delete item.origin.canvasPath;
+    delete item.origin.canvasNodeId;
+    item.canvasPlacements = [];
   }
 
   private repairDuplicateCanvasItems(): boolean {

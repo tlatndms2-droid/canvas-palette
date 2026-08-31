@@ -44,6 +44,8 @@ test("dedicated Workspaces accept only own-Canvas items while general Workspaces
   assert.equal(store.addToWorkspace(dedicated.id, item("foreign", "EP02.canvas")), false);
   assert.equal(store.addToWorkspaceAsUnlinked(dedicated.id, item("confirmed-foreign", "EP02.canvas")), true);
   assert.equal(store.data.items["confirmed-foreign"].origin.workspaceId, dedicated.id);
+  assert.equal(store.data.items["confirmed-foreign"].origin.canvasPath, undefined);
+  assert.deepEqual(store.data.items["confirmed-foreign"].canvasPlacements, []);
   assert.equal(dedicated.looseItemIds.includes("confirmed-foreign"), true);
   assert.equal(store.addToWorkspace(general.id, item("shared", "EP02.canvas")), true);
   const placed = item("placed", "EP02.canvas"); placed.canvasPlacements.push({ canvasPath: "EP01.canvas", nodeIds: ["node"], placedAt: 1 });
@@ -51,18 +53,21 @@ test("dedicated Workspaces accept only own-Canvas items while general Workspaces
   await cleanup();
 });
 
-test("reviewed pending import moves ownership and reports target-Canvas link state", async () => {
+test("reviewed pending import to another Canvas representative removes every Canvas link", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
   const previous = store.createWorkspace("Previous", "general");
   const dedicated = store.createWorkspace("EP01", "canvas", "folder/EP01.canvas", true);
   store.addToWorkspace(previous.id, item("foreign", "EP02.canvas"));
   store.addPending(store.data.items.foreign);
-  const result = store.importPending(dedicated.id, ["foreign"]);
+  store.data.items.foreign.canvasPlacements.push({ canvasPath: "EP03.canvas", nodeIds: ["node"], placedAt: 1 });
+  const result = store.importPending(dedicated.id, ["foreign"], true);
   assert.deepEqual(result, { imported: ["foreign"], rejected: [], alreadySaved: [] });
   assert.deepEqual(store.data.pendingItemIds, []);
   assert.equal(store.data.items.foreign.origin.workspaceId, dedicated.id);
-  assert.equal(store.data.items.foreign.origin.canvasPath, "EP02.canvas");
+  assert.equal(store.data.items.foreign.origin.canvasPath, undefined);
+  assert.equal(store.data.items.foreign.origin.canvasNodeId, undefined);
+  assert.deepEqual(store.data.items.foreign.canvasPlacements, []);
   assert.equal(previous.looseItemIds.includes("foreign"), false);
   assert.equal(dedicated.looseItemIds.includes("foreign"), true);
   assert.equal(dedicated.canvasPaths.includes("EP02.canvas"), false);
