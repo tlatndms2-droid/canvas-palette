@@ -359,6 +359,21 @@ export class CanvasAdapter {
     return this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, item, point));
   }
 
+  async restoreItems(items: PaletteItem[], screenX: number, screenY: number): Promise<boolean> {
+    const context = this.activeContext();
+    if (!context || items.length === 0) { if (!context) new Notice("Open a Canvas before placing items."); return false; }
+    const point = context.runtime.posFromClient?.({ x: screenX, y: screenY });
+    if (!point) { new Notice("Unable to calculate the Canvas position."); return false; }
+    const columns = Math.max(1, Math.ceil(Math.sqrt(items.length)));
+    let restored = 0;
+    for (let index = 0; index < items.length; index += 1) {
+      const position = { x: point.x + (index % columns) * 320, y: point.y + Math.floor(index / columns) * 220 };
+      if (await this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, items[index], position))) restored += 1;
+    }
+    if (items.length > 1) new Notice(`${restored} of ${items.length} items added to Canvas.`);
+    return restored > 0;
+  }
+
   async restoreItemFromDrop(item: PaletteItem, event: DragEvent): Promise<boolean> {
     const context = this.contextForTarget(event.target);
     if (!context) return false;

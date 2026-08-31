@@ -699,7 +699,10 @@ export class PaletteStore {
     for (const item of Object.values(this.data.items)) item.childItemIds = (item.childItemIds ?? []).filter((id) => !itemIds.includes(id));
     this.data.uiState.sideSelectedItemIds = this.data.uiState.sideSelectedItemIds.filter((id) => !itemIds.includes(id));
     for (const id of itemIds) { delete this.data.uiState.sideItemFaces[id]; delete this.data.uiState.miniItemFaces[id]; }
-    this.data.uiState.miniPalette.selectedItemIds = this.data.uiState.miniPalette.selectedItemIds.filter((id) => !itemIds.includes(id));
+    this.data.uiState.miniPalette.collectSelectedItemIds = this.data.uiState.miniPalette.collectSelectedItemIds.filter((id) => !itemIds.includes(id));
+    this.data.uiState.miniPalette.storageSelectedItemIds = this.data.uiState.miniPalette.storageSelectedItemIds.filter((id) => !itemIds.includes(id));
+    this.data.uiState.miniPalette.selectedItemIds = [];
+    if (this.data.uiState.miniPalette.focusedItemId && itemIds.includes(this.data.uiState.miniPalette.focusedItemId)) this.data.uiState.miniPalette.focusedItemId = null;
     if (this.data.uiState.selectedItemId && itemIds.includes(this.data.uiState.selectedItemId)) this.data.uiState.selectedItemId = null;
     this.changed();
   }

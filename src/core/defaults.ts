@@ -1,13 +1,14 @@
 import type { PaletteData, SideLayoutState } from "./types";
+import { ASSET_DENSITY_DEFAULT, legacyDensity } from "../ui/asset-density";
 
 export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
-  viewportRatio: 0.52, topRatio: 0.69, indexRatio: 0.5, viewMode: "grid",
+  viewportRatio: 0.52, topRatio: 0.69, indexRatio: 0.5, viewMode: "grid", densityLevel: ASSET_DENSITY_DEFAULT,
   selectedCollectionId: null, focusedCollectionId: null, collapsedCollectionIds: [], collapsedItemIds: [],
   outlinerItemHeight: 30, outlinerFontSize: 13, outlinerIncludeDescendants: true, outlinerWrapTitles: false
 };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 17,
+  schemaVersion: 18,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
@@ -17,7 +18,8 @@ export const DEFAULT_DATA: PaletteData = {
   uiState: { activeWorkspaceId: null, lastCanvasPath: null, selectedItemId: null, sideSelectedItemIds: [], sideItemFaces: {}, miniItemFaces: {}, quickEditor: { x: null, y: null, width: null, height: null }, workspaceExplorer: { viewMode: "details", sort: "modified-desc" }, miniPalette: {
     tab: "collect", isOpen: false, position: { x: 24, y: 62 }, size: { width: 1120, height: 720 },
     leftPaneOpen: true, rightPaneOpen: true, leftPaneWidth: 248, rightPaneWidth: 310,
-    viewMode: "grid", cardHeight: 220, sort: "modified-desc", selectedItemIds: []
+    viewMode: "grid", densityLevel: ASSET_DENSITY_DEFAULT, cardHeight: 220, sort: "modified-desc",
+    collectSelectedItemIds: [], collectSelectionAnchorId: null, storageSelectedItemIds: [], storageSelectionAnchorId: null, focusedItemId: null, selectedItemIds: []
   } }
 };
 
@@ -32,7 +34,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     kind: workspace.kind ?? "general",
     ownerCanvasPath: workspace.ownerCanvasPath ?? null,
     representativeCanvasPath: workspace.representativeCanvasPath ?? null,
-    sideLayout: { ...DEFAULT_SIDE_LAYOUT, ...workspace.sideLayout },
+    sideLayout: { ...DEFAULT_SIDE_LAYOUT, ...workspace.sideLayout, densityLevel: workspace.sideLayout?.densityLevel ?? legacyDensity(workspace.sideLayout?.viewMode, rawSettings?.cardHeight) },
     createdAt: workspace.createdAt ?? migratedAt,
     modifiedAt: workspace.modifiedAt ?? workspace.createdAt ?? migratedAt
   }]));
@@ -40,7 +42,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 17,
+    schemaVersion: 18,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
       const repairedType = item.type === "markdown" && !item.origin?.filePath ? "card" : item.type;
       const supportsFaces = repairedType !== "group";
@@ -68,6 +70,13 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
       workspaceExplorer: { ...DEFAULT_DATA.uiState.workspaceExplorer, ...legacyUi.workspaceExplorer },
       miniPalette: {
       ...DEFAULT_DATA.uiState.miniPalette, ...legacyUi.miniPalette,
+      densityLevel: legacyUi.miniPalette?.densityLevel ?? legacyDensity(legacyUi.miniPalette?.viewMode, legacyUi.miniPalette?.cardHeight),
+      collectSelectedItemIds: legacyUi.miniPalette?.collectSelectedItemIds ?? (legacyUi.miniPalette?.tab === "collect" ? legacyUi.miniPalette?.selectedItemIds ?? [] : []),
+      collectSelectionAnchorId: legacyUi.miniPalette?.collectSelectionAnchorId ?? null,
+      storageSelectedItemIds: legacyUi.miniPalette?.storageSelectedItemIds ?? (legacyUi.miniPalette?.tab === "storage" ? legacyUi.miniPalette?.selectedItemIds ?? [] : []),
+      storageSelectionAnchorId: legacyUi.miniPalette?.storageSelectionAnchorId ?? null,
+      focusedItemId: legacyUi.miniPalette?.focusedItemId ?? null,
+      selectedItemIds: [],
       tab: legacyUi.miniPalette?.tab ?? legacyUi.miniTab ?? DEFAULT_DATA.uiState.miniPalette.tab,
       leftPaneOpen: legacyUi.miniPalette?.leftPaneOpen ?? legacyUi.leftPaneOpen ?? DEFAULT_DATA.uiState.miniPalette.leftPaneOpen,
       rightPaneOpen: legacyUi.miniPalette?.rightPaneOpen ?? legacyUi.rightPaneOpen ?? DEFAULT_DATA.uiState.miniPalette.rightPaneOpen,

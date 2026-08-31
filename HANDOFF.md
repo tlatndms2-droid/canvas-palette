@@ -2,11 +2,13 @@
 
 ## Current state
 
-- Version: `0.3.17`.
+- Version: `0.3.18`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release target: `0.3.17`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.17`.
+- Latest release target: `0.3.18`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.18`.
+- Latest runtime change: `0.3.18`; Mini Palette and Side Palette share a seven-step Explorer-style Item size model that changes card dimensions, responsive columns, detail density, and List/Grid mode together. Mini Collect and Storage selections are isolated, Shift/range and Storage rectangle selection match Side conventions, batch metadata/delete/drag use the same selected set, deletion is confirmed, and Mini `Place on Canvas` places only the selected Items. Quick Search, Type, and Item size remain available when the Mini left pane is closed.
+- `0.3.18` runtime validation used only the disposable `Obsidian Mini Palette Sandbox` over its dedicated background CDP target. Official `0.3.17` release assets first matched the installed baseline by SHA-256. The rebuilt schema-18 bundle then passed Collect plain/Ctrl/Shift/Ctrl+Shift and filtered Select-all events, Collect/Storage selection isolation, multi Import interception, Storage plain/Ctrl/Shift, blank clearing, rectangle selection, two-ID drag payload, selection-aware context menu, guarded delete modal, selection-only Place-on-Canvas interception, Mini density levels 1/4/0/6, Side density levels and compact List, closed-left quick controls, reload persistence, and runtime error capture with no plugin exception. Intercepted Import/Place operations recorded targets without mutating the Canvas or Palette fixtures.
 - Latest runtime change: `0.3.17`; Mini Palette search updates only its result area so keyboard focus survives continuous Korean/English input. Grid/List controls remain visible above Assets, List has a distinct compact row layout, pane dividers persist only after uninterrupted dragging, and date/card-size controls are available. The floating window now toggles through the command/ribbon without a Canvas hover trigger, moves from the full non-control header, resizes from all edges/corners, uses an attached Inspector drawer, and removes placeholder Pin/More actions.
 - `0.3.17` runtime validation used the installed `secondbrain` build without retaining changes to user Palette or Canvas content. Three sequential search input events retained the same focused input; Grid/List controls and eight resize handles were present; real CDP mouse drags moved the full header, resized the southeast edge, and changed the left pane width while keeping the divider connected. A disposable Canvas and Card completed the real Mini-to-Canvas Drop path as a linked text node, then the test Canvas and Palette record were removed and the original Canvas was restored. Toggle command close behavior and plugin-reload state restoration were checked. The only captured error was an unrelated `mx/port-channel` retry message; no Canvas Palette exception was present.
 - Latest runtime change: `0.3.16`; the Side Palette's compact management button opens a file-Explorer-style Workspace browser. Current-Canvas-owned Workspaces are pinned first, Canvas and Workspace names share one search field, kind/date/sort controls are available, and Icons/List/Details views persist. Workspace deletion keeps Palette items in Mini Palette storage and never deletes source Vault files or Canvas nodes.
@@ -17,6 +19,100 @@
 - `0.3.14` runtime validation used the installed build in the current `secondbrain` Vault after backing up plugin data. The active Canvas automatically received one dedicated Workspace while the existing `My Workspace` remained general and intact. The Side dropdown showed the Canvas marker and one representative star; `Current Canvas` returned from the general Workspace to the representative. Two temporary dedicated Workspaces were created through the store, the representative changed to the second, own-Canvas material was accepted, foreign-Canvas material was rejected, and both temporary Workspaces were removed immediately. The Workspace menu exposed general creation, current-Canvas creation, rename, and representative selection. No Palette item or Canvas node fixture was created or changed.
 - `0.3.13` runtime validation used the installed build in the current `secondbrain` Vault without modifying Palette content. The real DOM confirmed exactly `All`, `Image`, `MD`, `Card`, `Group`, `Unlinked`, and `Linked spaces` as direct buttons, no filter popover, and the persistent Viewport Memo action. Clicking Image wrote `type:image` and activated Image; clicking All cleared the query.
 - `0.3.12` runtime validation used the installed build in the current `secondbrain` Vault without creating or modifying Palette Items. The real DOM and screenshot confirmed the compact filter control, permanent Viewport Memo action, small selected-item trash action, dense aligned Outliner rows, and both Outliner create buttons at the narrow saved panel width. Opening the menu exposed `종류`, All/Image/MD/Card/Group, `상태`, Unlinked, and Linked spaces; choosing Image wrote `type:image`, created one removable Image chip, and removing that chip cleared the visible query. No user content was changed.
+
+## 2026-08-28 Outliner live inspection and next development brief
+
+### Scope and evidence
+
+- The currently loaded Canvas Palette in the user's open Obsidian 1.13.7 window was operated directly and inspected visually. This was a read-only interaction review: Collection and Item rows were clicked/double-clicked, but no drag/drop, deletion, rename, or stored-data mutation was performed.
+- The supplied final Side Palette reference image is a **visual direction only**. Keep its clean white surface, thin gray borders, restrained purple accent, rounded controls, generous spacing, and distinct colored type icons, but do not discard or hide functionality added since that mockup.
+- A local concept infographic was generated at `C:\Users\MARU\.codex\generated_images\01a045b4-a941-7e12-8f52-00fee868140c\exec-147a122d-f601-459a-be23-e8188785587f.png`. That absolute path will not exist on another PC, so the complete reproducible design specification is written below.
+
+### Behaviors confirmed in the running plugin
+
+1. Clicking a Collection visibly selects it, but the Viewport continues to show its previous/all contents. Collection selection is not yet a Viewport navigation operation.
+2. Double-clicking a Collection does not enter it like a folder in Windows Explorer and does not create a breadcrumb/navigation history.
+3. Clicking the leading Collection chevron does not collapse or expand the branch; the displayed chevron is not connected to persisted expansion state.
+4. Item selection is shared between Outliner and Viewport: clicking an Outliner Item highlights its Viewport card, and clicking a Viewport card highlights the Outliner row.
+5. Selection synchronization is incomplete: selecting an Outliner Item whose Viewport card is outside the visible area does not scroll the Viewport to that card. The inverse path also needs ancestor expansion and Outliner auto-scroll verification/implementation.
+6. The Outliner uses long textual type prefixes (`CARD`, `MARKDOWN`, `IMAGE`, `GROUP`) in a dense tree. It needs distinct compact icons/badges so the file title receives the available horizontal space.
+7. No clear `before / inside / after` insertion feedback is visible for reordering. Existing drag/drop primarily communicates Collection membership, not an exact new order.
+
+### Authoritative Outliner product definition
+
+The Outliner is not a simple file list. It is the combination of:
+
+`Workspace structure editor + Viewport navigator + Canvas structure generator`
+
+- A Collection is a virtual folder, supports deep nesting, and never creates a Vault folder.
+- Collection selection must switch the Viewport to the selected Collection's actual contents.
+- Collection label double-click must enter that Collection. A breadcrumb and Back action must make the current location explicit.
+- The chevron is a separate click target whose only job is branch collapse/expand.
+- Card, Markdown, Image, and Group require clearly different icons; Card and Markdown must not reuse an indistinguishable document icon.
+- Viewport and Outliner selection must remain bidirectional and must automatically reveal the selected counterpart.
+- Outliner drag/drop must support Collection nesting, Item membership movement, and exact sibling ordering.
+- Search filters the Viewport while preserving the full Outliner tree and highlighting matching Items and their ancestor path.
+- Outliner has its own collapsed View settings for Item size and Font size.
+- Viewport and Outliner keep independent scrolling, and their splitter ratio is persisted per Workspace.
+- Exporting a Workspace/Collection tree to Canvas produces a mind-map: Collection headings are larger nodes and hierarchy/order is represented with edges.
+
+### Required state and interaction architecture
+
+1. **Navigation state**
+   - Persist `activeCollectionId` per Workspace; root is an explicit valid location.
+   - Persist `expandedCollectionIds` independently from selection.
+   - Derive breadcrumb ancestors from the Collection tree; Back navigates to the parent/history without mutating tree structure.
+   - Keep three hit targets independent: chevron = expand/collapse, row single-click = select and switch Viewport, row double-click = enter Collection.
+2. **Shared selection controller**
+   - Keep one canonical selected Item ID set for Viewport and Outliner.
+   - After Outliner selection and render, call the Viewport reveal path (`requestAnimationFrame`/post-render then `scrollIntoView({ block: "nearest" })`).
+   - After Viewport selection, expand every ancestor Collection, render, and reveal the Outliner row.
+   - Tag selection events with their source or use a re-entrancy guard so reveal updates cannot create an event loop.
+   - Preserve Explorer-style single, Ctrl/Cmd-toggle, and Shift-range selection in visible Outliner order.
+3. **Ordering and movement**
+   - Define explicit drop zones for every row: top third = `before`, middle = `inside` for Collections, bottom third = `after`.
+   - Render a horizontal insertion line for before/after and a filled/outlined Collection target for inside.
+   - Add store operations that atomically move the complete selected set and insert it at a target index. Do not implement this as DOM-only reordering.
+   - Preserve the existing self/descendant Collection cycle guard and shared Palette/Canvas identity.
+4. **UI and persistence**
+   - Use colored compact type badges/icons: CARD (amber), MD (green), IMAGE (orange/red), GROUP (purple); leave the full filename/title unprefixed beside it.
+   - Use pale-purple row selection, a stronger purple drop outline, and a thin purple insertion line labeled `여기에 이동` only during dragging.
+   - Move per-row Add/Edit actions to hover/focus/selection so narrow Outliner widths prioritize names.
+   - Add a compact Outliner View settings popover containing `항목 크기`, `글자 크기`, and a visible note that values are saved per Workspace.
+   - Store Outliner size/font and the Viewport/Outliner splitter with the existing per-Workspace Side layout state, not global transient DOM state.
+5. **Search and export**
+   - Search must not replace the tree with a flat result list. Keep all branches available, highlight matches, and reveal/highlight the ancestor route.
+   - Canvas export must consume the same canonical Collection ordering used by Outliner, create larger Collection heading cards, preserve Item type semantics, and connect parent/child structure with edges.
+
+### Proposed Outliner UI layout
+
+```text
+Outliner                  [+ Collection] [+ Memo] [View settings]
+[Back] My Workspace / Materials / Basic ideas
+  v  folder  Architecture references
+     v  folder  Basic ideas                     <- selected pale purple
+        CARD  Concept card collection
+        MD    Ideas summary.md
+     v  folder  References
+        IMAGE Wood finish reference.png
+        MD    BLENDER LOOP tools.md
+        ----------------  Move here              <- before/after insertion line
+     [ folder  Materials & finishes ]             <- inside drop target
+     >  folder  Lighting & mood
+        GROUP Minimal house cases
+```
+
+The Outliner retains its own slim scrollbar. The View settings popover is compact and does not cover the active tree more than necessary.
+
+### Implementation order and acceptance criteria
+
+1. **Navigation state** — Collection click filters/switches Viewport; chevron genuinely expands/collapses; double-click enters; breadcrumb and Back work; state restores after reload and Workspace switching.
+2. **Selection synchronization** — Both directions highlight exactly the same Item set, reveal off-screen counterparts, expand required ancestors, and do not loop or steal selection during Ctrl/Cmd/Shift operations.
+3. **Ordering/movement** — before/inside/after feedback matches the final stored order; multi-selection moves atomically; Collection cycle attempts are rejected without partial mutation.
+4. **Presentation/settings** — distinct type icons, title-first rows, hover actions, independent scroll, Outliner size/font controls, and Workspace-specific layout persistence match Light and Dark geometry.
+5. **Search/export QA** — full tree remains during search with match paths visible; Canvas mind-map output matches the same nested order and Item types.
+
+Do not describe these behaviors as implemented merely because the infographic or CSS exists. Each phase requires store/state wiring, runtime interaction testing in a disposable Sandbox, persistence checks after reload, and regression coverage for existing Viewport selection and drag behavior.
 
 ## Start here on another PC
 
@@ -272,7 +368,7 @@ Focused release checks are recorded above, but a future change touching shared i
 - Keep Collect and Storage separate, and keep Mini Palette Canvas-hosted rather than as a regular Obsidian tab.
 - Keep the Storage panes docked, the grid responsive, and Light/Dark layouts geometrically identical.
 - Do not define the More menu or final pane limits without user direction. Copy/link and search semantics are already fixed above.
-- Do not advance to `0.3.0` without explicit user instruction.
+- Do not advance to a new minor version beyond the current `0.3.x` line without explicit user instruction. `0.3.0` was explicitly requested and is already the current release.
 
 ## Release checklist
 

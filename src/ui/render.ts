@@ -96,12 +96,16 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
     card.draggable = true;
     card.addEventListener("dragstart", (event) => {
       if (event.dataTransfer) {
+        const draggedIds = options.dragItemIds?.includes(item.id) ? options.dragItemIds : [item.id];
         event.dataTransfer.clearData();
         event.dataTransfer.setData("application/x-canvas-palette-item", item.id);
-        event.dataTransfer.setData("application/x-canvas-palette-items", JSON.stringify(options.dragItemIds?.includes(item.id) ? options.dragItemIds : [item.id]));
+        event.dataTransfer.setData("application/x-canvas-palette-items", JSON.stringify(draggedIds));
         event.dataTransfer.setData("application/x-canvas-palette-type", item.type);
         event.dataTransfer.effectAllowed = "copyMove";
-        event.dataTransfer.setDragImage(card, Math.max(0, Math.min(event.offsetX, card.clientWidth)), Math.max(0, Math.min(event.offsetY, card.clientHeight)));
+        if (draggedIds.length > 1) {
+          const dragImage = document.body.createDiv({ cls: "cp-multi-drag-image" }); dragImage.createSpan({ text: item.displayTitle || "Selected items" }); dragImage.createEl("strong", { text: String(draggedIds.length) });
+          event.dataTransfer.setDragImage(dragImage, 20, 20); window.setTimeout(() => dragImage.remove(), 0);
+        } else event.dataTransfer.setDragImage(card, Math.max(0, Math.min(event.offsetX, card.clientWidth)), Math.max(0, Math.min(event.offsetY, card.clientHeight)));
       }
       card.addClass("is-dragging");
     }, true);

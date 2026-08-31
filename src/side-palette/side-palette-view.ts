@@ -6,6 +6,7 @@ import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
 import { LinkedSpacesModal } from "../ui/linked-spaces-modal";
 import { NativeMarkdownEditor } from "../editor/native-markdown-editor";
+import { applyAssetDensity, assetDensityLabel, ASSET_DENSITY_DEFAULT, ASSET_DENSITY_MAX, ASSET_DENSITY_MIN } from "../ui/asset-density";
 
 export const SIDE_PALETTE_VIEW = "canvas-palette-side";
 
@@ -243,9 +244,13 @@ export class SidePaletteView extends ItemView {
     const list = viewSwitch.createEl("button", { text: "List", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "list" ? "is-active" : "" });
     grid.addEventListener("click", () => this.setSideView("grid")); list.addEventListener("click", () => this.setSideView("list"));
     const memo = tools.createEl("button", { text: "+ Memo", cls: "cp-viewport-memo" }); memo.addEventListener("click", () => void this.plugin.createMemo());
-    const listEl = parent.createDiv({ cls: `cp-grid cp-grid--${this.plugin.activeWorkspace()?.sideLayout.viewMode ?? "grid"}` });
+    const workspaceLayout = this.plugin.activeWorkspace()?.sideLayout;
+    const listEl = parent.createDiv({ cls: "cp-grid" });
     const applyViewSettings = (): void => {
-      listEl.style.setProperty("--cp-card-height", `${this.plugin.store.data.settings.cardHeight}px`);
+      if (workspaceLayout) {
+        workspaceLayout.densityLevel = applyAssetDensity(listEl, workspaceLayout.densityLevel, "cp-grid");
+        workspaceLayout.viewMode = workspaceLayout.densityLevel === 0 ? "list" : "grid";
+      }
       listEl.style.setProperty("--cp-font-size", `${this.plugin.store.data.settings.fontSize}px`);
       listEl.style.setProperty("--font-text-size", `${this.plugin.store.data.settings.fontSize}px`);
     };
@@ -267,7 +272,20 @@ export class SidePaletteView extends ItemView {
       input.addEventListener("change", () => this.plugin.store.changed());
       reset.addEventListener("click", () => { input.value = String(defaultValue); update(); this.plugin.store.changed(); });
     };
-    rangeControl("Card height", "cardHeight", 32, 220, 220);
+    if (workspaceLayout) {
+      const row = controls.createDiv({ cls: "cp-view-option" });
+      const heading = row.createDiv({ cls: "cp-view-option__heading" });
+      const name = heading.createEl("label", { text: "Item size" });
+      const value = heading.createSpan({ cls: "cp-view-option__value" });
+      const reset = heading.createEl("button", { text: "Reset", cls: "cp-view-option__reset" });
+      const input = row.createEl("input", { attr: { type: "range", min: String(ASSET_DENSITY_MIN), max: String(ASSET_DENSITY_MAX), step: "1", value: String(workspaceLayout.densityLevel), "aria-label": "Item size" } });
+      name.htmlFor = input.id = "cp-side-density";
+      const updateDensity = (): void => { workspaceLayout.densityLevel = Number(input.value); value.setText(assetDensityLabel(workspaceLayout.densityLevel)); applyViewSettings(); };
+      updateDensity();
+      input.addEventListener("input", updateDensity);
+      input.addEventListener("change", () => this.plugin.store.changed());
+      reset.addEventListener("click", () => { input.value = String(ASSET_DENSITY_DEFAULT); updateDensity(); this.plugin.store.changed(); });
+    }
     rangeControl("Preview font size", "fontSize", 8, 14, 14);
     applyViewSettings();
     this.mountViewportReorder(parent, listEl, workspaceId);
@@ -622,7 +640,7 @@ export class SidePaletteView extends ItemView {
     return upperHeight / available;
   }
   private clamp(value: number, minimum: number, maximum: number): number { return Math.max(minimum, Math.min(maximum, value)); }
-  private setSideView(viewMode: "grid" | "list"): void { const workspace = this.plugin.activeWorkspace(); if (!workspace) return; workspace.sideLayout.viewMode = viewMode; this.plugin.store.changed(); }
+  private setSideView(viewMode: "grid" | "list"): void { const workspace = this.plugin.activeWorkspace(); if (!workspace) return; workspace.sideLayout.viewMode = viewMode; workspace.sideLayout.densityLevel = viewMode === "list" ? 0 : Math.max(1, workspace.sideLayout.densityLevel || ASSET_DENSITY_DEFAULT); this.plugin.store.changed(); }
   private promptCollection(workspaceId: string, parentId: string | null): void { new TextPromptModal(this.app, "New collection", "", (value) => this.plugin.store.createCollection(workspaceId, value, parentId), "Collection name").open(); }
   private itemMenu(event: MouseEvent, item: PaletteItem): void {
     event.preventDefault(); const menu = new Menu(); const workspace = this.plugin.activeWorkspace();

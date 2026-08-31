@@ -27,7 +27,7 @@ test("Collection deletion preserves items and promotes nested Collections", asyn
   const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
   const store = await readFile(new URL("../src/core/store.ts", import.meta.url), "utf8");
   const modal = await readFile(new URL("../src/ui/modal.ts", import.meta.url), "utf8");
-  const removeCollection = store.match(/removeCollection\(id: string\): void \{[\s\S]*?\n  \}\n\n  moveCollection/)?.[0] ?? "";
+  const removeCollection = store.match(/removeCollection\(id: string\): void \{[\s\S]*?\r?\n  \}\r?\n\r?\n  moveCollection/)?.[0] ?? "";
   assert.match(source, /iconButton\(row, "trash-2", "Delete collection"/);
   assert.match(source, /new ConfirmDeleteCollectionModal/);
   assert.match(store, /removeCollection\(id: string\)/);
@@ -48,7 +48,7 @@ test("Outliner files support metadata, context menus, child files, and grouping 
   assert.match(source, /zone === "inside"[\s\S]*targetId/);
   assert.match(store, /parentItemId: string \| null = null/);
   assert.match(store, /this\.isItemDescendant\(parentItemId, id\)/);
-  assert.match(defaults, /schemaVersion: 17/);
+  assert.match(defaults, /schemaVersion: 18/);
 });
 
 test("Viewport renders Collection and file-parent groups as vertical card stacks", async () => {

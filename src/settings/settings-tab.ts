@@ -19,14 +19,9 @@ export class CanvasPaletteSettingTab extends PluginSettingTab {
     if (this.plugin.store.data.settings.accentMode === "custom") new Setting(containerEl).setName("Custom accent").addColorPicker((picker) => picker
       .setValue(this.plugin.store.data.settings.accentColor)
       .onChange((value) => { this.plugin.store.data.settings.accentColor = value; this.plugin.store.changed(); }));
-    new Setting(containerEl).setName("Card height").setDesc("Reduce the vertical preview space without changing card width.").addSlider((slider) => slider
-      .setLimits(32, 220, 4).setDynamicTooltip().setValue(this.plugin.store.data.settings.cardHeight)
-      .onChange((value) => { this.plugin.store.data.settings.cardHeight = value; this.plugin.store.changed(); }));
+    new Setting(containerEl).setName("Asset size").setDesc("Side Palette and Mini Palette each keep their own Explorer-style item-size level. Change it from the palette's View settings or Control panel.");
     new Setting(containerEl).setName("Font size").setDesc("Reduce preview text from the default size.").addSlider((slider) => slider
       .setLimits(8, 14, 1).setDynamicTooltip().setValue(this.plugin.store.data.settings.fontSize)
       .onChange((value) => { this.plugin.store.data.settings.fontSize = value; this.plugin.store.changed(); }));
-    new Setting(containerEl).setName("Grid columns").setDesc("Preferred number of columns; narrow panes reflow automatically.").addSlider((slider) => slider
-      .setLimits(1, 8, 1).setDynamicTooltip().setValue(this.plugin.store.data.settings.columns)
-      .onChange((value) => { this.plugin.store.data.settings.columns = value; this.plugin.store.changed(); }));
   }
 }

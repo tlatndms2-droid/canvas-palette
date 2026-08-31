@@ -2,12 +2,15 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.15**
+Current version: **0.3.18**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
+- Mini Palette and Side Palette now share a seven-step Windows File Explorer-style asset density system. One Item size control changes card width, height, responsive column count, preview detail, and the final List/Details layout in sequence; each palette restores its own saved density after reload.
+- Mini Palette Collect and Storage keep independent selection sets and anchors. Both support plain, Ctrl/Cmd, Shift, and Ctrl/Cmd+Shift selection; Storage also supports blank-space clearing and rectangle selection. Single selection uses the border only, while multi-selection adds check markers.
+- Mini Palette batch actions operate on the visible selection: filtered Select all, multi-item metadata, confirmed deletion, multi-item drag payloads, and `Place on Canvas` for selected items only. Workspace mind-map Export remains a Side Palette responsibility. Closing the Mini left pane keeps quick Search, Type filter, and Item size controls above Assets.
 - Schema-versioned persistent model for items, workspaces, collections, pending imports, and UI state.
 - Workspaces are either general or Canvas-owned. Opening a Canvas automatically ensures its first dedicated Workspace and makes one dedicated Workspace the representative default. A Canvas can own unlimited dedicated Workspaces, the user can choose exactly one representative, and `Current Canvas` returns to it immediately. Dedicated Workspaces accept only items that originate from or currently exist on their owner Canvas; general Workspaces accept material from every Canvas. This storage restriction never limits exporting or dragging stored material to any Canvas.
 - Front/Back is opt-in per selected Canvas text or file node, including an Image only when the user explicitly enables that exact material; unrelated cards, images, and files remain unchanged. The Side Palette Viewport card menu exposes `Enable Front / Back` or `Remove Front / Back` for the clicked material, while the native Canvas node toolbar provides the same state control. An enabled linked material shows its flip control across Canvas, Side Palette, and Mini Palette. Removal returns linked placements to Front and hides their flip UI without deleting the saved Back text. Re-enabling restores that Back. In the Side Palette, Front content keeps the separate popup editor while Back content opens native Live Preview directly inside the Back-facing card. On Canvas, a rendered Back can be dragged to move its card and its own inline editor remains isolated from movement.

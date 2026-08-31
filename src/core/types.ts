@@ -65,6 +65,7 @@ export interface Collection { id: string; workspaceId: string; parentId: string 
 
 export interface SideLayoutState {
   viewportRatio: number; topRatio: number; indexRatio: number; viewMode: AssetViewMode;
+  densityLevel: number;
   selectedCollectionId: string | null;
   focusedCollectionId: string | null;
   collapsedCollectionIds: string[];
@@ -108,8 +109,15 @@ export interface MiniPaletteState {
   leftPaneWidth: number;
   rightPaneWidth: number;
   viewMode: AssetViewMode;
+  densityLevel: number;
   cardHeight: number;
   sort: "modified-desc" | "modified-asc" | "title-asc" | "title-desc";
+  collectSelectedItemIds: string[];
+  collectSelectionAnchorId: string | null;
+  storageSelectedItemIds: string[];
+  storageSelectionAnchorId: string | null;
+  focusedItemId: string | null;
+  /** @deprecated migration-only selection used before schema 18 */
   selectedItemIds: string[];
 }
 
