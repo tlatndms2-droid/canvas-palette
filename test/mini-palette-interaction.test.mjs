@@ -36,3 +36,11 @@ test("Mini Collect selection does not auto-open settings, which are opened from 
   assert.match(menu, /onClick\(\(\) => this\.openCollectInspector\(item\.id\)\)/);
   assert.match(menu, /private openCollectInspector\(itemId: string\)/);
 });
+
+test("Mini Collect uses separate single-item and multi-item editing actions", () => {
+  assert.match(source, /text: "Open selected item settings"/);
+  assert.match(source, /openSettings\.disabled = selected\.length !== 1/);
+  assert.match(source, /text: "Multiple selection editing"/);
+  assert.match(source, /multiEdit\.disabled = selected\.length < 2/);
+  assert.doesNotMatch(source, /text: "Edit selected"/);
+});

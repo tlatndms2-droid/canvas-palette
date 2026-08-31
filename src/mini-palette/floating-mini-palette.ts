@@ -100,7 +100,12 @@ export class FloatingMiniPalette {
       const all = summary.createEl("button", { text: allVisibleSelected ? "Clear selection" : "Select all results" });
       all.addEventListener("click", () => { this.setCollectSelectedIds(allVisibleSelected ? selected.filter((id) => !visible.some((item) => item.id === id)) : [...new Set([...selected, ...visible.map((item) => item.id)])]); this.plugin.store.changed(); });
       if (selected.length > 0) {
-        const edit = summary.createEl("button", { text: "Edit selected" }); edit.addEventListener("click", () => new TagLabelModal(this.plugin.app, this.plugin, selected).open());
+        const openSettings = summary.createEl("button", { text: "Open selected item settings" });
+        openSettings.disabled = selected.length !== 1;
+        openSettings.addEventListener("click", () => { if (selected.length === 1) this.openCollectInspector(selected[0]); });
+        const multiEdit = summary.createEl("button", { text: "Multiple selection editing" });
+        multiEdit.disabled = selected.length < 2;
+        multiEdit.addEventListener("click", () => { if (selected.length > 1) new TagLabelModal(this.plugin.app, this.plugin, selected).open(); });
         const remove = summary.createEl("button", { text: "Delete selected", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmPendingDelete(selected));
       }
       for (const item of visible) this.renderPendingRow(list, item, visible.map((entry) => entry.id));
@@ -271,7 +276,7 @@ export class FloatingMiniPalette {
     if (tab === "collect" && targetIds.length === 1) {
       menu.addItem((entry) => entry.setTitle("Open selected item settings").setIcon("settings-2").onClick(() => this.openCollectInspector(item.id)));
     } else {
-      menu.addItem((entry) => entry.setTitle(`Edit metadata${targetIds.length > 1 ? ` for ${targetIds.length} items` : ""}`).setIcon("tags").onClick(() => new TagLabelModal(this.plugin.app, this.plugin, targetIds).open()));
+      menu.addItem((entry) => entry.setTitle("Multiple selection editing").setIcon("tags").onClick(() => new TagLabelModal(this.plugin.app, this.plugin, targetIds).open()));
     }
     if (targetIds.length === 1) {
       if (item.origin.canvasPath && item.origin.canvasNodeId) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => void this.plugin.locateItemOnCanvas(item)));
