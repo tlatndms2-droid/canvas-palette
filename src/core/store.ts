@@ -14,7 +14,9 @@ export class PaletteStore {
 
   async load(): Promise<void> {
     this.data = migrateData(await this.plugin.loadData() as Partial<PaletteData> | null);
+    const repairedDuplicates = this.repairDuplicateCanvasItems();
     if (Object.keys(this.data.workspaces).length === 0) this.createWorkspace("My Workspace");
+    else if (repairedDuplicates) await this.flush();
   }
 
   subscribe(listener: Listener): () => void {
@@ -129,14 +131,17 @@ export class PaletteStore {
   }
 
   addPending(item: PaletteItem): void {
+    if (this.existingCollectedItem(item)) return;
     this.data.items[item.id] = item;
     if (!this.data.pendingItemIds.includes(item.id)) this.data.pendingItemIds.push(item.id);
     this.changed();
   }
 
   addToWorkspace(workspaceId: string, item: PaletteItem): boolean {
+    item = this.existingCollectedItem(item) ?? item;
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace || !this.canStoreItem(workspaceId, item)) return false;
+    this.detachWorkspaceLinks(item.id);
     item.origin.workspaceId = workspaceId;
     item.parentItemId ??= null;
     item.childItemIds ??= [];
@@ -233,6 +238,14 @@ export class PaletteStore {
 
   linkedItemForNode(canvasPath: string, nodeId: string): PaletteItem | undefined {
     return this.allItems().find((item) => this.itemHasLinkedNode(item, canvasPath, nodeId));
+  }
+
+  existingCollectedItem(item: PaletteItem): PaletteItem | undefined {
+    for (const location of this.linkedCanvasNodes(item)) {
+      const existing = this.linkedItemForNode(location.canvasPath, location.nodeId);
+      if (existing && existing.id !== item.id) return existing;
+    }
+    return this.data.items[item.id];
   }
 
   setCanvasNodeMetadata(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">): void {
@@ -743,6 +756,45 @@ export class PaletteStore {
     for (const workspace of Object.values(this.data.workspaces)) workspace.looseItemIds = workspace.looseItemIds.filter((id) => id !== itemId);
     for (const collection of Object.values(this.data.collections)) collection.itemIds = collection.itemIds.filter((id) => id !== itemId);
     for (const item of Object.values(this.data.items)) if (item.id !== itemId) item.childItemIds = (item.childItemIds ?? []).filter((id) => id !== itemId);
+  }
+
+  private repairDuplicateCanvasItems(): boolean {
+    const ownerByLocation = new Map<string, PaletteItem>();
+    const replacements = new Map<string, string>();
+    const ordered = Object.values(this.data.items).sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+    for (const item of ordered) {
+      const owners = this.linkedCanvasNodes(item).map((location) => ownerByLocation.get(`${location.canvasPath}\n${location.nodeId}`)).filter((owner): owner is PaletteItem => Boolean(owner));
+      const canonical = owners[0];
+      if (!canonical) {
+        for (const location of this.linkedCanvasNodes(item)) ownerByLocation.set(`${location.canvasPath}\n${location.nodeId}`, item);
+        continue;
+      }
+      replacements.set(item.id, canonical.id);
+      canonical.canvasPlacements = [...canonical.canvasPlacements, ...item.canvasPlacements].filter((placement, index, all) => all.findIndex((candidate) => candidate.canvasPath === placement.canvasPath && candidate.nodeIds.join("\n") === placement.nodeIds.join("\n")) === index);
+      canonical.childItemIds = [...new Set([...(canonical.childItemIds ?? []), ...(item.childItemIds ?? [])])];
+      if (item.modifiedAt > canonical.modifiedAt) {
+        const createdAt = canonical.createdAt;
+        Object.assign(canonical, item, { id: canonical.id, createdAt, origin: { ...item.origin, workspaceId: canonical.origin.workspaceId ?? item.origin.workspaceId }, canvasPlacements: canonical.canvasPlacements, childItemIds: canonical.childItemIds });
+      }
+      for (const location of this.linkedCanvasNodes(item)) ownerByLocation.set(`${location.canvasPath}\n${location.nodeId}`, canonical);
+    }
+    if (replacements.size === 0) return false;
+    const replace = (ids: string[]): string[] => [...new Set(ids.map((id) => replacements.get(id) ?? id))];
+    for (const workspace of Object.values(this.data.workspaces)) workspace.looseItemIds = replace(workspace.looseItemIds);
+    for (const collection of Object.values(this.data.collections)) collection.itemIds = replace(collection.itemIds);
+    for (const item of Object.values(this.data.items)) {
+      item.childItemIds = replace(item.childItemIds ?? []);
+      if (item.parentItemId) item.parentItemId = replacements.get(item.parentItemId) ?? item.parentItemId;
+    }
+    this.data.pendingItemIds = replace(this.data.pendingItemIds).filter((id) => !this.workspaceForItem(id));
+    this.data.uiState.sideSelectedItemIds = replace(this.data.uiState.sideSelectedItemIds);
+    this.data.uiState.miniPalette.collectSelectedItemIds = replace(this.data.uiState.miniPalette.collectSelectedItemIds);
+    this.data.uiState.miniPalette.storageSelectedItemIds = replace(this.data.uiState.miniPalette.storageSelectedItemIds);
+    this.data.uiState.miniPalette.storageItemIds = replace(this.data.uiState.miniPalette.storageItemIds);
+    if (this.data.uiState.selectedItemId) this.data.uiState.selectedItemId = replacements.get(this.data.uiState.selectedItemId) ?? this.data.uiState.selectedItemId;
+    if (this.data.uiState.miniPalette.focusedItemId) this.data.uiState.miniPalette.focusedItemId = replacements.get(this.data.uiState.miniPalette.focusedItemId) ?? this.data.uiState.miniPalette.focusedItemId;
+    for (const duplicateId of replacements.keys()) delete this.data.items[duplicateId];
+    return true;
   }
 
   private isItemDescendant(itemId: string, ancestorId: string): boolean {

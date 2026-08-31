@@ -244,10 +244,12 @@ export default class CanvasPalettePlugin extends Plugin {
   async collectCanvasSelection(): Promise<void> {
     const items = await this.canvas.collectSelection();
     if (items.length === 0) return;
-    for (const item of items) this.store.addPending(item);
+    const newItems = items.filter((item) => !this.store.existingCollectedItem(item));
+    for (const item of newItems) this.store.addPending(item);
     this.store.data.uiState.miniPalette.tab = "collect";
     this.miniPalette.open();
-    new Notice(`${items.length} Canvas item${items.length === 1 ? "" : "s"} collected.`);
+    const skipped = items.length - newItems.length;
+    new Notice(newItems.length > 0 ? `${newItems.length} Canvas item${newItems.length === 1 ? "" : "s"} collected${skipped > 0 ? `; ${skipped} already linked` : ""}.` : "The selected Canvas items are already linked to Palette.");
   }
 
   private editCanvasNodesMetadata(nodes: unknown[]): void {
@@ -318,7 +320,8 @@ export default class CanvasPalettePlugin extends Plugin {
   private async collectCanvasSelectionToWorkspace(workspaceId: string): Promise<void> {
     const items = await this.canvas.collectSelection();
     if (items.length === 0) return;
-    const accepted = items.filter((item) => this.store.addToWorkspace(workspaceId, item));
+    const candidates = items.map((item) => this.store.existingCollectedItem(item) ?? item);
+    const accepted = candidates.filter((item, index) => candidates.findIndex((candidate) => candidate.id === item.id) === index && this.store.addToWorkspace(workspaceId, item));
     if (accepted.length === 0) { new Notice("This Canvas Workspace only accepts items from its own Canvas."); return; }
     this.store.data.uiState.activeWorkspaceId = workspaceId;
     this.store.data.uiState.selectedItemId = accepted[0].id;

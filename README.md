@@ -2,12 +2,13 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.22**
+Current version: **0.3.23**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
+- Canvas collection now enforces one linked node as one canonical Palette Item. Re-collecting an already linked Card/Markdown/Image/Group does not create another ID in Collect, Side, or Mini Storage. On load, exact duplicate IDs that point to the same Canvas path and node are consolidated into the oldest identity, while the newest content/metadata and existing Workspace, Collection, Mini relay, child, selection, and placement references are redirected to that canonical Item.
 - Mini Collect is the inspection boundary before Side storage. Importing a reviewed Item no longer fails because it came from another Canvas: it removes that Item's previous Workspace/Collection membership, assigns only the selected destination Workspace, and keeps its original Canvas link as provenance. In a Canvas-owned Workspace, Side `Linked/Unlinked` is evaluated against that Workspace's owner Canvas, so an imported Item with no node inside that Canvas is immediately shown and filterable as `Unlinked`.
 - Mini Palette is now an explicit Workspace-independent relay hub: Side Palette cards enter or leave Mini through the `Mini Palette로 보내기` / `Mini Palette에서 제거` context-menu toggle. Mini Storage shows only those explicitly sent links, its own removal action unlinks only from Mini, and Side Palette/Workspace items, original Vault files, and Canvas nodes remain canonical and unchanged. Storage counts exclude pending Collect items, the obsolete Mini Workspace selector remains removed, and the type filter displays Markdown compactly as `MD`.
 - Mini Palette and Side Palette now share a seven-step Windows File Explorer-style asset density system. One Item size control changes card width, height, responsive column count, preview detail, and the final List/Details layout in sequence; each palette restores its own saved density after reload.

@@ -59,6 +59,43 @@ test("a dropped Card becomes a linked placement with shared metadata", async () 
   await cleanup();
 });
 
+test("collecting one linked Canvas node again reuses its canonical Palette item", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  store.data = fixture();
+  const duplicate = { ...structuredClone(store.data.items.card), id: "duplicate", createdAt: 2, modifiedAt: 2 };
+
+  assert.equal(store.existingCollectedItem(duplicate)?.id, "card");
+  store.addPending(duplicate);
+  assert.equal(store.data.items.duplicate, undefined);
+  assert.deepEqual(store.data.pendingItemIds, []);
+
+  await cleanup();
+});
+
+test("loading repairs duplicate Canvas-linked IDs across Side, Collect, and Mini Storage", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const raw = fixture();
+  raw.items.duplicate = { ...structuredClone(raw.items.card), id: "duplicate", displayTitle: "Newest", content: "Newest body", createdAt: 2, modifiedAt: 5 };
+  raw.workspaces.workspace.looseItemIds.push("duplicate");
+  raw.pendingItemIds.push("duplicate");
+  raw.uiState.miniPalette.storageItemIds = ["card", "duplicate"];
+  const saved = [];
+  const store = new PaletteStore({ loadData: async () => raw, saveData: async (data) => saved.push(structuredClone(data)), syncPaletteItemToCanvas: async () => {} });
+
+  await store.load();
+
+  assert.deepEqual(Object.keys(store.data.items), ["card"]);
+  assert.equal(store.data.items.card.displayTitle, "Newest");
+  assert.equal(store.data.items.card.content, "Newest body");
+  assert.deepEqual(store.data.workspaces.workspace.looseItemIds, ["card"]);
+  assert.deepEqual(store.data.pendingItemIds, []);
+  assert.deepEqual(store.data.uiState.miniPalette.storageItemIds, ["card"]);
+  assert.equal(saved.length, 1);
+
+  await cleanup();
+});
+
 test("Palette edits propagate metadata to every linked Card node", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const synchronized = [];
