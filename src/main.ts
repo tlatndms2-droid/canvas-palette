@@ -14,7 +14,7 @@ import { PreviewService } from "./preview/preview-service";
 import { SearchService } from "./search/search-service";
 import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
-import { ConfirmCanvasReplacementModal, ConfirmDeleteModal, ConfirmForeignCanvasWorkspaceModal, ItemEditorModal, MetadataEditorModal, TextPromptModal } from "./ui/modal";
+import { AlreadySavedToWorkspaceModal, ConfirmCanvasReplacementModal, ConfirmDeleteModal, ConfirmForeignCanvasWorkspaceModal, ItemEditorModal, MetadataEditorModal, TextPromptModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 import { FindLinkModal } from "./ui/find-link-modal";
 import { WorkspaceExplorerModal } from "./ui/workspace-explorer-modal";
@@ -355,9 +355,8 @@ export default class CanvasPalettePlugin extends Plugin {
     this.store.data.uiState.selectedItemId = (accepted[0] ?? alreadySaved[0]).id;
     this.store.changed();
     await this.openSidePalette();
-    if (accepted.length > 0 && alreadySaved.length > 0) new Notice(`${accepted.length} Canvas item${accepted.length === 1 ? "" : "s"} saved; ${alreadySaved.length} already in Side Palette.`);
-    else if (accepted.length > 0) new Notice(`${accepted.length} Canvas item${accepted.length === 1 ? "" : "s"} saved to Side Palette.`);
-    else new Notice(`${alreadySaved.length} Canvas item${alreadySaved.length === 1 ? " is" : "s are"} already in Side Palette; no duplicate saved.`);
+    if (alreadySaved.length > 0) new AlreadySavedToWorkspaceModal(this.app, this.store.data.workspaces[workspaceId]?.name ?? "Side Palette", accepted.length, alreadySaved.length).open();
+    else new Notice(`${accepted.length} Canvas item${accepted.length === 1 ? "" : "s"} saved to Side Palette.`);
   }
 
   markdownSourceStatus(item: PaletteItem): "deleted" | null {

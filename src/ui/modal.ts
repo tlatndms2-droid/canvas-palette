@@ -84,6 +84,19 @@ export class ConfirmForeignCanvasWorkspaceModal extends Modal {
   onClose(): void { this.contentEl.empty(); }
 }
 
+export class AlreadySavedToWorkspaceModal extends Modal {
+  constructor(app: App, private readonly workspaceName: string, private readonly savedCount: number, private readonly alreadySavedCount: number) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-confirm-modal");
+    this.contentEl.createEl("h2", { text: "이미 Side Palette에 저장된 항목입니다" });
+    this.contentEl.createEl("p", { text: `“${this.workspaceName}”에 이미 저장된 항목 ${this.alreadySavedCount}개는 중복 저장하지 않았습니다.` });
+    if (this.savedCount > 0) this.contentEl.createEl("p", { text: `${this.savedCount}개 항목은 새로 저장되었습니다.` });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "확인", cls: "mod-cta" }).addEventListener("click", () => this.close());
+  }
+  onClose(): void { this.contentEl.empty(); }
+}
+
 export class ConfirmDeleteCollectionModal extends Modal {
   constructor(app: App, private readonly name: string, private readonly destination: string, private readonly itemCount: number, private readonly childCount: number, private readonly onConfirm: () => void) { super(app); }
   onOpen(): void {

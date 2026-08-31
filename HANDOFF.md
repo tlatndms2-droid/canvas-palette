@@ -2,11 +2,13 @@
 
 ## Current state
 
-- Version: `0.3.28`.
+- Version: `0.3.29`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release target: `0.3.28`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.28`.
+- Latest release target: `0.3.29`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.29`.
+- Latest runtime change: `0.3.29`; direct Canvas-to-Side duplicate detection now opens a dedicated acknowledgement popup instead of only a transient corner notice. It names the target Workspace and tells how many duplicates were skipped; a mixed selection also states how many Items were newly saved. Feature 2 has not started.
+- `0.3.29` runtime validation used the existing `Obsidian Sandbox`. Re-saving an existing Canvas Card into `Current` retained exactly one Item and rendered the real popup titled `이미 Side Palette에 저장된 항목입니다`, naming `Current`, stating that one Item was not saved as a duplicate, and exposing the `확인` button. Closing it removed the popup; the original Sandbox data was restored and reload captured no error.
 - Latest runtime change: `0.3.28`; direct Canvas-to-Side saving now detects Items already present in the selected Workspace before trying to save them. Existing Items remain single and report that no duplicate was saved; mixed selections report both saved and already-present counts. Feature 2 has not started.
 - `0.3.28` runtime validation used the existing `Obsidian Sandbox`. Re-saving the exact same Canvas Card into its existing Side Workspace retained one Item and one Workspace entry, and the real notice reported that one Canvas Item was already in Side Palette and no duplicate was saved. The original Sandbox plugin data was restored and reload captured no error.
 - Latest runtime change: `0.3.27`; before direct Canvas-to-Side saving or Mini Collect import proceeds to another Canvas's representative Workspace, the user is told that the destination belongs to another Canvas and that the Item will be stored without a link to that destination Canvas. `취소` leaves the Item unchanged; `저장` continues the existing unlinked save. Current-Canvas representatives and general Workspaces do not show this confirmation.
@@ -79,6 +81,7 @@
 | `0.3.26` | release tag | Added visually distinct representative marks in the Side Palette Workspace selector. | `★` is the active Canvas representative; `☆` is another Canvas representative; general Workspaces have no mark. |
 | `0.3.27` | release tag | Added a confirmation before saving to another Canvas's representative Workspace. | The same confirmation protects Canvas direct save and Mini-to-Workspace import; accepted Items remain unlinked to the destination Canvas. |
 | `0.3.28` | release tag | Added duplicate-save feedback for direct Canvas-to-Side save. | Existing Items remain single; users are told that no duplicate was saved. |
+| `0.3.29` | release tag | Replaced duplicate-save corner notice with an acknowledgement popup. | The popup names the target Side Workspace, says duplicates were not saved, and reports new Items for a mixed selection. |
 
 ### Feature 1 behavior currently implemented
 
