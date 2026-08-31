@@ -686,12 +686,14 @@ export class PaletteStore {
 
   miniStorageHas(itemId: string): boolean { return this.data.uiState.miniPalette.storageItemIds.includes(itemId); }
 
-  addMiniStorageItems(itemIds: string[]): void {
+  addMiniStorageItems(itemIds: string[]): string[] {
     const pending = new Set(this.data.pendingItemIds);
     const linked = new Set(this.data.uiState.miniPalette.storageItemIds);
-    for (const id of itemIds) if (this.data.items[id] && !pending.has(id)) linked.add(id);
+    const added: string[] = [];
+    for (const id of itemIds) if (this.data.items[id] && !pending.has(id) && !linked.has(id)) { linked.add(id); added.push(id); }
     this.data.uiState.miniPalette.storageItemIds = [...linked];
     this.changed();
+    return added;
   }
 
   itemLinkedToWorkspace(item: PaletteItem, workspaceId: string): boolean {

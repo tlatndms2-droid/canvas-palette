@@ -20,7 +20,10 @@ test("Side item menu uses focused metadata, move, and Find link actions", async 
   assert.doesNotMatch(source, /setTitle\("Locate on Canvas"\)/);
   assert.match(source, /setTitle\("Find link"\)/);
   assert.match(source, /allInMini \? "Mini Palette에서 제거" : "Mini Palette로 보내기"/);
-  assert.match(source, /allInMini \? this\.plugin\.store\.removeMiniStorageItems\(targetIds\) : this\.plugin\.store\.addMiniStorageItems\(targetIds\)/);
+  assert.match(source, /allInMini \? this\.plugin\.store\.removeMiniStorageItems\(targetIds\) : this\.plugin\.sendItemsToMini\(targetIds\)/);
+  assert.match(source, /Send to Mini Palette[\s\S]{0,180}sendItemsToMini\(this\.sideSelectedIds\(\)\)/);
+  assert.match(main, /existingIds[\s\S]{0,500}addMiniStorageItems\(existingIds\)/);
+  assert.match(main, /sendItemsToMini\(itemIds: string\[\]\)/);
   assert.doesNotMatch(source, /setTitle\("Open original"\)/);
   assert.match(source, /setTitle\("Open source file"\)/);
   assert.match(source, /application\/x-canvas-palette-collection/);

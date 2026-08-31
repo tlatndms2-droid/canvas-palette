@@ -126,7 +126,8 @@ test("Side explicitly adds and removes a Mini relay link without changing Worksp
   const workspace = store.createWorkspace("Owned by Side", "general");
   store.addToWorkspace(workspace.id, item("linked", "EP01.canvas"));
   assert.equal(store.miniStorageHas("linked"), false);
-  store.addMiniStorageItems(["linked"]);
+  assert.deepEqual(store.addMiniStorageItems(["linked"]), ["linked"]);
+  assert.deepEqual(store.addMiniStorageItems(["linked"]), []);
   assert.equal(store.miniStorageHas("linked"), true);
   store.removeMiniStorageItems(["linked"]);
   assert.equal(store.data.items.linked.displayTitle, "linked");

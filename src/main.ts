@@ -244,12 +244,23 @@ export default class CanvasPalettePlugin extends Plugin {
   async collectCanvasSelection(): Promise<void> {
     const items = await this.canvas.collectSelection();
     if (items.length === 0) return;
+    const existingIds = [...new Set(items.flatMap((item) => this.store.existingCollectedItem(item)?.id ?? []))];
     const newItems = items.filter((item) => !this.store.existingCollectedItem(item));
     for (const item of newItems) this.store.addPending(item);
-    this.store.data.uiState.miniPalette.tab = "collect";
+    const sent = this.store.addMiniStorageItems(existingIds);
+    this.store.data.uiState.miniPalette.tab = newItems.length > 0 ? "collect" : "storage";
     this.miniPalette.open();
-    const skipped = items.length - newItems.length;
-    new Notice(newItems.length > 0 ? `${newItems.length} Canvas item${newItems.length === 1 ? "" : "s"} collected${skipped > 0 ? `; ${skipped} already linked` : ""}.` : "The selected Canvas items are already linked to Palette.");
+    if (newItems.length > 0) new Notice(`${newItems.length} new Canvas item${newItems.length === 1 ? "" : "s"} collected${sent.length > 0 ? `; ${sent.length} existing item${sent.length === 1 ? "" : "s"} sent to Mini Storage` : ""}.`);
+    else new Notice(sent.length > 0 ? `${sent.length} existing Palette item${sent.length === 1 ? "" : "s"} sent to Mini Storage.` : "The selected items are already in Mini Palette.");
+  }
+
+  sendItemsToMini(itemIds: string[]): void {
+    const validIds = [...new Set(itemIds)].filter((id) => Boolean(this.store.data.items[id]));
+    if (validIds.length === 0) { new Notice("Select one or more Side Palette items first."); return; }
+    const added = this.store.addMiniStorageItems(validIds);
+    this.store.data.uiState.miniPalette.tab = "storage";
+    this.miniPalette.open();
+    new Notice(added.length > 0 ? `${added.length} item${added.length === 1 ? "" : "s"} sent to Mini Palette.` : "The selected items are already in Mini Palette.");
   }
 
   private editCanvasNodesMetadata(nodes: unknown[]): void {

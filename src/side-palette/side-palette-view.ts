@@ -71,7 +71,7 @@ export class SidePaletteView extends ItemView {
     const header = root.createDiv({ cls: "cp-side__header" });
     header.createDiv({ cls: "cp-brand", text: "Canvas Palette" });
     const exportButton = header.createEl("button", { text: "Export" }); exportButton.addEventListener("click", () => void this.plugin.exportActiveWorkspace());
-    const collectButton = header.createEl("button", { text: "Send to Mini Palette" }); collectButton.addEventListener("click", () => void this.plugin.collectCanvasSelection());
+    const collectButton = header.createEl("button", { text: "Send to Mini Palette" }); collectButton.addEventListener("click", () => this.plugin.sendItemsToMini(this.sideSelectedIds()));
     const selectorRow = root.createDiv({ cls: "cp-workspace-row" }); selectorRow.createSpan({ text: "Current workspace" });
     workspaceSelect(this.plugin, selectorRow, workspace.id, (id) => { this.query = ""; this.plugin.store.data.uiState.activeWorkspaceId = id; this.plugin.store.changed(); });
     const currentCanvas = selectorRow.createEl("button", { cls: "cp-current-canvas-workspace", attr: { title: "Open current Canvas Workspace", "aria-label": "Open current Canvas Workspace" } });
@@ -677,7 +677,7 @@ export class SidePaletteView extends ItemView {
       .setTitle(allInMini ? "Mini Palette에서 제거" : "Mini Palette로 보내기")
       .setIcon(allInMini ? "unlink" : "send")
       .setChecked(allInMini)
-      .onClick(() => allInMini ? this.plugin.store.removeMiniStorageItems(targetIds) : this.plugin.store.addMiniStorageItems(targetIds)));
+      .onClick(() => allInMini ? this.plugin.store.removeMiniStorageItems(targetIds) : this.plugin.sendItemsToMini(targetIds)));
     if (workspace) menu.addItem((entry) => entry.setTitle("Move to…").setIcon("folder-input").onClick(() => new MoveItemsModal(this.app, workspace.name, Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id), targetIds.length, (collectionId) => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collectionId)).open()));
     const linkedLocations = this.plugin.store.linkedCanvasLocations(item);
     if (linkedLocations.length > 0) menu.addItem((entry) => entry.setTitle("Find link").setIcon("locate-fixed").onClick(() => this.plugin.findLinkedCanvas(item)));
