@@ -30,23 +30,25 @@ test("Mini batch actions use selected IDs and guarded Canvas placement", async (
   const mini = await readFile(new URL("../src/mini-palette/floating-mini-palette.ts", import.meta.url), "utf8");
   const canvas = await readFile(new URL("../src/canvas/canvas-adapter.ts", import.meta.url), "utf8");
   assert.match(mini, /Place on Canvas/);
-  assert.match(mini, /new ConfirmDeleteModal/);
+  assert.match(mini, /new ConfirmMiniStorageRemovalModal/);
   assert.match(mini, /dragItemIds: selected/);
   assert.match(mini, /application\/x-canvas-palette-items/);
   assert.match(canvas, /async restoreItems\(items: PaletteItem\[\], screenX: number, screenY: number\)/);
 });
 
-test("Mini Storage workspace filter is independent from the active Side workspace", async () => {
+test("Mini Storage is workspace-independent and removes relay links without deleting source items", async () => {
   const types = await readFile(new URL("../src/core/types.ts", import.meta.url), "utf8");
   const defaults = await readFile(new URL("../src/core/defaults.ts", import.meta.url), "utf8");
   const store = await readFile(new URL("../src/core/store.ts", import.meta.url), "utf8");
   const mini = await readFile(new URL("../src/mini-palette/floating-mini-palette.ts", import.meta.url), "utf8");
-  assert.match(types, /storageWorkspaceFilter: string \| null/);
-  assert.match(defaults, /hasStorageWorkspaceFilter = Object\.prototype\.hasOwnProperty\.call/);
-  assert.match(defaults, /hasStorageWorkspaceFilter \? legacyUi\.miniPalette\?\.storageWorkspaceFilter \?\? null : legacyUi\.activeWorkspaceId \?\? null/);
-  assert.match(defaults, /requestedStorageWorkspaceFilter && workspaces\[requestedStorageWorkspaceFilter\]/);
-  assert.match(mini, /miniPalette\.storageWorkspaceFilter = all\.value === "all" \? null : all\.value/);
-  assert.match(mini, /const filter = this\.plugin\.store\.data\.uiState\.miniPalette\.storageWorkspaceFilter/);
-  assert.doesNotMatch(mini, /activeWorkspaceId = all\.value === "all"/);
-  assert.match(store, /miniPalette\.storageWorkspaceFilter === id/);
+  assert.match(types, /hiddenStorageItemIds: string\[\]/);
+  assert.match(defaults, /storageWorkspaceFilter: _legacyStorageWorkspaceFilter/);
+  assert.match(defaults, /hiddenStorageItemIds: legacyMiniPalette\.hiddenStorageItemIds/);
+  assert.doesNotMatch(mini, /storageWorkspaceFilter/);
+  assert.doesNotMatch(mini, /text: "Workspace"/);
+  assert.match(mini, /storageCandidates\(\)/);
+  assert.match(mini, /text: "Remove from Mini"/);
+  assert.match(mini, /type === "markdown" \? "MD"/);
+  assert.match(store, /hideMiniStorageItems\(itemIds: string\[\]\)/);
+  assert.match(store, /hiddenStorageItemIds = \[\.\.\.hidden\]/);
 });

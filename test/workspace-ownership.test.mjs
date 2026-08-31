@@ -109,3 +109,16 @@ test("deleting a Workspace preserves its Palette items in Mini Palette storage",
   assert.ok(store.data.pendingItemIds.includes("preserved"));
   await cleanup();
 });
+
+test("removing a Mini relay link preserves Workspace ownership and the source item", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  const workspace = store.createWorkspace("Owned by Side", "general");
+  store.addToWorkspace(workspace.id, item("linked", "EP01.canvas"));
+  store.hideMiniStorageItems(["linked"]);
+  assert.equal(store.data.items.linked.displayTitle, "linked");
+  assert.ok(workspace.looseItemIds.includes("linked"));
+  assert.equal(store.data.items.linked.origin.workspaceId, workspace.id);
+  assert.deepEqual(store.data.uiState.miniPalette.hiddenStorageItemIds, ["linked"]);
+  await cleanup();
+});

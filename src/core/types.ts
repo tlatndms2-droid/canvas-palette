@@ -101,8 +101,8 @@ export interface PaletteSettings {
 
 export interface MiniPaletteState {
   tab: "collect" | "storage";
-  /** Mini Storage-only workspace filter. null means All Workspaces. */
-  storageWorkspaceFilter: string | null;
+  /** Items whose relay links are hidden from Mini Storage. Source Workspace items remain intact. */
+  hiddenStorageItemIds: string[];
   isOpen: boolean;
   position: { x: number; y: number };
   size: { width: number; height: number };

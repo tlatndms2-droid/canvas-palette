@@ -57,6 +57,19 @@ export class ConfirmDeleteModal extends Modal {
   onClose(): void { this.contentEl.empty(); }
 }
 
+export class ConfirmMiniStorageRemovalModal extends Modal {
+  constructor(app: App, private readonly count: number, private readonly onConfirm: () => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-confirm-modal");
+    this.contentEl.createEl("h2", { text: "Remove from Mini Palette?" });
+    this.contentEl.createEl("p", { text: `${this.count} selected link${this.count === 1 ? "" : "s"} will be removed from Mini Palette only. Side Palette, Workspace items, original Vault files, and Canvas nodes will remain unchanged.` });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
+    actions.createEl("button", { text: "Remove from Mini", cls: "mod-warning" }).addEventListener("click", () => { this.onConfirm(); this.close(); });
+  }
+  onClose(): void { this.contentEl.empty(); }
+}
+
 export class ConfirmDeleteCollectionModal extends Modal {
   constructor(app: App, private readonly name: string, private readonly destination: string, private readonly itemCount: number, private readonly childCount: number, private readonly onConfirm: () => void) { super(app); }
   onOpen(): void {

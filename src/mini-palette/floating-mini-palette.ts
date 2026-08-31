@@ -1,7 +1,7 @@
 import { Menu, Notice, setIcon } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { PaletteItem, PaletteItemType } from "../core/types";
-import { ConfirmDeleteModal, TagLabelModal } from "../ui/modal";
+import { ConfirmDeleteModal, ConfirmMiniStorageRemovalModal, TagLabelModal } from "../ui/modal";
 import { makeHorizontalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
 import { applyAssetDensity, assetDensityLabel, ASSET_DENSITY_MAX, ASSET_DENSITY_MIN } from "../ui/asset-density";
@@ -69,7 +69,7 @@ export class FloatingMiniPalette {
     this.applyAccent(panel);
     const header = panel.createDiv({ cls: "cp-mini-float__header" });
     const handle = header.createDiv({ cls: "cp-window-handle" }); setIcon(handle, "grip-vertical"); handle.createSpan({ text: "Mini Palette" }); this.makeDraggable(header, panel);
-    const tabs = header.createDiv({ cls: "cp-tabs" }); this.tabButton(tabs, "collect", `Collect (${this.plugin.store.data.pendingItemIds.length})`); this.tabButton(tabs, "storage", `Storage (${this.plugin.store.allItems().length})`);
+    const tabs = header.createDiv({ cls: "cp-tabs" }); this.tabButton(tabs, "collect", `Collect (${this.plugin.store.data.pendingItemIds.length})`); this.tabButton(tabs, "storage", `Storage (${this.storageCandidates().length})`);
     const actions = header.createDiv({ cls: "cp-window-actions" });
     iconButton(actions, "settings", "Canvas Palette settings", () => this.plugin.openSettings());
     iconButton(actions, "x", "Close Mini Palette", () => this.close());
@@ -101,7 +101,7 @@ export class FloatingMiniPalette {
       all.addEventListener("click", () => { this.setCollectSelectedIds(allVisibleSelected ? selected.filter((id) => !visible.some((item) => item.id === id)) : [...new Set([...selected, ...visible.map((item) => item.id)])]); this.plugin.store.changed(); });
       if (selected.length > 0) {
         const edit = summary.createEl("button", { text: "Edit selected" }); edit.addEventListener("click", () => new TagLabelModal(this.plugin.app, this.plugin, selected).open());
-        const remove = summary.createEl("button", { text: "Delete selected", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmMiniDelete(selected, "collect"));
+        const remove = summary.createEl("button", { text: "Delete selected", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmPendingDelete(selected));
       }
       for (const item of visible) this.renderPendingRow(list, item, visible.map((entry) => entry.id));
       if (list.childElementCount === 0) list.createDiv({ cls: "cp-empty", text: "Canvas scraps will wait here for review." });
@@ -150,17 +150,16 @@ export class FloatingMiniPalette {
     const bottom = panel.createDiv({ cls: "cp-bottom cp-bottom--float" }); bottom.createSpan({ text: `Total ${this.storageItems().length} · Selected ${selected.length}${hiddenCount > 0 ? ` (${hiddenCount} hidden)` : ""}` });
     const placeButton = bottom.createEl("button", { text: "Place on Canvas" }); placeButton.disabled = selected.length === 0; placeButton.addEventListener("click", () => void this.placeSelectedOnCanvas());
     const tagEdit = bottom.createEl("button", { text: "Edit metadata" }); tagEdit.addEventListener("click", () => this.editSelectedMetadata());
-    const remove = bottom.createEl("button", { text: "Delete" }); remove.disabled = selected.length === 0; remove.addEventListener("click", () => this.confirmMiniDelete(selected, "storage"));
+    const remove = bottom.createEl("button", { text: "Remove from Mini" }); remove.disabled = selected.length === 0; remove.addEventListener("click", () => this.confirmMiniStorageRemoval(selected));
   }
 
   private renderLeftPane(parent: HTMLElement): void {
     const head = parent.createDiv({ cls: "cp-pane-heading" }); head.createEl("h4", { text: "Control panel" }); iconButton(head, "panel-left-close", "Close left pane", () => { this.plugin.store.data.uiState.miniPalette.leftPaneOpen = false; this.plugin.store.changed(); });
-    parent.createEl("label", { text: "Workspace" }); const all = parent.createEl("select", { cls: "dropdown" }); all.createEl("option", { value: "all", text: "All Workspaces" }); for (const workspace of Object.values(this.plugin.store.data.workspaces)) all.createEl("option", { value: workspace.id, text: this.plugin.workspaceDisplayName(workspace) }); all.value = this.plugin.store.data.uiState.miniPalette.storageWorkspaceFilter ?? "all"; all.addEventListener("change", () => { this.plugin.store.data.uiState.miniPalette.storageWorkspaceFilter = all.value === "all" ? null : all.value; this.plugin.store.changed(); });
     parent.createEl("label", { text: "Search" }); const search = parent.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Title, tag, caption" }, value: this.search }); search.addEventListener("input", () => { this.search = search.value; this.refreshStorageItems(); });
     parent.createEl("label", { text: "Sort" }); const sort = parent.createEl("select", { cls: "dropdown" }); for (const [value, label] of [["modified-desc", "Modified (newest)"], ["modified-asc", "Modified (oldest)"], ["title-asc", "Title (A-Z)"], ["title-desc", "Title (Z-A)"]] as const) sort.createEl("option", { value, text: label }); sort.value = this.plugin.store.data.uiState.miniPalette.sort; sort.addEventListener("change", () => { this.plugin.store.data.uiState.miniPalette.sort = sort.value as typeof this.plugin.store.data.uiState.miniPalette.sort; this.plugin.store.changed(); });
     this.renderDensityControl(parent, "Mini Palette item size");
     parent.createEl("label", { text: "Date" }); const date = parent.createEl("select", { cls: "dropdown" }); for (const [value, text] of [["all", "All dates"], ["today", "Today"], ["week", "Last 7 days"], ["month", "Last 30 days"]] as const) date.createEl("option", { value, text }); date.value = this.dateFilter; date.addEventListener("change", () => { this.dateFilter = date.value as typeof this.dateFilter; this.refreshStorageItems(); });
-    parent.createEl("label", { text: "Filter type" }); const types = parent.createDiv({ cls: "cp-filter-chips" }); for (const type of ["all", "card", "markdown", "image", "group"] as const) { const button = types.createEl("button", { text: type === "all" ? "All" : type, cls: this.typeFilter === type ? "is-active" : "" }); button.addEventListener("click", () => { this.typeFilter = type; this.render(); }); }
+    parent.createEl("label", { text: "Filter type" }); const types = parent.createDiv({ cls: "cp-filter-chips" }); for (const type of ["all", "card", "markdown", "image", "group"] as const) { const button = types.createEl("button", { text: type === "all" ? "All" : type === "markdown" ? "MD" : type, cls: this.typeFilter === type ? "is-active" : "" }); button.addEventListener("click", () => { this.typeFilter = type; this.render(); }); }
     parent.createEl("label", { text: "Tag filter" }); const tag = parent.createEl("input", { attr: { placeholder: "#tag" }, value: this.tagFilter }); tag.addEventListener("input", () => { this.tagFilter = tag.value.replace(/^#/, ""); this.refreshStorageItems(); });
     parent.createEl("label", { text: "Label filter" }); const label = parent.createEl("input", { attr: { placeholder: "Label" }, value: this.labelFilter }); label.addEventListener("input", () => { this.labelFilter = label.value; this.refreshStorageItems(); });
   }
@@ -176,7 +175,7 @@ export class FloatingMiniPalette {
       const quick = parent.createDiv({ cls: "cp-mini-quick-controls" });
       const search = quick.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search assets" }, value: this.search }); search.addEventListener("input", () => { this.search = search.value; this.refreshStorageItems(); });
       const type = quick.createEl("select", { cls: "dropdown", attr: { "aria-label": "Type filter" } });
-      for (const value of ["all", "card", "markdown", "image", "group"] as const) type.createEl("option", { value, text: value === "all" ? "All types" : value });
+      for (const value of ["all", "card", "markdown", "image", "group"] as const) type.createEl("option", { value, text: value === "all" ? "All types" : value === "markdown" ? "MD" : value });
       type.value = this.typeFilter; type.addEventListener("change", () => { this.typeFilter = type.value as TypeFilter; this.refreshStorageItems(); });
       this.renderDensityControl(quick, "Item size", true);
     }
@@ -213,7 +212,7 @@ export class FloatingMiniPalette {
     const item = this.plugin.store.data.items[this.inspectorItemId ?? ""]; if (!item || !this.panel) return;
     const drawer = this.panel.createDiv({ cls: "cp-inspector-drawer" }); const head = drawer.createDiv({ cls: "cp-pane-heading" }); head.createEl("h3", { text: "Selected item settings" }); iconButton(head, "x", "Close inspector", () => { this.inspectorItemId = null; this.render(); });
     const title = this.input(drawer, "Title", item.displayTitle); const tags = this.input(drawer, "Tag", item.tags.join(", "), "tag1, tag2"); const label = this.input(drawer, "Label", item.label, "e.g. Idea, In progress"); drawer.createEl("label", { text: "Label color" }); const labelColor = drawer.createEl("input", { attr: { type: "color", "aria-label": "Label color" } }); labelColor.value = item.labelColor || "#8b5cf6"; const caption = this.textarea(drawer, "Caption", item.caption); drawer.createEl("h4", { text: "Original preview" }); const preview = drawer.createDiv({ cls: "cp-preview cp-preview--inspector" }); void this.plugin.preview.render(preview, item, true);
-    const actions = drawer.createDiv({ cls: "cp-inspector-actions" }); const remove = actions.createEl("button", { text: "Delete", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmMiniDelete([item.id], "collect")); const close = actions.createEl("button", { text: "Close" }); close.addEventListener("click", () => { this.inspectorItemId = null; this.plugin.store.data.uiState.miniPalette.focusedItemId = null; this.render(); }); const save = actions.createEl("button", { text: "Save", cls: "mod-cta" }); save.addEventListener("click", () => { const labelValue = label.value.trim(); this.plugin.store.updateItem(item.id, { displayTitle: title.value, tags: tags.value.split(",").map((value) => value.trim().replace(/^#/, "")).filter(Boolean), label: labelValue, labelColor: labelValue ? labelColor.value : "", caption: caption.value }); this.inspectorItemId = null; this.plugin.store.data.uiState.miniPalette.focusedItemId = null; });
+    const actions = drawer.createDiv({ cls: "cp-inspector-actions" }); const remove = actions.createEl("button", { text: "Delete", cls: "mod-warning" }); remove.addEventListener("click", () => this.confirmPendingDelete([item.id])); const close = actions.createEl("button", { text: "Close" }); close.addEventListener("click", () => { this.inspectorItemId = null; this.plugin.store.data.uiState.miniPalette.focusedItemId = null; this.render(); }); const save = actions.createEl("button", { text: "Save", cls: "mod-cta" }); save.addEventListener("click", () => { const labelValue = label.value.trim(); this.plugin.store.updateItem(item.id, { displayTitle: title.value, tags: tags.value.split(",").map((value) => value.trim().replace(/^#/, "")).filter(Boolean), label: labelValue, labelColor: labelValue ? labelColor.value : "", caption: caption.value }); this.inspectorItemId = null; this.plugin.store.data.uiState.miniPalette.focusedItemId = null; });
   }
 
   private input(parent: HTMLElement, label: string, value: string, placeholder = ""): HTMLInputElement { parent.createEl("label", { text: label }); return parent.createEl("input", { attr: { placeholder }, value }); }
@@ -244,7 +243,8 @@ export class FloatingMiniPalette {
     this.plugin.store.data.uiState.selectedItemId = next.includes(id) ? id : next.at(-1) ?? null; this.plugin.store.changed();
   }
   private collectItems(): PaletteItem[] { return this.filtered(this.plugin.store.data.pendingItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item))); }
-  private storageItems(): PaletteItem[] { const filter = this.plugin.store.data.uiState.miniPalette.storageWorkspaceFilter; const candidates = filter && this.plugin.store.data.workspaces[filter] ? this.plugin.store.itemsForWorkspace(filter) : this.plugin.store.allItems().filter((item) => !this.plugin.store.data.pendingItemIds.includes(item.id)); const now = Date.now(); const cutoff = this.dateFilter === "today" ? new Date().setHours(0, 0, 0, 0) : this.dateFilter === "week" ? now - 7 * 86400000 : this.dateFilter === "month" ? now - 30 * 86400000 : 0; return this.sort(this.filtered(candidates).filter((item) => item.modifiedAt >= cutoff)); }
+  private storageCandidates(): PaletteItem[] { const pending = new Set(this.plugin.store.data.pendingItemIds); const hidden = new Set(this.plugin.store.data.uiState.miniPalette.hiddenStorageItemIds); return this.plugin.store.allItems().filter((item) => !pending.has(item.id) && !hidden.has(item.id)); }
+  private storageItems(): PaletteItem[] { const now = Date.now(); const cutoff = this.dateFilter === "today" ? new Date().setHours(0, 0, 0, 0) : this.dateFilter === "week" ? now - 7 * 86400000 : this.dateFilter === "month" ? now - 30 * 86400000 : 0; return this.sort(this.filtered(this.storageCandidates()).filter((item) => item.modifiedAt >= cutoff)); }
   private filtered(items: PaletteItem[]): PaletteItem[] { return this.plugin.search.filter(items, this.search).filter((item) => (this.typeFilter === "all" || item.type === this.typeFilter) && (!this.tagFilter || item.tags.some((tag) => tag.toLocaleLowerCase().includes(this.tagFilter.toLocaleLowerCase()))) && (!this.labelFilter || item.label.toLocaleLowerCase().includes(this.labelFilter.toLocaleLowerCase()))); }
   private refreshStorageItems(): void { const main = this.panel?.querySelector<HTMLElement>(".cp-storage-main"); if (!main) return; main.empty(); this.renderStorageMain(main); const total = this.panel?.querySelector<HTMLElement>(".cp-bottom--float > span"); if (total) total.setText(`Total ${this.storageItems().length} · Selected ${this.storageSelectedIds().length}`); }
   private sort(items: PaletteItem[]): PaletteItem[] { const mode = this.plugin.store.data.uiState.miniPalette.sort; return [...items].sort((a, b) => mode === "modified-desc" ? b.modifiedAt - a.modifiedAt : mode === "modified-asc" ? a.modifiedAt - b.modifiedAt : mode === "title-desc" ? b.displayTitle.localeCompare(a.displayTitle) : a.displayTitle.localeCompare(b.displayTitle)); }
@@ -273,15 +273,23 @@ export class FloatingMiniPalette {
       menu.addItem((entry) => entry.setTitle("Open original").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
       if (item.origin.canvasPath && item.origin.canvasNodeId) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => void this.plugin.locateItemOnCanvas(item)));
     }
-    menu.addSeparator(); menu.addItem((entry) => entry.setTitle(`Delete ${targetIds.length} item${targetIds.length === 1 ? "" : "s"}`).setIcon("trash").onClick(() => this.confirmMiniDelete(targetIds, tab)));
+    menu.addSeparator();
+    if (tab === "collect") menu.addItem((entry) => entry.setTitle(`Delete ${targetIds.length} pending item${targetIds.length === 1 ? "" : "s"}`).setIcon("trash").onClick(() => this.confirmPendingDelete(targetIds)));
+    else menu.addItem((entry) => entry.setTitle(`Remove ${targetIds.length} link${targetIds.length === 1 ? "" : "s"} from Mini`).setIcon("unlink").onClick(() => this.confirmMiniStorageRemoval(targetIds)));
     menu.showAtMouseEvent(event);
   }
-  private confirmMiniDelete(ids: string[], tab: "collect" | "storage"): void {
-    const valid = ids.filter((id) => Boolean(this.plugin.store.data.items[id])); if (valid.length === 0) return;
+  private confirmPendingDelete(ids: string[]): void {
+    const valid = ids.filter((id) => Boolean(this.plugin.store.data.items[id]) && this.plugin.store.data.pendingItemIds.includes(id)); if (valid.length === 0) return;
     new ConfirmDeleteModal(this.plugin.app, valid.length, () => {
       this.plugin.store.removeItems(valid);
-      if (tab === "collect") { this.setCollectSelectedIds([]); this.inspectorItemId = null; this.plugin.store.data.uiState.miniPalette.focusedItemId = null; }
-      else { this.setStorageSelectedIds([]); this.hoverItemId = null; }
+      this.setCollectSelectedIds([]); this.inspectorItemId = null; this.plugin.store.data.uiState.miniPalette.focusedItemId = null;
+    }).open();
+  }
+  private confirmMiniStorageRemoval(ids: string[]): void {
+    const valid = ids.filter((id) => Boolean(this.plugin.store.data.items[id]) && !this.plugin.store.data.pendingItemIds.includes(id)); if (valid.length === 0) return;
+    new ConfirmMiniStorageRemovalModal(this.plugin.app, valid.length, () => {
+      this.plugin.store.hideMiniStorageItems(valid);
+      this.setStorageSelectedIds([]); this.hoverItemId = null; this.plugin.store.data.uiState.miniPalette.storageSelectionAnchorId = null;
     }).open();
   }
   private async placeSelectedOnCanvas(): Promise<void> {
