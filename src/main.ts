@@ -159,6 +159,10 @@ export default class CanvasPalettePlugin extends Plugin {
     new ConfirmForeignCanvasWorkspaceModal(this.app, workspace.name, onConfirm).open();
   }
 
+  showAlreadySavedToWorkspace(workspaceId: string, savedCount: number, alreadySavedCount: number): void {
+    new AlreadySavedToWorkspaceModal(this.app, this.store.data.workspaces[workspaceId]?.name ?? "Side Palette", savedCount, alreadySavedCount).open();
+  }
+
   openCurrentCanvasWorkspace(): void {
     const workspace = this.ensureCurrentCanvasWorkspace();
     if (!workspace) { new Notice("Open a Canvas first."); return; }
@@ -355,7 +359,7 @@ export default class CanvasPalettePlugin extends Plugin {
     this.store.data.uiState.selectedItemId = (accepted[0] ?? alreadySaved[0]).id;
     this.store.changed();
     await this.openSidePalette();
-    if (alreadySaved.length > 0) new AlreadySavedToWorkspaceModal(this.app, this.store.data.workspaces[workspaceId]?.name ?? "Side Palette", accepted.length, alreadySaved.length).open();
+    if (alreadySaved.length > 0) this.showAlreadySavedToWorkspace(workspaceId, accepted.length, alreadySaved.length);
     else new Notice(`${accepted.length} Canvas item${accepted.length === 1 ? "" : "s"} saved to Side Palette.`);
   }
 

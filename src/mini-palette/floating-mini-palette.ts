@@ -117,8 +117,9 @@ export class FloatingMiniPalette {
       this.plugin.confirmWorkspaceSave(select.value, () => {
         const result = this.plugin.store.importPending(select.value, this.collectSelectedIds());
         if (result.rejected.length > 0) new Notice("Some items could not be imported because the selected Workspace is unavailable.");
-        if (result.imported.length > 0) new Notice(`${result.imported.length} item${result.imported.length === 1 ? "" : "s"} imported.`);
-        this.setCollectSelectedIds(result.rejected); this.plugin.store.data.uiState.miniPalette.focusedItemId = null; this.inspectorItemId = null;
+        if (result.alreadySaved.length > 0) this.plugin.showAlreadySavedToWorkspace(select.value, result.imported.length, result.alreadySaved.length);
+        else if (result.imported.length > 0) new Notice(`${result.imported.length} item${result.imported.length === 1 ? "" : "s"} imported.`);
+        this.setCollectSelectedIds([...result.rejected, ...result.alreadySaved]); this.plugin.store.data.uiState.miniPalette.focusedItemId = null; this.inspectorItemId = null;
       });
     });
   }

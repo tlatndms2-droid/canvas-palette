@@ -173,13 +173,14 @@ export class PaletteStore {
     return true;
   }
 
-  importPending(workspaceId: string, itemIds: string[]): { imported: string[]; rejected: string[] } {
+  importPending(workspaceId: string, itemIds: string[]): { imported: string[]; rejected: string[]; alreadySaved: string[] } {
     const workspace = this.data.workspaces[workspaceId];
-    if (!workspace) return { imported: [], rejected: [...itemIds] };
-    const imported: string[] = []; const rejected: string[] = [];
+    if (!workspace) return { imported: [], rejected: [...itemIds], alreadySaved: [] };
+    const imported: string[] = []; const rejected: string[] = []; const alreadySaved: string[] = [];
     for (const id of itemIds) {
       const item = this.data.items[id];
       if (!item) continue;
+      if (this.workspaceForItem(id)?.id === workspaceId) { alreadySaved.push(id); continue; }
       this.detachWorkspaceLinks(id);
       item.origin.workspaceId = workspaceId;
       item.parentItemId = null;
@@ -191,7 +192,7 @@ export class PaletteStore {
     }
     this.data.pendingItemIds = this.data.pendingItemIds.filter((id) => !imported.includes(id));
     this.changed();
-    return { imported, rejected };
+    return { imported, rejected, alreadySaved };
   }
 
   updateItem(id: string, changes: Pick<PaletteItem, "displayTitle" | "tags" | "label" | "caption"> & Partial<Pick<PaletteItem, "content" | "backContent" | "labelColor">>): void {

@@ -59,7 +59,7 @@ test("reviewed pending import moves ownership and reports target-Canvas link sta
   store.addToWorkspace(previous.id, item("foreign", "EP02.canvas"));
   store.addPending(store.data.items.foreign);
   const result = store.importPending(dedicated.id, ["foreign"]);
-  assert.deepEqual(result, { imported: ["foreign"], rejected: [] });
+  assert.deepEqual(result, { imported: ["foreign"], rejected: [], alreadySaved: [] });
   assert.deepEqual(store.data.pendingItemIds, []);
   assert.equal(store.data.items.foreign.origin.workspaceId, dedicated.id);
   assert.equal(store.data.items.foreign.origin.canvasPath, "EP02.canvas");
@@ -88,8 +88,10 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   assert.match(main, /addToWorkspaceAsUnlinked/);
   assert.match(main, /const alreadySaved = unique\.filter/);
   assert.match(main, /AlreadySavedToWorkspaceModal/);
+  assert.match(main, /showAlreadySavedToWorkspace/);
   assert.match(main, /alreadySaved\.length > 0/);
   assert.match(mini, /confirmWorkspaceSave\(select\.value/);
+  assert.match(mini, /result\.alreadySaved\.length > 0/);
   assert.match(main, /const changedCanvas = context\.file\.path !== this\.lastCanvasPath/);
   assert.match(main, /if \(changedCanvas\) this\.selectRepresentativeWorkspace\(context\.file\.path\)/);
   assert.match(main, /activeContext\(\)\?\.file\.path \?\? this\.lastCanvasPath/);
@@ -145,6 +147,21 @@ test("Side explicitly adds and removes a Mini relay link without changing Worksp
   assert.ok(workspace.looseItemIds.includes("linked"));
   assert.equal(store.data.items.linked.origin.workspaceId, workspace.id);
   assert.deepEqual(store.data.uiState.miniPalette.storageItemIds, []);
+  await cleanup();
+});
+
+test("Mini import keeps an already stored Collect item and reports it as a duplicate", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  const workspace = store.createWorkspace("Already stored", "general");
+  const collected = item("already-stored", "EP01.canvas");
+  store.addToWorkspace(workspace.id, collected);
+  store.collectCanvasItems([collected]);
+
+  const result = store.importPending(workspace.id, [collected.id]);
+  assert.deepEqual(result, { imported: [], rejected: [], alreadySaved: [collected.id] });
+  assert.deepEqual(store.data.pendingItemIds, [collected.id]);
+  assert.deepEqual(store.data.workspaces[workspace.id].looseItemIds, [collected.id]);
   await cleanup();
 });
 

@@ -2,11 +2,13 @@
 
 ## Current state
 
-- Version: `0.3.30`.
+- Version: `0.3.31`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release target: `0.3.30`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.30`.
+- Latest release target: `0.3.31`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.31`.
+- Latest runtime change: `0.3.31`; Mini Collect-to-Workspace import now detects an Item already stored in the selected Side Workspace, leaves that duplicate in Collect, and opens the same acknowledgement popup used by direct Canvas-to-Side saves. Mixed imports state both the newly imported and skipped counts. Feature 2 has not started.
+- `0.3.31` runtime validation used the existing `Obsidian Sandbox`. A selected Mini Collect Item already present in `Mini duplicate target` opened the real `이미 Side Palette에 저장된 항목입니다` popup, named that Workspace, stated that one Item was not saved as a duplicate, and exposed `확인`. The Item remained in Collect and the Side Workspace retained one Item. The disposable Canvas and original Sandbox data were restored; reload captured no error.
 - Latest runtime change: `0.3.30`; Mini Collect and Storage are independent memberships. Sending Side Palette Items to Storage adds every selected Item unless that exact Item is already in Storage, even when it is also in Collect. Storage no longer hides explicitly sent Collect Items. Feature 2 has not started.
 - `0.3.30` runtime validation used the existing `Obsidian Sandbox`. With one of three Side Items also retained in Collect, sending all three to Mini produced `Storage (3)` and rendered all three Storage cards while `Collect (1)` remained intact. The disposable Canvas and original Sandbox data were restored; reload captured no error.
 - Latest runtime change: `0.3.29`; direct Canvas-to-Side duplicate detection now opens a dedicated acknowledgement popup instead of only a transient corner notice. It names the target Workspace and tells how many duplicates were skipped; a mixed selection also states how many Items were newly saved. Feature 2 has not started.
@@ -85,6 +87,7 @@
 | `0.3.28` | release tag | Added duplicate-save feedback for direct Canvas-to-Side save. | Existing Items remain single; users are told that no duplicate was saved. |
 | `0.3.29` | release tag | Replaced duplicate-save corner notice with an acknowledgement popup. | The popup names the target Side Workspace, says duplicates were not saved, and reports new Items for a mixed selection. |
 | `0.3.30` | release tag | Separated Mini Collect and Storage membership during Side-to-Mini sends. | Collect presence cannot block or hide an explicitly sent Storage Item; only Storage itself deduplicates. |
+| `0.3.31` | release tag | Added duplicate acknowledgement to Mini Collect-to-Workspace import. | Existing Side Items stay in Collect and are not saved twice; the shared popup names the destination and skipped count. |
 
 ### Feature 1 behavior currently implemented
 
