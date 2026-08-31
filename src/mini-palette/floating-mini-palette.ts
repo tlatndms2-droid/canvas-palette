@@ -243,7 +243,7 @@ export class FloatingMiniPalette {
     this.plugin.store.data.uiState.selectedItemId = next.includes(id) ? id : next.at(-1) ?? null; this.plugin.store.changed();
   }
   private collectItems(): PaletteItem[] { return this.filtered(this.plugin.store.data.pendingItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item))); }
-  private storageCandidates(): PaletteItem[] { const pending = new Set(this.plugin.store.data.pendingItemIds); const hidden = new Set(this.plugin.store.data.uiState.miniPalette.hiddenStorageItemIds); return this.plugin.store.allItems().filter((item) => !pending.has(item.id) && !hidden.has(item.id)); }
+  private storageCandidates(): PaletteItem[] { return this.plugin.store.data.uiState.miniPalette.storageItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item) && !this.plugin.store.data.pendingItemIds.includes(item.id)); }
   private storageItems(): PaletteItem[] { const now = Date.now(); const cutoff = this.dateFilter === "today" ? new Date().setHours(0, 0, 0, 0) : this.dateFilter === "week" ? now - 7 * 86400000 : this.dateFilter === "month" ? now - 30 * 86400000 : 0; return this.sort(this.filtered(this.storageCandidates()).filter((item) => item.modifiedAt >= cutoff)); }
   private filtered(items: PaletteItem[]): PaletteItem[] { return this.plugin.search.filter(items, this.search).filter((item) => (this.typeFilter === "all" || item.type === this.typeFilter) && (!this.tagFilter || item.tags.some((tag) => tag.toLocaleLowerCase().includes(this.tagFilter.toLocaleLowerCase()))) && (!this.labelFilter || item.label.toLocaleLowerCase().includes(this.labelFilter.toLocaleLowerCase()))); }
   private refreshStorageItems(): void { const main = this.panel?.querySelector<HTMLElement>(".cp-storage-main"); if (!main) return; main.empty(); this.renderStorageMain(main); const total = this.panel?.querySelector<HTMLElement>(".cp-bottom--float > span"); if (total) total.setText(`Total ${this.storageItems().length} · Selected ${this.storageSelectedIds().length}`); }
@@ -288,7 +288,7 @@ export class FloatingMiniPalette {
   private confirmMiniStorageRemoval(ids: string[]): void {
     const valid = ids.filter((id) => Boolean(this.plugin.store.data.items[id]) && !this.plugin.store.data.pendingItemIds.includes(id)); if (valid.length === 0) return;
     new ConfirmMiniStorageRemovalModal(this.plugin.app, valid.length, () => {
-      this.plugin.store.hideMiniStorageItems(valid);
+      this.plugin.store.removeMiniStorageItems(valid);
       this.setStorageSelectedIds([]); this.hoverItemId = null; this.plugin.store.data.uiState.miniPalette.storageSelectionAnchorId = null;
     }).open();
   }

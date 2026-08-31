@@ -48,7 +48,7 @@ test("Outliner files support metadata, context menus, child files, and grouping 
   assert.match(source, /zone === "inside"[\s\S]*targetId/);
   assert.match(store, /parentItemId: string \| null = null/);
   assert.match(store, /this\.isItemDescendant\(parentItemId, id\)/);
-  assert.match(defaults, /schemaVersion: 20/);
+  assert.match(defaults, /schemaVersion: 21/);
 });
 
 test("Viewport renders Collection and file-parent groups as vertical card stacks", async () => {

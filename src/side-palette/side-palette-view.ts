@@ -672,6 +672,12 @@ export class SidePaletteView extends ItemView {
         .setIcon(item.facesEnabled ? "circle-off" : "refresh-cw")
         .onClick(() => item.facesEnabled ? this.plugin.store.disableItemFaces(item.id) : this.plugin.store.enableItemFaces(item.id)));
     }
+    const allInMini = targetIds.every((id) => this.plugin.store.miniStorageHas(id));
+    menu.addItem((entry) => entry
+      .setTitle(allInMini ? "Mini Palette에서 제거" : "Mini Palette로 보내기")
+      .setIcon(allInMini ? "unlink" : "send")
+      .setChecked(allInMini)
+      .onClick(() => allInMini ? this.plugin.store.removeMiniStorageItems(targetIds) : this.plugin.store.addMiniStorageItems(targetIds)));
     if (workspace) menu.addItem((entry) => entry.setTitle("Move to…").setIcon("folder-input").onClick(() => new MoveItemsModal(this.app, workspace.name, Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id), targetIds.length, (collectionId) => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collectionId)).open()));
     const linkedLocations = this.plugin.store.linkedCanvasLocations(item);
     if (linkedLocations.length > 0) menu.addItem((entry) => entry.setTitle("Find link").setIcon("locate-fixed").onClick(() => this.plugin.findLinkedCanvas(item)));

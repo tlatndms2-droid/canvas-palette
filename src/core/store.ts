@@ -671,13 +671,21 @@ export class PaletteStore {
 
   allItems(): PaletteItem[] { return Object.values(this.data.items); }
 
-  hideMiniStorageItems(itemIds: string[]): void {
+  miniStorageHas(itemId: string): boolean { return this.data.uiState.miniPalette.storageItemIds.includes(itemId); }
+
+  addMiniStorageItems(itemIds: string[]): void {
     const pending = new Set(this.data.pendingItemIds);
-    const hidden = new Set(this.data.uiState.miniPalette.hiddenStorageItemIds);
-    for (const id of itemIds) if (this.data.items[id] && !pending.has(id)) hidden.add(id);
-    this.data.uiState.miniPalette.hiddenStorageItemIds = [...hidden];
-    this.data.uiState.miniPalette.storageSelectedItemIds = this.data.uiState.miniPalette.storageSelectedItemIds.filter((id) => !hidden.has(id));
-    if (this.data.uiState.selectedItemId && hidden.has(this.data.uiState.selectedItemId)) this.data.uiState.selectedItemId = null;
+    const linked = new Set(this.data.uiState.miniPalette.storageItemIds);
+    for (const id of itemIds) if (this.data.items[id] && !pending.has(id)) linked.add(id);
+    this.data.uiState.miniPalette.storageItemIds = [...linked];
+    this.changed();
+  }
+
+  removeMiniStorageItems(itemIds: string[]): void {
+    const removed = new Set(itemIds);
+    this.data.uiState.miniPalette.storageItemIds = this.data.uiState.miniPalette.storageItemIds.filter((id) => !removed.has(id));
+    this.data.uiState.miniPalette.storageSelectedItemIds = this.data.uiState.miniPalette.storageSelectedItemIds.filter((id) => !removed.has(id));
+    if (this.data.uiState.selectedItemId && removed.has(this.data.uiState.selectedItemId)) this.data.uiState.selectedItemId = null;
     this.changed();
   }
 
@@ -711,7 +719,7 @@ export class PaletteStore {
     for (const id of itemIds) { delete this.data.uiState.sideItemFaces[id]; delete this.data.uiState.miniItemFaces[id]; }
     this.data.uiState.miniPalette.collectSelectedItemIds = this.data.uiState.miniPalette.collectSelectedItemIds.filter((id) => !itemIds.includes(id));
     this.data.uiState.miniPalette.storageSelectedItemIds = this.data.uiState.miniPalette.storageSelectedItemIds.filter((id) => !itemIds.includes(id));
-    this.data.uiState.miniPalette.hiddenStorageItemIds = this.data.uiState.miniPalette.hiddenStorageItemIds.filter((id) => !itemIds.includes(id));
+    this.data.uiState.miniPalette.storageItemIds = this.data.uiState.miniPalette.storageItemIds.filter((id) => !itemIds.includes(id));
     this.data.uiState.miniPalette.selectedItemIds = [];
     if (this.data.uiState.miniPalette.focusedItemId && itemIds.includes(this.data.uiState.miniPalette.focusedItemId)) this.data.uiState.miniPalette.focusedItemId = null;
     if (this.data.uiState.selectedItemId && itemIds.includes(this.data.uiState.selectedItemId)) this.data.uiState.selectedItemId = null;

@@ -101,8 +101,8 @@ export interface PaletteSettings {
 
 export interface MiniPaletteState {
   tab: "collect" | "storage";
-  /** Items whose relay links are hidden from Mini Storage. Source Workspace items remain intact. */
-  hiddenStorageItemIds: string[];
+  /** Explicit relay links sent from Side Palette. Source Workspace items remain canonical. */
+  storageItemIds: string[];
   isOpen: boolean;
   position: { x: number; y: number };
   size: { width: number; height: number };

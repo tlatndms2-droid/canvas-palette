@@ -8,7 +8,7 @@ export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
 };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 20,
+  schemaVersion: 21,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
@@ -16,7 +16,7 @@ export const DEFAULT_DATA: PaletteData = {
   pendingItemIds: [],
   canvasNodeMetadata: {},
   uiState: { activeWorkspaceId: null, lastCanvasPath: null, selectedItemId: null, sideSelectedItemIds: [], sideItemFaces: {}, miniItemFaces: {}, quickEditor: { x: null, y: null, width: null, height: null }, workspaceExplorer: { viewMode: "details", sort: "modified-desc" }, miniPalette: {
-    tab: "collect", hiddenStorageItemIds: [], isOpen: false, position: { x: 24, y: 62 }, size: { width: 1120, height: 720 },
+    tab: "collect", storageItemIds: [], isOpen: false, position: { x: 24, y: 62 }, size: { width: 1120, height: 720 },
     leftPaneOpen: true, rightPaneOpen: true, leftPaneWidth: 248, rightPaneWidth: 310,
     viewMode: "grid", densityLevel: ASSET_DENSITY_DEFAULT, cardHeight: 220, sort: "modified-desc",
     collectSelectedItemIds: [], collectSelectionAnchorId: null, storageSelectedItemIds: [], storageSelectionAnchorId: null, focusedItemId: null, selectedItemIds: []
@@ -38,12 +38,12 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     createdAt: workspace.createdAt ?? migratedAt,
     modifiedAt: workspace.modifiedAt ?? workspace.createdAt ?? migratedAt
   }]));
-  const { storageWorkspaceFilter: _legacyStorageWorkspaceFilter, ...legacyMiniPalette } = (legacyUi.miniPalette ?? {}) as Partial<PaletteData["uiState"]["miniPalette"]> & { storageWorkspaceFilter?: string | null };
+  const { storageWorkspaceFilter: _legacyStorageWorkspaceFilter, hiddenStorageItemIds: _legacyHiddenStorageItemIds, ...legacyMiniPalette } = (legacyUi.miniPalette ?? {}) as Partial<PaletteData["uiState"]["miniPalette"]> & { storageWorkspaceFilter?: string | null; hiddenStorageItemIds?: string[] };
   return {
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 20,
+    schemaVersion: 21,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
       const repairedType = item.type === "markdown" && !item.origin?.filePath ? "card" : item.type;
       const supportsFaces = repairedType !== "group";
@@ -71,7 +71,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
       workspaceExplorer: { ...DEFAULT_DATA.uiState.workspaceExplorer, ...legacyUi.workspaceExplorer },
       miniPalette: {
       ...DEFAULT_DATA.uiState.miniPalette, ...legacyMiniPalette,
-      hiddenStorageItemIds: legacyMiniPalette.hiddenStorageItemIds?.filter((id) => Boolean(raw.items?.[id])) ?? [],
+      storageItemIds: legacyMiniPalette.storageItemIds?.filter((id) => Boolean(raw.items?.[id]) && !(raw.pendingItemIds ?? []).includes(id)) ?? [],
       densityLevel: legacyUi.miniPalette?.densityLevel ?? legacyDensity(legacyUi.miniPalette?.viewMode, legacyUi.miniPalette?.cardHeight),
       collectSelectedItemIds: legacyUi.miniPalette?.collectSelectedItemIds ?? (legacyUi.miniPalette?.tab === "collect" ? legacyUi.miniPalette?.selectedItemIds ?? [] : []),
       collectSelectionAnchorId: legacyUi.miniPalette?.collectSelectionAnchorId ?? null,

@@ -2,13 +2,13 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.20**
+Current version: **0.3.21**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
-- Mini Palette is now a Workspace-independent relay hub: Storage always browses links from every Workspace, the obsolete Mini Workspace selector is removed, Storage counts exclude pending Collect items, and removing an item from Mini hides only its relay link while preserving the Side Palette/Workspace item, original Vault file, and Canvas nodes. The type filter displays Markdown compactly as `MD`.
+- Mini Palette is now an explicit Workspace-independent relay hub: Side Palette cards enter or leave Mini through the `Mini Palette로 보내기` / `Mini Palette에서 제거` context-menu toggle. Mini Storage shows only those explicitly sent links, its own removal action unlinks only from Mini, and Side Palette/Workspace items, original Vault files, and Canvas nodes remain canonical and unchanged. Storage counts exclude pending Collect items, the obsolete Mini Workspace selector remains removed, and the type filter displays Markdown compactly as `MD`.
 - Mini Palette and Side Palette now share a seven-step Windows File Explorer-style asset density system. One Item size control changes card width, height, responsive column count, preview detail, and the final List/Details layout in sequence; each palette restores its own saved density after reload.
 - Mini Palette Collect and Storage keep independent selection sets and anchors. Both support plain, Ctrl/Cmd, Shift, and Ctrl/Cmd+Shift selection; Storage also supports blank-space clearing and rectangle selection. Single selection uses the border only, while multi-selection adds check markers.
 - Mini Palette batch actions operate on the visible selection: filtered Select all, multi-item metadata, confirmed deletion, multi-item drag payloads, and `Place on Canvas` for selected items only. Workspace mind-map Export remains a Side Palette responsibility. Closing the Mini left pane keeps quick Search, Type filter, and Item size controls above Assets.
