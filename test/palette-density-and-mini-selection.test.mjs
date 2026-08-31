@@ -57,11 +57,12 @@ test("Mini Storage is workspace-independent and removes relay links without dele
   assert.match(store, /storageItemIds = \[\.\.\.linked\]/);
 });
 
-test("Mini Collect menu keeps Locate on Canvas without the duplicate Open original action", async () => {
+test("Mini Collect and Storage use the same Canvas and source-file navigation labels", async () => {
   const mini = await readFile(new URL("../src/mini-palette/floating-mini-palette.ts", import.meta.url), "utf8");
   const menu = mini.slice(mini.indexOf("private openMiniItemMenu"), mini.indexOf("private confirmPendingDelete"));
-  assert.match(menu, /if \(tab !== "collect"\) menu\.addItem\(\(entry\) => entry\.setTitle\("Open original"\)/);
   assert.match(menu, /setTitle\("Locate on Canvas"\)/);
+  assert.match(menu, /else if \(item\.origin\.filePath\) menu\.addItem\(\(entry\) => entry\.setTitle\("Open source file"\)/);
+  assert.doesNotMatch(menu, /Open original/);
 });
 
 test("Canvas Collect always opens Collect and never redirects existing items to Storage", async () => {

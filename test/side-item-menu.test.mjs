@@ -17,8 +17,7 @@ test("Side item menu uses focused metadata, move, and Find link actions", async 
   assert.doesNotMatch(canvas, /else if \(item\.type === "group"[\s\S]{0,600}item\.displayTitle/);
   assert.match(source, /setTitle\("Move to…"\)/);
   assert.doesNotMatch(source, /setTitle\(`Move to \$\{collection\.name\}`\)/);
-  assert.doesNotMatch(source, /setTitle\("Locate on Canvas"\)/);
-  assert.match(source, /setTitle\("Find link"\)/);
+  assert.match(source, /setTitle\("Locate on Canvas"\)/);
   assert.match(source, /allInMini \? "Mini Palette에서 제거" : "Mini Palette로 보내기"/);
   assert.match(source, /allInMini \? this\.plugin\.store\.removeMiniStorageItems\(targetIds\) : this\.plugin\.sendItemsToMini\(targetIds\)/);
   assert.match(source, /Send to Mini Palette[\s\S]{0,180}sendItemsToMini\(this\.sideSelectedIds\(\)\)/);

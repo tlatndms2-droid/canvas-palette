@@ -2,11 +2,13 @@
 
 ## Current state
 
-- Version: `0.3.32`.
+- Version: `0.3.33`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release target: `0.3.32`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.32`.
+- Latest release target: `0.3.33`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.33`.
+- Latest runtime change: `0.3.33`; navigation is consistent across Mini Collect, Mini Storage, Side Palette, and item detail panels. Canvas-linked Items use `Locate on Canvas`; Items with only a Vault source use `Open source file`; ambiguous `Open original` entries are removed. Feature 2 has not started.
+- `0.3.33` runtime validation used the existing `Obsidian Sandbox`. A Canvas-linked Mini Storage Item menu showed `Edit metadata`, `Locate on Canvas`, and Mini removal with no `Open original`; the matching Side menu showed `Locate on Canvas` with no `Find link` or `Open original`. The disposable Canvas and original Sandbox data were restored; reload captured no error.
 - Latest runtime change: `0.3.32`; Mini Palette Collect item menus no longer show the overlapping `Open original` action. Canvas-linked Collect Items retain `Locate on Canvas`; Mini Storage and other original-opening locations are unchanged. Feature 2 has not started.
 - `0.3.32` runtime validation used the existing `Obsidian Sandbox`. The real Collect item action menu showed only `Edit metadata`, `Locate on Canvas`, and `Delete 1 pending item`; `Open original` was absent. The disposable Canvas and original Sandbox data were restored; reload captured no error.
 - Latest runtime change: `0.3.31`; Mini Collect-to-Workspace import now detects an Item already stored in the selected Side Workspace, leaves that duplicate in Collect, and opens the same acknowledgement popup used by direct Canvas-to-Side saves. Mixed imports state both the newly imported and skipped counts. Feature 2 has not started.
@@ -91,6 +93,7 @@
 | `0.3.30` | release tag | Separated Mini Collect and Storage membership during Side-to-Mini sends. | Collect presence cannot block or hide an explicitly sent Storage Item; only Storage itself deduplicates. |
 | `0.3.31` | release tag | Added duplicate acknowledgement to Mini Collect-to-Workspace import. | Existing Side Items stay in Collect and are not saved twice; the shared popup names the destination and skipped count. |
 | `0.3.32` | release tag | Removed the overlapping Collect menu `Open original` action. | Canvas-linked Collect Items keep `Locate on Canvas`; other Mini locations are unchanged. |
+| `0.3.33` | release tag | Unified navigation action labels across Mini, Side, and item detail panels. | Canvas-linked Items use `Locate on Canvas`; file-only Items use `Open source file`; `Open original` is removed. |
 
 ### Feature 1 behavior currently implemented
 

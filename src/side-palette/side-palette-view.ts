@@ -680,7 +680,7 @@ export class SidePaletteView extends ItemView {
       .onClick(() => allInMini ? this.plugin.store.removeMiniStorageItems(targetIds) : this.plugin.sendItemsToMini(targetIds)));
     if (workspace) menu.addItem((entry) => entry.setTitle("Move to…").setIcon("folder-input").onClick(() => new MoveItemsModal(this.app, workspace.name, Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id), targetIds.length, (collectionId) => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collectionId)).open()));
     const linkedLocations = this.plugin.store.linkedCanvasLocations(item);
-    if (linkedLocations.length > 0) menu.addItem((entry) => entry.setTitle("Find link").setIcon("locate-fixed").onClick(() => this.plugin.findLinkedCanvas(item)));
+    if (linkedLocations.length > 0) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => this.plugin.findLinkedCanvas(item)));
     else if (item.origin.filePath) menu.addItem((entry) => entry.setTitle("Open source file").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
     menu.addSeparator(); menu.addItem((entry) => entry.setTitle(`Delete${targetIds.length > 1 ? ` ${targetIds.length} items` : ""}`).setIcon("trash").onClick(() => this.confirmDelete(targetIds)));
     menu.showAtMouseEvent(event);

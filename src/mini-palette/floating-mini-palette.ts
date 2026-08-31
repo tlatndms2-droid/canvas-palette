@@ -203,7 +203,9 @@ export class FloatingMiniPalette {
     parent.createEl("h3", { text: item.displayTitle }); const preview = parent.createDiv({ cls: "cp-preview" }); void this.plugin.preview.render(preview, item);
     parent.createEl("h4", { text: "Details" }); const details = [["Original Workspace", this.workspaceName(item.origin.workspaceId)], ["Created", new Date(item.createdAt).toLocaleString()], ["Modified", new Date(item.modifiedAt).toLocaleString()], ["Type", item.type], ["Original Path", item.origin.filePath ?? item.origin.canvasPath ?? "-"]];
     for (const [label, value] of details) { const row = parent.createDiv({ cls: "cp-detail" }); row.createSpan({ text: label }); row.createEl("strong", { text: value }); }
-    const actions = parent.createDiv({ cls: "cp-preview-actions" }); const copy = actions.createEl("button", { text: "Copy" }); copy.addEventListener("click", () => void navigator.clipboard?.writeText(item.content ?? item.origin.filePath ?? item.displayTitle)); const original = actions.createEl("button", { text: "Open original" }); original.addEventListener("click", () => void this.plugin.openOriginal(item));
+    const actions = parent.createDiv({ cls: "cp-preview-actions" }); const copy = actions.createEl("button", { text: "Copy" }); copy.addEventListener("click", () => void navigator.clipboard?.writeText(item.content ?? item.origin.filePath ?? item.displayTitle));
+    if (item.origin.canvasPath && item.origin.canvasNodeId) actions.createEl("button", { text: "Locate on Canvas" }).addEventListener("click", () => void this.plugin.locateItemOnCanvas(item));
+    else if (item.origin.filePath) actions.createEl("button", { text: "Open source file" }).addEventListener("click", () => void this.plugin.openOriginal(item));
   }
 
   private renderInspector(): void {
@@ -268,8 +270,8 @@ export class FloatingMiniPalette {
     const menu = new Menu();
     menu.addItem((entry) => entry.setTitle(`Edit metadata${targetIds.length > 1 ? ` for ${targetIds.length} items` : ""}`).setIcon("tags").onClick(() => new TagLabelModal(this.plugin.app, this.plugin, targetIds).open()));
     if (targetIds.length === 1) {
-      if (tab !== "collect") menu.addItem((entry) => entry.setTitle("Open original").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
       if (item.origin.canvasPath && item.origin.canvasNodeId) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => void this.plugin.locateItemOnCanvas(item)));
+      else if (item.origin.filePath) menu.addItem((entry) => entry.setTitle("Open source file").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
     }
     menu.addSeparator();
     if (tab === "collect") menu.addItem((entry) => entry.setTitle(`Delete ${targetIds.length} pending item${targetIds.length === 1 ? "" : "s"}`).setIcon("trash").onClick(() => this.confirmPendingDelete(targetIds)));

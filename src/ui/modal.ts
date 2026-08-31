@@ -445,7 +445,8 @@ export class ItemEditorModal extends Modal {
     this.renderCanvasLinks(item);
     const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
     actions.createEl("button", { text: "Delete", cls: "mod-warning" }).addEventListener("click", () => new ConfirmDeleteModal(this.app, 1, () => { this.plugin.store.removeItems([item.id]); this.close(); }).open());
-    actions.createEl("button", { text: "Open original" }).addEventListener("click", () => void this.plugin.openOriginal(item));
+    if (item.origin.canvasPath && item.origin.canvasNodeId) actions.createEl("button", { text: "Locate on Canvas" }).addEventListener("click", () => void this.plugin.locateItemOnCanvas(item));
+    else if (item.origin.filePath) actions.createEl("button", { text: "Open source file" }).addEventListener("click", () => void this.plugin.openOriginal(item));
     actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
     actions.createEl("button", { text: "Save", cls: "mod-cta" }).addEventListener("click", () => {
       const labelValue = label.value.trim();
