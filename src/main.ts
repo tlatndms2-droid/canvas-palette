@@ -347,13 +347,17 @@ export default class CanvasPalettePlugin extends Plugin {
     if (items.length === 0) return;
     const candidates = items.map((item) => this.store.existingCollectedItem(item) ?? item);
     const save = this.isOtherCanvasRepresentativeWorkspace(workspaceId) ? (item: PaletteItem) => this.store.addToWorkspaceAsUnlinked(workspaceId, item) : (item: PaletteItem) => this.store.addToWorkspace(workspaceId, item);
-    const accepted = candidates.filter((item, index) => candidates.findIndex((candidate) => candidate.id === item.id) === index && save(item));
-    if (accepted.length === 0) { new Notice("This Canvas Workspace only accepts items from its own Canvas."); return; }
+    const unique = candidates.filter((item, index) => candidates.findIndex((candidate) => candidate.id === item.id) === index);
+    const alreadySaved = unique.filter((item) => this.store.workspaceForItem(item.id)?.id === workspaceId);
+    const accepted = unique.filter((item) => !alreadySaved.includes(item) && save(item));
+    if (accepted.length === 0 && alreadySaved.length === 0) { new Notice("This Canvas Workspace only accepts items from its own Canvas."); return; }
     this.store.data.uiState.activeWorkspaceId = workspaceId;
-    this.store.data.uiState.selectedItemId = accepted[0].id;
+    this.store.data.uiState.selectedItemId = (accepted[0] ?? alreadySaved[0]).id;
     this.store.changed();
     await this.openSidePalette();
-    new Notice(`${accepted.length} Canvas item${accepted.length === 1 ? "" : "s"} saved to Side Palette.`);
+    if (accepted.length > 0 && alreadySaved.length > 0) new Notice(`${accepted.length} Canvas item${accepted.length === 1 ? "" : "s"} saved; ${alreadySaved.length} already in Side Palette.`);
+    else if (accepted.length > 0) new Notice(`${accepted.length} Canvas item${accepted.length === 1 ? "" : "s"} saved to Side Palette.`);
+    else new Notice(`${alreadySaved.length} Canvas item${alreadySaved.length === 1 ? " is" : "s are"} already in Side Palette; no duplicate saved.`);
   }
 
   markdownSourceStatus(item: PaletteItem): "deleted" | null {
