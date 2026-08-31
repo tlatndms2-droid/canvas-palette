@@ -27,3 +27,12 @@ test("Mini Palette uses command toggling, a full header drag surface, and eight 
   assert.match(styles, /\.cp-window-resize--nw/);
   assert.match(styles, /\.cp-window-resize--se/);
 });
+
+test("Mini Collect selection does not auto-open settings, which are opened from its context menu", () => {
+  assert.match(source, /row\.addEventListener\("click", \(event\) => \{ if \(event\.target instanceof HTMLButtonElement\) return; this\.selectPending\(item\.id, event, orderedIds\); this\.inspectorItemId = null; this\.render\(\); \}\)/);
+  const menu = source.slice(source.indexOf("private openMiniItemMenu"), source.indexOf("private confirmPendingDelete"));
+  assert.match(menu, /tab === "collect" && targetIds\.length === 1/);
+  assert.match(menu, /setTitle\("Open selected item settings"\)/);
+  assert.match(menu, /onClick\(\(\) => this\.openCollectInspector\(item\.id\)\)/);
+  assert.match(menu, /private openCollectInspector\(itemId: string\)/);
+});

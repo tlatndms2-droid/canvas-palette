@@ -2,11 +2,12 @@
 
 ## Current state
 
-- Version: `0.3.33`.
+- Version: `0.3.34`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release target: `0.3.33`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.33`.
+- Latest release target: `0.3.34`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.34`.
+- Latest runtime change: `0.3.34`; selecting a Mini Palette Collect row no longer opens the right `Selected item settings` drawer. Right-click the row and choose `Open selected item settings` to open that drawer deliberately. Collect multi-selection retains its batch `Edit metadata` modal. Runtime validation in Obsidian Sandbox confirmed a normal click selects without a drawer; the context menu exposes the new command; selecting it opens the drawer with Title, Tag, Label, Label color, Caption, and Original preview; no runtime error was captured.
 - Latest runtime change: `0.3.33`; navigation is consistent across Mini Collect, Mini Storage, Side Palette, and item detail panels. Canvas-linked Items use `Locate on Canvas`; Items with only a Vault source use `Open source file`; ambiguous `Open original` entries are removed. Feature 2 has not started.
 - `0.3.33` runtime validation used the existing `Obsidian Sandbox`. A Canvas-linked Mini Storage Item menu showed `Edit metadata`, `Locate on Canvas`, and Mini removal with no `Open original`; the matching Side menu showed `Locate on Canvas` with no `Find link` or `Open original`. The disposable Canvas and original Sandbox data were restored; reload captured no error.
 - Latest runtime change: `0.3.32`; Mini Palette Collect item menus no longer show the overlapping `Open original` action. Canvas-linked Collect Items retain `Locate on Canvas`; Mini Storage and other original-opening locations are unchanged. Feature 2 has not started.

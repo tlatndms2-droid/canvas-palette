@@ -83,7 +83,7 @@ export class FloatingMiniPalette {
 
   private tabButton(parent: HTMLElement, tab: "collect" | "storage", label: string): void {
     const button = parent.createEl("button", { text: label, cls: this.plugin.store.data.uiState.miniPalette.tab === tab ? "is-active" : "" });
-    button.addEventListener("click", () => { const state = this.plugin.store.data.uiState.miniPalette; state.tab = tab; this.inspectorItemId = tab === "collect" ? state.focusedItemId : null; if (tab === "storage") state.focusedItemId = null; this.plugin.store.changed(); });
+    button.addEventListener("click", () => { const state = this.plugin.store.data.uiState.miniPalette; state.tab = tab; this.inspectorItemId = null; if (tab === "storage") state.focusedItemId = null; this.plugin.store.changed(); });
   }
 
   private renderCollect(panel: HTMLElement): void {
@@ -132,7 +132,7 @@ export class FloatingMiniPalette {
     const text = row.createDiv({ cls: "cp-pending-row__text" }); text.createEl("strong", { text: item.displayTitle }); text.createEl("small", { text: (item.content ?? item.origin.filePath ?? `${item.group?.nodes.length ?? 0} nodes`).slice(0, 80) });
     row.createSpan({ cls: "cp-pending-row__time", text: new Date(item.modifiedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) });
     const actions = row.createEl("button", { cls: "clickable-icon cp-icon-button", attr: { "aria-label": "Item actions" } }); setIcon(actions, "more-horizontal"); actions.addEventListener("click", (event) => { event.stopPropagation(); this.openMiniItemMenu(event, item, "collect"); });
-    row.addEventListener("click", (event) => { if (event.target instanceof HTMLButtonElement) return; this.selectPending(item.id, event, orderedIds); this.plugin.store.data.uiState.miniPalette.focusedItemId = item.id; this.inspectorItemId = item.id; this.render(); });
+    row.addEventListener("click", (event) => { if (event.target instanceof HTMLButtonElement) return; this.selectPending(item.id, event, orderedIds); this.inspectorItemId = null; this.render(); });
     row.addEventListener("contextmenu", (event) => { event.preventDefault(); this.openMiniItemMenu(event, item, "collect"); });
   }
 
@@ -268,7 +268,11 @@ export class FloatingMiniPalette {
       this.plugin.store.changed();
     }
     const menu = new Menu();
-    menu.addItem((entry) => entry.setTitle(`Edit metadata${targetIds.length > 1 ? ` for ${targetIds.length} items` : ""}`).setIcon("tags").onClick(() => new TagLabelModal(this.plugin.app, this.plugin, targetIds).open()));
+    if (tab === "collect" && targetIds.length === 1) {
+      menu.addItem((entry) => entry.setTitle("Open selected item settings").setIcon("settings-2").onClick(() => this.openCollectInspector(item.id)));
+    } else {
+      menu.addItem((entry) => entry.setTitle(`Edit metadata${targetIds.length > 1 ? ` for ${targetIds.length} items` : ""}`).setIcon("tags").onClick(() => new TagLabelModal(this.plugin.app, this.plugin, targetIds).open()));
+    }
     if (targetIds.length === 1) {
       if (item.origin.canvasPath && item.origin.canvasNodeId) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => void this.plugin.locateItemOnCanvas(item)));
       else if (item.origin.filePath) menu.addItem((entry) => entry.setTitle("Open source file").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
@@ -277,6 +281,11 @@ export class FloatingMiniPalette {
     if (tab === "collect") menu.addItem((entry) => entry.setTitle(`Delete ${targetIds.length} pending item${targetIds.length === 1 ? "" : "s"}`).setIcon("trash").onClick(() => this.confirmPendingDelete(targetIds)));
     else menu.addItem((entry) => entry.setTitle(`Remove ${targetIds.length} link${targetIds.length === 1 ? "" : "s"} from Mini`).setIcon("unlink").onClick(() => this.confirmMiniStorageRemoval(targetIds)));
     menu.showAtMouseEvent(event);
+  }
+  private openCollectInspector(itemId: string): void {
+    this.plugin.store.data.uiState.miniPalette.focusedItemId = itemId;
+    this.inspectorItemId = itemId;
+    this.plugin.store.changed();
   }
   private confirmPendingDelete(ids: string[]): void {
     const valid = ids.filter((id) => Boolean(this.plugin.store.data.items[id]) && this.plugin.store.data.pendingItemIds.includes(id)); if (valid.length === 0) return;
