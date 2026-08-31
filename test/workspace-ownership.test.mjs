@@ -48,14 +48,24 @@ test("dedicated Workspaces accept only own-Canvas items while general Workspaces
   await cleanup();
 });
 
-test("pending import keeps rejected foreign items and Canvas renames follow ownership", async () => {
+test("reviewed pending import moves ownership and reports target-Canvas link state", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  const previous = store.createWorkspace("Previous", "general");
   const dedicated = store.createWorkspace("EP01", "canvas", "folder/EP01.canvas", true);
-  store.addPending(item("own", "folder/EP01.canvas")); store.addPending(item("foreign", "EP02.canvas"));
-  const result = store.importPending(dedicated.id, ["own", "foreign"]);
-  assert.deepEqual(result, { imported: ["own"], rejected: ["foreign"] });
-  assert.deepEqual(store.data.pendingItemIds, ["foreign"]);
+  store.addToWorkspace(previous.id, item("foreign", "EP02.canvas"));
+  store.addPending(store.data.items.foreign);
+  const result = store.importPending(dedicated.id, ["foreign"]);
+  assert.deepEqual(result, { imported: ["foreign"], rejected: [] });
+  assert.deepEqual(store.data.pendingItemIds, []);
+  assert.equal(store.data.items.foreign.origin.workspaceId, dedicated.id);
+  assert.equal(store.data.items.foreign.origin.canvasPath, "EP02.canvas");
+  assert.equal(previous.looseItemIds.includes("foreign"), false);
+  assert.equal(dedicated.looseItemIds.includes("foreign"), true);
+  assert.equal(dedicated.canvasPaths.includes("EP02.canvas"), false);
+  assert.equal(store.itemLinkedToWorkspace(store.data.items.foreign, dedicated.id), false);
+  store.data.items.foreign.canvasPlacements.push({ canvasPath: "folder/EP01.canvas", nodeIds: ["node"], placedAt: 1 });
+  assert.equal(store.itemLinkedToWorkspace(store.data.items.foreign, dedicated.id), true);
   store.renameCanvasPath("folder/EP01.canvas", "story/EP01.canvas");
   assert.equal(dedicated.ownerCanvasPath, "story/EP01.canvas");
   assert.equal(dedicated.representativeCanvasPath, "story/EP01.canvas");
@@ -78,8 +88,8 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   assert.match(side, /Open current Canvas Workspace/);
   assert.match(side, /Open Workspace Explorer/);
   assert.match(side, /openWorkspaceExplorer/);
-  assert.match(mini, /option\.disabled = Boolean\(workspace/);
-  assert.match(mini, /only accepts items that exist in its own Canvas/);
+  assert.doesNotMatch(mini, /option\.disabled = Boolean\(workspace/);
+  assert.doesNotMatch(mini, /only accepts items that exist in its own Canvas/);
 });
 
 test("Workspace Explorer prioritizes the current Canvas and offers search, dates, and Explorer views", async () => {

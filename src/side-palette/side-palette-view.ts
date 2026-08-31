@@ -202,14 +202,14 @@ export class SidePaletteView extends ItemView {
     viewport.empty(); this.renderViewport(viewport, workspaceId); viewport.scrollTop = scrollTop;
   }
 
-  private searchContextForItem(workspaceId: string, item: PaletteItem): { groupNames: string[] } {
+  private searchContextForItem(workspaceId: string, item: PaletteItem): { groupNames: string[]; unlinked: boolean } {
     const names: string[] = []; let cursor = item.parentItemId ? this.plugin.store.data.items[item.parentItemId] : undefined;
     while (cursor) { names.push(cursor.displayTitle); cursor = cursor.parentItemId ? this.plugin.store.data.items[cursor.parentItemId] : undefined; }
     let rootId = item.id; let root = item;
     while (root.parentItemId && this.plugin.store.data.items[root.parentItemId]) { rootId = root.parentItemId; root = this.plugin.store.data.items[root.parentItemId]; }
     let collection = Object.values(this.plugin.store.data.collections).find((entry) => entry.workspaceId === workspaceId && entry.itemIds.includes(rootId));
     while (collection) { names.push(collection.name); collection = collection.parentId ? this.plugin.store.data.collections[collection.parentId] : undefined; }
-    return { groupNames: [...new Set(names)] };
+    return { groupNames: [...new Set(names)], unlinked: !this.plugin.store.itemLinkedToWorkspace(item, workspaceId) };
   }
 
   private renderViewport(parent: HTMLElement, workspaceId: string): void {
@@ -298,7 +298,7 @@ export class SidePaletteView extends ItemView {
     const renderCard = (host: HTMLElement, item: PaletteItem): void => {
       const facesEnabled = supportsFrontBack(item) && item.facesEnabled;
       const face = facesEnabled ? this.plugin.store.data.uiState.sideItemFaces[item.id] ?? "front" : "front";
-      const card = renderItem(host, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, dragItemIds: selectedIds, currentFace: face, markdownSourceStatus: this.plugin.markdownSourceStatus(item), onMarkdownSourceStatus: (event) => this.plugin.showMarkdownSourceMenu(item, event), onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("side", item.id, next) : undefined, onSelect: (event) => { this.pendingReveal = "outliner"; this.selectSideItem(item.id, event); }, onOpen: () => face === "back" ? void this.openInlineBackEditor(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => this.plugin.findLinkedCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+      const card = renderItem(host, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, dragItemIds: selectedIds, currentFace: face, unlinked: !this.plugin.store.itemLinkedToWorkspace(item, workspaceId), markdownSourceStatus: this.plugin.markdownSourceStatus(item), onMarkdownSourceStatus: (event) => this.plugin.showMarkdownSourceMenu(item, event), onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("side", item.id, next) : undefined, onSelect: (event) => { this.pendingReveal = "outliner"; this.selectSideItem(item.id, event); }, onOpen: () => face === "back" ? void this.openInlineBackEditor(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => this.plugin.findLinkedCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
       const body = card.querySelector<HTMLElement>(".cp-item__body");
       if (body) {
         const compactLimit = Math.round(360 * 14 / this.plugin.store.data.settings.fontSize);

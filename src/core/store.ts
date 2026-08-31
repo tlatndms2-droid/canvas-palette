@@ -155,11 +155,11 @@ export class PaletteStore {
     for (const id of itemIds) {
       const item = this.data.items[id];
       if (!item) continue;
-      if (!this.canStoreItem(workspaceId, item)) { rejected.push(id); continue; }
+      this.detachWorkspaceLinks(id);
       item.origin.workspaceId = workspaceId;
-      item.parentItemId ??= null;
+      item.parentItemId = null;
       item.childItemIds ??= [];
-      if (item.origin.canvasPath && !workspace.canvasPaths.includes(item.origin.canvasPath)) workspace.canvasPaths.push(item.origin.canvasPath);
+      if (workspace.kind === "general" && item.origin.canvasPath && !workspace.canvasPaths.includes(item.origin.canvasPath)) workspace.canvasPaths.push(item.origin.canvasPath);
       if (workspace.kind === "general" && item.origin.canvasPath && !workspace.representativeCanvasPath) workspace.representativeCanvasPath = item.origin.canvasPath;
       if (!workspace.looseItemIds.includes(id)) workspace.looseItemIds.push(id);
       imported.push(id);
@@ -681,6 +681,13 @@ export class PaletteStore {
     this.changed();
   }
 
+  itemLinkedToWorkspace(item: PaletteItem, workspaceId: string): boolean {
+    const workspace = this.data.workspaces[workspaceId];
+    if (!workspace) return false;
+    const locations = this.linkedCanvasNodes(item);
+    return workspace.kind === "canvas" ? Boolean(workspace.ownerCanvasPath && locations.some((location) => location.canvasPath === workspace.ownerCanvasPath)) : locations.length > 0;
+  }
+
   removeMiniStorageItems(itemIds: string[]): void {
     const removed = new Set(itemIds);
     this.data.uiState.miniPalette.storageItemIds = this.data.uiState.miniPalette.storageItemIds.filter((id) => !removed.has(id));
@@ -730,6 +737,12 @@ export class PaletteStore {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace) return [];
     return [workspace.looseItemIds, ...Object.values(this.data.collections).filter((entry) => entry.workspaceId === workspaceId).map((entry) => entry.itemIds), ...this.itemsForWorkspace(workspaceId).map((item) => item.childItemIds ??= [])];
+  }
+
+  private detachWorkspaceLinks(itemId: string): void {
+    for (const workspace of Object.values(this.data.workspaces)) workspace.looseItemIds = workspace.looseItemIds.filter((id) => id !== itemId);
+    for (const collection of Object.values(this.data.collections)) collection.itemIds = collection.itemIds.filter((id) => id !== itemId);
+    for (const item of Object.values(this.data.items)) if (item.id !== itemId) item.childItemIds = (item.childItemIds ?? []).filter((id) => id !== itemId);
   }
 
   private isItemDescendant(itemId: string, ancestorId: string): boolean {

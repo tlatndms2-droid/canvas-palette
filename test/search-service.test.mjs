@@ -38,6 +38,8 @@ test("Obsidian-like tag, label, AND, OR, and parentheses filter palette items", 
   assert.equal(search.matches(work, 'space:"Projects/Planning.canvas"'), true);
   assert.equal(search.matches(work, 'space:"Other.canvas"'), false);
   assert.equal(search.matches(work, "unlinked"), false);
+  assert.equal(search.matches(work, "unlinked", { unlinked: true }), true);
+  assert.equal(search.matches(work, "unlinked", { unlinked: false }), false);
   const unlinked = { ...work, origin: {}, canvasPlacements: [] };
   assert.equal(search.matches(unlinked, "unlinked"), true);
   assert.equal(search.matches({ ...unlinked, canvasPlacements: [{ canvasPath: "A.canvas", nodeIds: [], placedAt: 1 }] }, "unlinked"), true);

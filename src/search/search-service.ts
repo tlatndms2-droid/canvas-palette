@@ -1,6 +1,6 @@
 import type { PaletteItem } from "../core/types";
 
-export interface SearchItemContext { groupNames?: string[]; }
+export interface SearchItemContext { groupNames?: string[]; unlinked?: boolean; }
 
 export class SearchService {
   matches(item: PaletteItem, query: string, context: SearchItemContext = {}): boolean {
@@ -70,7 +70,7 @@ export class SearchService {
 
   private matchesToken(item: PaletteItem, token: string, context: SearchItemContext): boolean {
     const lower = token.toLocaleLowerCase();
-    if (lower === "unlinked") return !(item.origin.canvasPath && item.origin.canvasNodeId) && !item.canvasPlacements.some((placement) => placement.nodeIds.length > 0);
+    if (lower === "unlinked") return context.unlinked ?? (!(item.origin.canvasPath && item.origin.canvasNodeId) && !item.canvasPlacements.some((placement) => placement.nodeIds.length > 0));
     if (lower.startsWith("label:")) return item.label.toLocaleLowerCase() === this.unquote(token.slice(6)).toLocaleLowerCase();
     if (lower.startsWith("type:")) return item.type === lower.slice(5);
     if (lower.startsWith("group:")) { const value = this.unquote(token.slice(6)).toLocaleLowerCase(); return (context.groupNames ?? []).some((name) => name.toLocaleLowerCase().includes(value)); }

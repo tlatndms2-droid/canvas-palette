@@ -16,7 +16,7 @@ test("linked Canvas nodes render an isolated clickable top-left link badge", () 
 });
 
 test("unlinked Palette state occupies a header slot separate from Front Back and selection", () => {
-  assert.match(itemRenderer, /const unlinked = canvasPaths\.length === 0/);
+  assert.match(itemRenderer, /const unlinked = options\.unlinked \?\? canvasPaths\.length === 0/);
   assert.match(itemRenderer, /cp-item__header-actions/);
   assert.match(itemRenderer, /cp-item__link-state--unlinked/);
   assert.match(itemRenderer, /setIcon\(unlinkedBadge, "unlink"\)/);

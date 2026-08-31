@@ -110,17 +110,12 @@ export class FloatingMiniPalette {
     const bottom = panel.createDiv({ cls: "cp-bottom cp-bottom--float" });
     const settings = iconButton(bottom, "settings-2", "Settings", () => this.plugin.openSettings());
     settings.addClass("cp-bottom__start");
-    const destination = workspaceSelect(this.plugin, bottom, this.plugin.store.data.uiState.activeWorkspaceId, () => undefined);
-    const selectedItems = this.collectSelectedIds().map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
-    for (const option of Array.from(destination.options)) {
-      const workspace = this.plugin.store.data.workspaces[option.value];
-      option.disabled = Boolean(workspace && selectedItems.some((item) => !this.plugin.store.canStoreItem(workspace.id, item)));
-    }
+    workspaceSelect(this.plugin, bottom, this.plugin.store.data.uiState.activeWorkspaceId, () => undefined);
     const importButton = bottom.createEl("button", { cls: "mod-cta", text: "Import to workspace" }); importButton.disabled = this.collectSelectedIds().length === 0;
     importButton.addEventListener("click", () => {
       const select = bottom.querySelector("select"); if (!select) return;
       const result = this.plugin.store.importPending(select.value, this.collectSelectedIds());
-      if (result.rejected.length > 0) new Notice("A Canvas Workspace only accepts items that exist in its own Canvas.");
+      if (result.rejected.length > 0) new Notice("Some items could not be imported because the selected Workspace is unavailable.");
       if (result.imported.length > 0) new Notice(`${result.imported.length} item${result.imported.length === 1 ? "" : "s"} imported.`);
       this.setCollectSelectedIds(result.rejected); this.plugin.store.data.uiState.miniPalette.focusedItemId = null; this.inspectorItemId = null;
     });
