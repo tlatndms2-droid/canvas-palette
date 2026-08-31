@@ -20,6 +20,7 @@ export function clampAssetDensity(value: number | undefined): number {
 
 export function assetDensityLabel(value: number): string { return STEPS[clampAssetDensity(value)].label; }
 export function assetViewMode(value: number): AssetViewMode { return clampAssetDensity(value) === 0 ? "list" : "grid"; }
+export function nextAssetDensity(value: number, deltaY: number): number { return deltaY === 0 ? clampAssetDensity(value) : clampAssetDensity(value + (deltaY < 0 ? 1 : -1)); }
 
 export function legacyDensity(viewMode: AssetViewMode | undefined, cardHeight: number | undefined): number {
   if (viewMode === "list") return 0;

@@ -4,7 +4,7 @@ import type { PaletteItem, PaletteItemType } from "../core/types";
 import { ConfirmDeleteModal, ConfirmMiniStorageRemovalModal, TagLabelModal } from "../ui/modal";
 import { makeHorizontalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
-import { applyAssetDensity, assetDensityLabel, ASSET_DENSITY_MAX, ASSET_DENSITY_MIN } from "../ui/asset-density";
+import { applyAssetDensity, assetDensityLabel, ASSET_DENSITY_MAX, ASSET_DENSITY_MIN, nextAssetDensity } from "../ui/asset-density";
 
 type TypeFilter = "all" | PaletteItemType;
 
@@ -93,6 +93,9 @@ export class FloatingMiniPalette {
     const list = body.createDiv({ cls: "cp-pending-list" });
     const update = () => {
       list.empty(); summary.empty();
+      const density = this.plugin.store.data.uiState.miniPalette.densityLevel;
+      list.dataset.density = String(density);
+      list.style.setProperty("--cp-collect-row-height", `${96 + density * 28}px`);
       const visible = this.collectItems();
       const selected = this.collectSelectedIds();
       summary.createSpan({ text: `Pending ${this.plugin.store.data.pendingItemIds.length} · Selected ${selected.length}` });
@@ -111,7 +114,9 @@ export class FloatingMiniPalette {
       for (const item of visible) this.renderPendingRow(list, item, visible.map((entry) => entry.id));
       if (list.childElementCount === 0) list.createDiv({ cls: "cp-empty", text: "Canvas scraps will wait here for review." });
     };
-    search.addEventListener("input", () => { this.search = search.value; update(); }); update();
+    search.addEventListener("input", () => { this.search = search.value; update(); });
+    body.addEventListener("wheel", (event) => { if (!event.ctrlKey && !event.metaKey) return; event.preventDefault(); event.stopPropagation(); const state = this.plugin.store.data.uiState.miniPalette; state.densityLevel = nextAssetDensity(state.densityLevel, event.deltaY); state.viewMode = state.densityLevel === 0 ? "list" : "grid"; update(); this.plugin.store.changed(); }, { passive: false });
+    update();
     const bottom = panel.createDiv({ cls: "cp-bottom cp-bottom--float" });
     const settings = iconButton(bottom, "settings-2", "Settings", () => this.plugin.openSettings());
     settings.addClass("cp-bottom__start");
@@ -185,6 +190,7 @@ export class FloatingMiniPalette {
     const grid = parent.createDiv({ cls: "cp-asset-grid" });
     state.densityLevel = applyAssetDensity(grid, state.densityLevel, "cp-asset-grid");
     state.viewMode = state.densityLevel === 0 ? "list" : "grid";
+    grid.addEventListener("wheel", (event) => { if (!event.ctrlKey && !event.metaKey) return; event.preventDefault(); event.stopPropagation(); state.densityLevel = nextAssetDensity(state.densityLevel, event.deltaY); state.viewMode = state.densityLevel === 0 ? "list" : "grid"; applyAssetDensity(grid, state.densityLevel, "cp-asset-grid"); this.plugin.store.changed(); }, { passive: false });
     const storageItems = this.storageItems();
     const orderedIds = storageItems.map((item) => item.id);
     for (const item of storageItems) {

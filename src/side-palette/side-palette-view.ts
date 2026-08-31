@@ -6,7 +6,7 @@ import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
 import { LinkedSpacesModal } from "../ui/linked-spaces-modal";
 import { NativeMarkdownEditor } from "../editor/native-markdown-editor";
-import { applyAssetDensity, assetDensityLabel, ASSET_DENSITY_DEFAULT, ASSET_DENSITY_MAX, ASSET_DENSITY_MIN } from "../ui/asset-density";
+import { applyAssetDensity, assetDensityLabel, ASSET_DENSITY_DEFAULT, ASSET_DENSITY_MAX, ASSET_DENSITY_MIN, nextAssetDensity } from "../ui/asset-density";
 
 export const SIDE_PALETTE_VIEW = "canvas-palette-side";
 
@@ -288,6 +288,7 @@ export class SidePaletteView extends ItemView {
     }
     rangeControl("Preview font size", "fontSize", 8, 14, 14);
     applyViewSettings();
+    listEl.addEventListener("wheel", (event) => { if ((!event.ctrlKey && !event.metaKey) || !workspaceLayout) return; event.preventDefault(); event.stopPropagation(); workspaceLayout.densityLevel = nextAssetDensity(workspaceLayout.densityLevel, event.deltaY); applyViewSettings(); this.plugin.store.changed(); }, { passive: false });
     this.mountViewportReorder(parent, listEl, workspaceId);
     const visibleItems = this.plugin.search.filter(this.itemsForViewportScope(workspaceId), this.query, (item) => this.searchContextForItem(workspaceId, item));
     const workspace = this.plugin.store.data.workspaces[workspaceId];
