@@ -147,3 +147,17 @@ test("Side explicitly adds and removes a Mini relay link without changing Worksp
   assert.deepEqual(store.data.uiState.miniPalette.storageItemIds, []);
   await cleanup();
 });
+
+test("Side can send a Collect item to Mini Storage without either space hiding it", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  const workspace = store.createWorkspace("Owned by Side", "general");
+  const collected = item("collected-and-sent", "EP01.canvas");
+  store.addToWorkspace(workspace.id, collected);
+  store.collectCanvasItems([collected]);
+
+  assert.deepEqual(store.addMiniStorageItems([collected.id]), [collected.id]);
+  assert.deepEqual(store.data.pendingItemIds, [collected.id]);
+  assert.deepEqual(store.data.uiState.miniPalette.storageItemIds, [collected.id]);
+  await cleanup();
+});

@@ -51,6 +51,9 @@ test("Mini Storage is workspace-independent and removes relay links without dele
   assert.match(mini, /type === "markdown" \? "MD"/);
   assert.match(store, /addMiniStorageItems\(itemIds: string\[\]\)/);
   assert.match(store, /removeMiniStorageItems\(itemIds: string\[\]\)/);
+  const addToStorage = store.slice(store.indexOf("addMiniStorageItems(itemIds: string[])"), store.indexOf("itemLinkedToWorkspace", store.indexOf("addMiniStorageItems(itemIds: string[])")));
+  assert.doesNotMatch(addToStorage, /!pending\.has\(id\)/);
+  assert.doesNotMatch(mini, /!this\.plugin\.store\.data\.pendingItemIds\.includes\(item\.id\)/);
   assert.match(store, /storageItemIds = \[\.\.\.linked\]/);
 });
 
