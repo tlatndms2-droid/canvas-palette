@@ -268,7 +268,7 @@ export class FloatingMiniPalette {
     const menu = new Menu();
     menu.addItem((entry) => entry.setTitle(`Edit metadata${targetIds.length > 1 ? ` for ${targetIds.length} items` : ""}`).setIcon("tags").onClick(() => new TagLabelModal(this.plugin.app, this.plugin, targetIds).open()));
     if (targetIds.length === 1) {
-      menu.addItem((entry) => entry.setTitle("Open original").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
+      if (tab !== "collect") menu.addItem((entry) => entry.setTitle("Open original").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
       if (item.origin.canvasPath && item.origin.canvasNodeId) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => void this.plugin.locateItemOnCanvas(item)));
     }
     menu.addSeparator();

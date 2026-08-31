@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.31**
+Current version: **0.3.32**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
@@ -14,6 +14,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - Saving a Canvas Item that is already in the selected Side Palette Workspace keeps exactly one Item and opens a confirmation popup instead of only a brief corner notice. The popup names the destination Workspace, tells how many duplicates were skipped, and, for a mixed selection, how many new Items were saved.
 - Mini Palette's `Collect` and `Storage` are independent. Sending Side Palette Items to Storage now adds every selected Item unless that exact Item is already in Storage; Collect membership neither blocks the transfer nor hides the Storage card.
 - Importing from Mini Palette Collect to a Side Palette Workspace now uses the same duplicate popup as direct Canvas saving. If an Item is already in the selected Workspace, it remains in Collect, is not saved again, and the popup names the Workspace and skipped count.
+- Mini Palette Collect item menus now keep `Locate on Canvas` as the single Canvas-navigation action; the overlapping `Open original` entry is removed there. Other Mini Palette locations remain unchanged.
 - Canvas collection now enforces one linked node as one canonical Palette Item. Re-collecting an already linked Card/Markdown/Image/Group does not create another ID in Collect, Side, or Mini Storage. On load, exact duplicate IDs that point to the same Canvas path and node are consolidated into the oldest identity, while the newest content/metadata and existing Workspace, Collection, Mini relay, child, selection, and placement references are redirected to that canonical Item.
 - Mini Collect is the inspection boundary before Side storage. Importing a reviewed Item no longer fails because it came from another Canvas: it removes that Item's previous Workspace/Collection membership, assigns only the selected destination Workspace, and keeps its original Canvas link as provenance. In a Canvas-owned Workspace, Side `Linked/Unlinked` is evaluated against that Workspace's owner Canvas, so an imported Item with no node inside that Canvas is immediately shown and filterable as `Unlinked`.
 - Mini Palette is now an explicit Workspace-independent relay hub: Side Palette cards enter or leave Mini through the `Mini Palette로 보내기` / `Mini Palette에서 제거` context-menu toggle. Mini Storage shows only those explicitly sent links, its own removal action unlinks only from Mini, and Side Palette/Workspace items, original Vault files, and Canvas nodes remain canonical and unchanged. Storage counts exclude pending Collect items, the obsolete Mini Workspace selector remains removed, and the type filter displays Markdown compactly as `MD`.
