@@ -7,6 +7,7 @@ import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../u
 import { LinkedSpacesModal } from "../ui/linked-spaces-modal";
 import { NativeMarkdownEditor } from "../editor/native-markdown-editor";
 import { applyAssetDensity, assetDensityLabel, ASSET_DENSITY_DEFAULT, ASSET_DENSITY_MAX, ASSET_DENSITY_MIN, nextAssetDensity } from "../ui/asset-density";
+import { attachedFlyoutPlacement, sideLayoutMode, type SideLayoutMode } from "../ui/responsive-layout";
 
 export const SIDE_PALETTE_VIEW = "canvas-palette-side";
 
@@ -26,13 +27,19 @@ export class SidePaletteView extends ItemView {
   private pendingReveal: "viewport" | "outliner" | null = null;
   private activeBackEditor: { itemId: string; close: (save: boolean) => Promise<void> } | null = null;
   private readonly scrollSelectors = [".cp-viewport", ".cp-outliner", ".cp-tag-index", ".cp-label-index"] as const;
+  private readonly scrollMemory: Record<string, number> = {};
+  private layoutMode: SideLayoutMode = "wide";
+  private resizeObserver?: ResizeObserver;
+  private indexesFlyoutOpen = false;
+  private activeIndexTab: "tag" | "label" = "tag";
+  private indexesFlyoutCleanup?: () => void;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: CanvasPalettePlugin) { super(leaf); }
   getViewType(): string { return SIDE_PALETTE_VIEW; }
   getDisplayText(): string { return "Canvas Palette"; }
   getIcon(): string { return "library-big"; }
   async onOpen(): Promise<void> { this.unsubscribe = this.plugin.store.subscribe(() => this.render()); this.render(); }
-  async onClose(): Promise<void> { this.unsubscribe?.(); await this.activeBackEditor?.close(true); }
+  async onClose(): Promise<void> { this.resizeObserver?.disconnect(); this.indexesFlyoutCleanup?.(); this.unsubscribe?.(); await this.activeBackEditor?.close(true); }
 
   revealItem(itemId: string): void {
     this.query = "";
@@ -61,62 +68,28 @@ export class SidePaletteView extends ItemView {
     if (this.activeBackEditor || this.searchComposing) return;
     const root = this.contentEl;
     const previousWorkspaceId = root.dataset.cpWorkspaceId;
-    const scrollPositions = new Map(this.scrollSelectors.map((selector) => [selector, root.querySelector<HTMLElement>(selector)?.scrollTop ?? 0]));
+    this.captureScrollMemory(root);
+    this.resizeObserver?.disconnect(); this.resizeObserver = undefined;
+    this.indexesFlyoutCleanup?.(); this.indexesFlyoutCleanup = undefined;
     root.empty(); root.addClass("canvas-palette", "cp-side", `cp-theme-${this.plugin.store.data.settings.theme}`);
     if (this.plugin.store.data.settings.accentMode === "custom") root.style.setProperty("--cp-accent", this.plugin.store.data.settings.accentColor);
     const workspace = this.plugin.activeWorkspace();
     if (!workspace) return;
     root.dataset.cpWorkspaceId = workspace.id;
+    this.layoutMode = sideLayoutMode(root.clientWidth || root.parentElement?.clientWidth || window.innerWidth);
+    root.dataset.layoutMode = this.layoutMode;
+    root.addClass(`cp-side-layout--${this.layoutMode}`);
+    if (this.layoutMode === "wide") this.indexesFlyoutOpen = false;
     this.applyLayoutVariables(root, workspace.sideLayout);
-    const header = root.createDiv({ cls: "cp-side__header" });
-    header.createDiv({ cls: "cp-brand", text: "Canvas Palette" });
-    const exportButton = header.createEl("button", { text: "Export" }); exportButton.addEventListener("click", () => void this.plugin.exportActiveWorkspace());
-    const collectButton = header.createEl("button", { text: "Send to Mini Palette" }); collectButton.addEventListener("click", () => this.plugin.sendItemsToMini(this.sideSelectedIds()));
-    const selectorRow = root.createDiv({ cls: "cp-workspace-row" }); selectorRow.createSpan({ text: "Current workspace" });
-    workspaceSelect(this.plugin, selectorRow, workspace.id, (id) => { this.query = ""; this.plugin.store.data.uiState.activeWorkspaceId = id; this.plugin.store.changed(); });
-    const currentCanvas = selectorRow.createEl("button", { cls: "cp-current-canvas-workspace", attr: { title: "Open current Canvas Workspace", "aria-label": "Open current Canvas Workspace" } });
-    setIcon(currentCanvas.createSpan(), "locate-fixed"); currentCanvas.createSpan({ text: "Current Canvas" });
-    currentCanvas.addEventListener("click", () => this.plugin.openCurrentCanvasWorkspace()); currentCanvas.disabled = !this.plugin.currentCanvasPath();
-    const manageWorkspace = iconButton(selectorRow, "folder-cog", "Open Workspace Explorer", () => this.plugin.openWorkspaceExplorer());
-    manageWorkspace.addClass("cp-workspace-manage");
-    const searchWrap = root.createDiv({ cls: "cp-search-wrap" });
-    const search = searchWrap.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search files, groups, tags, labels…", autocomplete: "off" }, value: this.query });
-    const refreshSearch = (): void => this.refreshSearchSurface(searchWrap, workspace.id);
-    search.addEventListener("compositionstart", () => { this.searchComposing = true; });
-    search.addEventListener("compositionend", () => { this.searchComposing = false; this.query = search.value.normalize("NFC"); search.value = this.query; queueMicrotask(refreshSearch); });
-    search.addEventListener("input", (event) => { this.query = search.value; if (this.searchComposing || (event as InputEvent).isComposing) return; refreshSearch(); });
-    search.addEventListener("keydown", (event) => { if (event.key === "ArrowDown") { event.preventDefault(); searchWrap.querySelector<HTMLButtonElement>(".cp-search-suggestion")?.focus(); } else if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); this.searchAssistantOpen = false; this.renderSearchAssistant(searchWrap, workspace.id); } });
-    search.addEventListener("focus", () => { this.searchAssistantOpen = true; this.renderSearchAssistant(searchWrap, workspace.id); });
-    search.addEventListener("pointerdown", () => { if (!this.searchAssistantOpen) { this.searchAssistantOpen = true; this.renderSearchAssistant(searchWrap, workspace.id); } });
-    root.onpointerdown = (event) => { if (this.searchAssistantOpen && !searchWrap.contains(event.target as Node)) { this.searchAssistantOpen = false; this.renderSearchAssistant(searchWrap, workspace.id); search.blur(); } };
-    this.renderSearchAssistant(searchWrap, workspace.id);
-    const top = root.createDiv({ cls: "cp-side__top" });
-    const viewport = top.createDiv({ cls: "cp-panel cp-viewport" }); this.renderViewport(viewport, workspace.id);
-    const vDivider = top.createDiv({ cls: "cp-divider cp-divider--vertical" });
-    makeHorizontalDivider(vDivider, (x) => {
-      workspace.sideLayout.viewportRatio = this.horizontalRatio(top, vDivider, x, 160, 180);
-      this.applyLayoutVariables(root, workspace.sideLayout);
-    }, () => this.plugin.store.changed());
-    const outliner = top.createDiv({ cls: "cp-panel cp-outliner" }); this.renderOutliner(outliner, workspace.id);
-    const hDivider = root.createDiv({ cls: "cp-divider cp-divider--horizontal" });
-    const indexes = root.createDiv({ cls: "cp-side__indexes" });
-    makeVerticalDivider(hDivider, (y) => {
-      workspace.sideLayout.topRatio = this.verticalRatio(top, indexes, hDivider, y);
-      this.applyLayoutVariables(root, workspace.sideLayout);
-    }, () => this.plugin.store.changed());
-    const tags = indexes.createDiv({ cls: "cp-panel cp-tag-index" }); this.renderIndex(tags, "Tag index", this.items(workspace.id).flatMap((item) => item.tags), "tag");
-    const iDivider = indexes.createDiv({ cls: "cp-divider cp-divider--vertical" });
-    makeHorizontalDivider(iDivider, (x) => {
-      workspace.sideLayout.indexRatio = this.horizontalRatio(indexes, iDivider, x, 130, 130);
-      this.applyLayoutVariables(root, workspace.sideLayout);
-    }, () => this.plugin.store.changed());
-    const labels = indexes.createDiv({ cls: "cp-panel cp-label-index" }); this.renderIndex(labels, "Label index", this.items(workspace.id).map((item) => item.label).filter(Boolean), "label");
+    this.renderHeader(root, workspace.id);
+    this.renderSearch(root, workspace.id);
+    if (this.layoutMode === "wide") this.renderWideLayout(root, workspace.id);
+    else this.renderCompactLayout(root, workspace.id);
     if (previousWorkspaceId === workspace.id) {
-      for (const [selector, scrollTop] of scrollPositions) {
-        const panel = root.querySelector<HTMLElement>(selector);
-        if (panel) panel.scrollTop = scrollTop;
-      }
+      this.restoreScrollMemory(root);
     }
+    this.observeResponsiveLayout(root);
+    if (this.indexesFlyoutOpen && this.layoutMode !== "wide") this.renderIndexesFlyout(root, workspace.id);
     if (this.pendingReveal) {
       const target = this.pendingReveal; this.pendingReveal = null;
       window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
@@ -125,6 +98,185 @@ export class SidePaletteView extends ItemView {
         this.contentEl.querySelector<HTMLElement>(selector)?.scrollIntoView({ block: "center", inline: "nearest" });
       }));
     }
+  }
+
+  private renderHeader(root: HTMLElement, workspaceId: string): void {
+    const header = root.createDiv({ cls: "cp-side__header" });
+    header.createDiv({ cls: "cp-brand", text: "Canvas Palette" });
+    const send = this.layoutMode === "wide"
+      ? header.createEl("button", { text: "Send to Mini Palette" })
+      : iconButton(header, "send", "Send selected items to Mini Palette", () => this.plugin.sendItemsToMini(this.sideSelectedIds()));
+    if (this.layoutMode === "wide") send.addEventListener("click", () => this.plugin.sendItemsToMini(this.sideSelectedIds()));
+    if (this.layoutMode === "wide") {
+      const exportButton = header.createEl("button", { text: "Export" });
+      exportButton.addEventListener("click", () => void this.plugin.exportActiveWorkspace());
+    } else {
+      const more = iconButton(header, "ellipsis", "More Canvas Palette actions", () => this.openHeaderMenu(more, workspaceId));
+    }
+    const selectorRow = root.createDiv({ cls: "cp-workspace-row" }); selectorRow.createSpan({ cls: "cp-workspace-label", text: "Current workspace" });
+    workspaceSelect(this.plugin, selectorRow, workspaceId, (id) => { this.query = ""; this.plugin.store.data.uiState.activeWorkspaceId = id; this.plugin.store.changed(); });
+    const currentCanvas = selectorRow.createEl("button", { cls: "cp-current-canvas-workspace", attr: { title: "Open current Canvas Workspace", "aria-label": "Open current Canvas Workspace" } });
+    setIcon(currentCanvas.createSpan(), "locate-fixed"); currentCanvas.createSpan({ text: "Current Canvas" });
+    currentCanvas.addEventListener("click", () => this.plugin.openCurrentCanvasWorkspace()); currentCanvas.disabled = !this.plugin.currentCanvasPath();
+    if (this.layoutMode === "wide") {
+      const manageWorkspace = iconButton(selectorRow, "folder-cog", "Open Workspace Explorer", () => this.plugin.openWorkspaceExplorer());
+      manageWorkspace.addClass("cp-workspace-manage");
+    }
+  }
+
+  private openHeaderMenu(trigger: HTMLElement, workspaceId: string): void {
+    const menu = new Menu();
+    menu.addItem((entry) => entry.setTitle("Export workspace").setIcon("download").onClick(() => void this.plugin.exportActiveWorkspace()));
+    menu.addItem((entry) => entry.setTitle("Open Workspace Explorer").setIcon("folder-cog").onClick(() => this.plugin.openWorkspaceExplorer()));
+    menu.addItem((entry) => entry.setTitle("Open linked spaces").setIcon("network").onClick(() => this.openLinkedSpaces(workspaceId)));
+    const rect = trigger.getBoundingClientRect(); menu.showAtPosition({ x: rect.right, y: rect.bottom });
+  }
+
+  private renderSearch(root: HTMLElement, workspaceId: string): HTMLElement {
+    const searchWrap = root.createDiv({ cls: "cp-search-wrap" });
+    const search = searchWrap.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search files, groups, tags, labels…", autocomplete: "off" }, value: this.query });
+    const refreshSearch = (): void => this.refreshSearchSurface(searchWrap, workspaceId);
+    search.addEventListener("compositionstart", () => { this.searchComposing = true; });
+    search.addEventListener("compositionend", () => { this.searchComposing = false; this.query = search.value.normalize("NFC"); search.value = this.query; queueMicrotask(refreshSearch); });
+    search.addEventListener("input", (event) => { this.query = search.value; if (this.searchComposing || (event as InputEvent).isComposing) return; refreshSearch(); });
+    search.addEventListener("keydown", (event) => { if (event.key === "ArrowDown") { event.preventDefault(); searchWrap.querySelector<HTMLButtonElement>(".cp-search-suggestion")?.focus(); } else if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); this.searchAssistantOpen = false; this.renderSearchAssistant(searchWrap, workspaceId); } });
+    search.addEventListener("focus", () => { this.searchAssistantOpen = true; this.renderSearchAssistant(searchWrap, workspaceId); });
+    search.addEventListener("pointerdown", () => { if (!this.searchAssistantOpen) { this.searchAssistantOpen = true; this.renderSearchAssistant(searchWrap, workspaceId); } });
+    root.onpointerdown = (event) => { if (this.searchAssistantOpen && !searchWrap.contains(event.target as Node)) { this.searchAssistantOpen = false; this.renderSearchAssistant(searchWrap, workspaceId); search.blur(); } };
+    this.renderSearchAssistant(searchWrap, workspaceId);
+    return searchWrap;
+  }
+
+  private renderWideLayout(root: HTMLElement, workspaceId: string): void {
+    const workspace = this.plugin.store.data.workspaces[workspaceId]; if (!workspace) return;
+    const top = root.createDiv({ cls: "cp-side__top" });
+    const viewport = top.createDiv({ cls: "cp-panel cp-viewport" }); this.renderViewport(viewport, workspaceId);
+    const vDivider = top.createDiv({ cls: "cp-divider cp-divider--vertical" });
+    makeHorizontalDivider(vDivider, (x) => { workspace.sideLayout.viewportRatio = this.horizontalRatio(top, vDivider, x, 160, 180); this.applyLayoutVariables(root, workspace.sideLayout); }, () => this.plugin.store.changed());
+    const outliner = top.createDiv({ cls: "cp-panel cp-outliner" }); this.renderOutliner(outliner, workspaceId);
+    const hDivider = root.createDiv({ cls: "cp-divider cp-divider--horizontal" });
+    const indexes = root.createDiv({ cls: "cp-side__indexes" });
+    makeVerticalDivider(hDivider, (y) => { workspace.sideLayout.topRatio = this.verticalRatio(top, indexes, hDivider, y); this.applyLayoutVariables(root, workspace.sideLayout); }, () => this.plugin.store.changed());
+    const tags = indexes.createDiv({ cls: "cp-panel cp-tag-index" }); this.renderIndex(tags, "Tag index", this.items(workspaceId).flatMap((item) => item.tags), "tag");
+    const iDivider = indexes.createDiv({ cls: "cp-divider cp-divider--vertical" });
+    makeHorizontalDivider(iDivider, (x) => { workspace.sideLayout.indexRatio = this.horizontalRatio(indexes, iDivider, x, 130, 130); this.applyLayoutVariables(root, workspace.sideLayout); }, () => this.plugin.store.changed());
+    const labels = indexes.createDiv({ cls: "cp-panel cp-label-index" }); this.renderIndex(labels, "Label index", this.items(workspaceId).map((item) => item.label).filter(Boolean), "label");
+  }
+
+  private renderCompactLayout(root: HTMLElement, workspaceId: string): void {
+    const workspace = this.plugin.store.data.workspaces[workspaceId]; if (!workspace) return;
+    const tabList = root.createDiv({ cls: "cp-side-tabs", attr: { role: "tablist", "aria-label": "Canvas Palette content" } });
+    for (const [id, label, icon] of [["viewport", "Viewport", "layout-grid"], ["outliner", "Outliner", "list-tree"]] as const) {
+      const selected = workspace.sideLayout.responsiveTab === id;
+      const tab = tabList.createEl("button", { cls: `cp-side-tab${selected ? " is-active" : ""}`, text: label, attr: { role: "tab", id: `cp-side-${id}-${workspaceId}`, "aria-selected": String(selected), "aria-controls": `cp-side-panel-${workspaceId}`, tabindex: selected ? "0" : "-1" } });
+      setIcon(tab.createSpan({ cls: "cp-side-tab__icon" }), icon);
+      tab.addEventListener("click", () => this.selectResponsiveTab(workspaceId, id));
+      tab.addEventListener("keydown", (event) => this.handleResponsiveTabKeydown(event, workspaceId, id));
+    }
+    const indexes = tabList.createEl("button", { cls: "cp-side-indexes-trigger", text: "Indexes", attr: { type: "button", "aria-label": "Open Indexes flyout", "aria-controls": `cp-side-indexes-${workspaceId}`, "aria-expanded": String(this.indexesFlyoutOpen), "data-cp-indexes-trigger": "true" } });
+    setIcon(indexes.createSpan({ cls: "cp-side-tab__icon" }), "tags");
+    indexes.addEventListener("click", () => this.setIndexesFlyoutOpen(!this.indexesFlyoutOpen));
+    const single = root.createDiv({ cls: "cp-side__single", attr: { id: `cp-side-panel-${workspaceId}`, role: "tabpanel", "aria-labelledby": `cp-side-${workspace.sideLayout.responsiveTab}-${workspaceId}` } });
+    const panel = single.createDiv({ cls: `cp-panel ${workspace.sideLayout.responsiveTab === "viewport" ? "cp-viewport" : "cp-outliner"}` });
+    if (workspace.sideLayout.responsiveTab === "viewport") this.renderViewport(panel, workspaceId); else this.renderOutliner(panel, workspaceId);
+  }
+
+  private selectResponsiveTab(workspaceId: string, tab: "viewport" | "outliner"): void {
+    const workspace = this.plugin.store.data.workspaces[workspaceId]; if (!workspace || workspace.sideLayout.responsiveTab === tab) return;
+    workspace.sideLayout.responsiveTab = tab;
+    this.plugin.store.changed();
+    queueMicrotask(() => this.contentEl.querySelector<HTMLElement>(`#cp-side-${tab}-${CSS.escape(workspaceId)}`)?.focus());
+  }
+
+  private handleResponsiveTabKeydown(event: KeyboardEvent, workspaceId: string, tab: "viewport" | "outliner"): void {
+    const tabs: Array<"viewport" | "outliner"> = ["viewport", "outliner"];
+    const index = tabs.indexOf(tab);
+    let next: "viewport" | "outliner" | null = null;
+    if (event.key === "ArrowLeft") next = tabs[(index + tabs.length - 1) % tabs.length];
+    else if (event.key === "ArrowRight") next = tabs[(index + 1) % tabs.length];
+    else if (event.key === "Home") next = tabs[0];
+    else if (event.key === "End") next = tabs[tabs.length - 1];
+    else if (event.key === "Enter" || event.key === " ") next = tab;
+    if (!next) return;
+    event.preventDefault(); this.selectResponsiveTab(workspaceId, next);
+  }
+
+  private setIndexesFlyoutOpen(open: boolean): void {
+    if (this.layoutMode === "wide") return;
+    this.indexesFlyoutOpen = open;
+    this.render();
+    queueMicrotask(() => {
+      if (open) this.contentEl.ownerDocument.querySelector<HTMLElement>(".cp-side-indexes-flyout [role=tab]")?.focus();
+      else this.contentEl.querySelector<HTMLElement>("[data-cp-indexes-trigger]")?.focus();
+    });
+  }
+
+  private renderIndexesFlyout(root: HTMLElement, workspaceId: string): void {
+    const doc = root.ownerDocument;
+    const rootRect = root.getBoundingClientRect();
+    const placement = attachedFlyoutPlacement(window.innerWidth, rootRect.left, rootRect.width, "left", 320);
+    const flyout = doc.body.createDiv({ cls: `canvas-palette cp-side-indexes-flyout cp-theme-${this.plugin.store.data.settings.theme} is-${placement.side}`, attr: { id: `cp-side-indexes-${workspaceId}`, role: "dialog", "aria-label": "Indexes" } });
+    flyout.style.width = `${placement.width}px`;
+    flyout.style.top = `${Math.max(8, rootRect.top)}px`;
+    flyout.style.height = `${Math.max(180, Math.min(rootRect.height, window.innerHeight - Math.max(8, rootRect.top) - 8))}px`;
+    flyout.style.left = `${placement.side === "left" ? Math.max(8, rootRect.left - placement.width - 8) : Math.min(window.innerWidth - placement.width - 8, rootRect.right + 8)}px`;
+    if (this.plugin.store.data.settings.accentMode === "custom") flyout.style.setProperty("--cp-accent", this.plugin.store.data.settings.accentColor);
+    const heading = flyout.createDiv({ cls: "cp-side-indexes-flyout__header" }); heading.createEl("h4", { text: "Indexes" });
+    iconButton(heading, "x", "Close Indexes flyout", () => this.setIndexesFlyoutOpen(false));
+    const tabs = flyout.createDiv({ cls: "cp-index-tabs", attr: { role: "tablist", "aria-label": "Index type" } });
+    for (const [kind, label] of [["tag", "Tags"], ["label", "Labels"]] as const) {
+      const selected = this.activeIndexTab === kind;
+      const tab = tabs.createEl("button", { cls: selected ? "is-active" : "", text: label, attr: { role: "tab", "aria-selected": String(selected), tabindex: selected ? "0" : "-1" } });
+      tab.addEventListener("click", () => this.selectIndexTab(kind));
+      tab.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End", "Enter", " "].includes(event.key)) return;
+        event.preventDefault(); this.selectIndexTab(event.key === "ArrowLeft" || event.key === "End" ? "label" : "tag");
+      });
+    }
+    const panel = flyout.createDiv({ cls: `cp-panel cp-${this.activeIndexTab}-index` });
+    if (this.activeIndexTab === "tag") this.renderIndex(panel, "Tag index", this.items(workspaceId).flatMap((item) => item.tags), "tag", false);
+    else this.renderIndex(panel, "Label index", this.items(workspaceId).map((item) => item.label).filter(Boolean), "label", false);
+    const onPointerDown = (event: PointerEvent): void => {
+      if (flyout.contains(event.target as Node) || root.contains(event.target as Node)) return;
+      window.setTimeout(() => this.setIndexesFlyoutOpen(false), 0);
+    };
+    const onKeydown = (event: KeyboardEvent): void => { if (event.key === "Escape") { event.preventDefault(); this.setIndexesFlyoutOpen(false); } };
+    doc.addEventListener("pointerdown", onPointerDown, true); doc.addEventListener("keydown", onKeydown, true);
+    this.indexesFlyoutCleanup = () => { doc.removeEventListener("pointerdown", onPointerDown, true); doc.removeEventListener("keydown", onKeydown, true); flyout.remove(); };
+  }
+
+  private selectIndexTab(tab: "tag" | "label"): void {
+    if (this.activeIndexTab === tab) return;
+    this.activeIndexTab = tab;
+    this.render();
+    queueMicrotask(() => this.contentEl.ownerDocument.querySelector<HTMLElement>(`.cp-side-indexes-flyout [role=tab][aria-selected="true"]`)?.focus());
+  }
+
+  private captureScrollMemory(root: HTMLElement): void {
+    for (const selector of this.scrollSelectors) {
+      const panel = root.querySelector<HTMLElement>(selector);
+      if (panel) this.scrollMemory[selector] = panel.scrollTop;
+    }
+  }
+
+  private restoreScrollMemory(root: HTMLElement): void {
+    for (const selector of this.scrollSelectors) {
+      const panel = root.querySelector<HTMLElement>(selector);
+      if (panel && this.scrollMemory[selector] !== undefined) panel.scrollTop = this.scrollMemory[selector];
+    }
+  }
+
+  private observeResponsiveLayout(root: HTMLElement): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? root.clientWidth;
+      const next = sideLayoutMode(width);
+      if (next === this.layoutMode) return;
+      this.layoutMode = next;
+      if (next === "wide") this.indexesFlyoutOpen = false;
+      this.render();
+    });
+    this.resizeObserver.observe(root);
   }
 
   private renderSearchAssistant(parent: HTMLElement, workspaceId: string): void {
@@ -588,8 +740,8 @@ export class SidePaletteView extends ItemView {
     });
   }
 
-  private renderIndex(parent: HTMLElement, title: string, values: string[], kind: "tag" | "label"): void {
-    parent.createEl("h4", { text: title }); const counts = new Map<string, number>(); for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  private renderIndex(parent: HTMLElement, title: string, values: string[], kind: "tag" | "label", showTitle = true): void {
+    if (showTitle) parent.createEl("h4", { text: title }); const counts = new Map<string, number>(); for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
     for (const [value, count] of [...counts].sort((a, b) => b[1] - a[1])) {
       const token = kind === "tag" ? `#${value}` : `label:"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
       const row = parent.createDiv({ cls: "cp-index-row" });

@@ -1,12 +1,24 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
+import { build } from "esbuild";
 import ts from "typescript";
 
 async function loadLayoutModule() {
   const source = await readFile(new URL("../src/ui/responsive-layout.ts", import.meta.url), "utf8");
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
+
+async function loadDefaults() {
+  const directory = await mkdtemp(join(tmpdir(), "canvas-palette-responsive-defaults-"));
+  const outfile = join(directory, "defaults.mjs");
+  await build({ entryPoints: [join(process.cwd(), "src/core/defaults.ts")], outfile, bundle: true, format: "esm", platform: "node" });
+  const module = await import(`${pathToFileURL(outfile).href}?${Date.now()}`);
+  return { ...module, cleanup: () => rm(directory, { recursive: true, force: true }) };
 }
 
 test("Mini responsive modes honor every one-pixel boundary", async () => {
@@ -40,4 +52,13 @@ test("Attached flyouts prefer their requested side and stay within the host", as
   assert.ok(shifted.panelLeft + shifted.width + 8 <= 700);
   const constrained = attachedFlyoutPlacement(500, 0, 360, "right", 300);
   assert.ok(constrained.panelLeft + 360 + 8 + constrained.width <= 500);
+});
+
+test("Side migration defaults responsive tab but keeps a Workspace choice", async () => {
+  const { migrateData, cleanup } = await loadDefaults();
+  const legacy = migrateData({ workspaces: { legacy: { id: "legacy", name: "Legacy", sideLayout: { viewportRatio: 0.5, topRatio: 0.5, indexRatio: 0.5, viewMode: "grid" } } } });
+  assert.equal(legacy.workspaces.legacy.sideLayout.responsiveTab, "viewport");
+  const saved = migrateData({ workspaces: { saved: { id: "saved", name: "Saved", sideLayout: { responsiveTab: "outliner" } } } });
+  assert.equal(saved.workspaces.saved.sideLayout.responsiveTab, "outliner");
+  await cleanup();
 });

@@ -65,6 +65,7 @@ export interface Collection { id: string; workspaceId: string; parentId: string 
 
 export interface SideLayoutState {
   viewportRatio: number; topRatio: number; indexRatio: number; viewMode: AssetViewMode;
+  responsiveTab: "viewport" | "outliner";
   densityLevel: number;
   selectedCollectionId: string | null;
   focusedCollectionId: string | null;

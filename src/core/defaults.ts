@@ -3,6 +3,7 @@ import { ASSET_DENSITY_DEFAULT, legacyDensity } from "../ui/asset-density";
 
 export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
   viewportRatio: 0.52, topRatio: 0.69, indexRatio: 0.5, viewMode: "grid", densityLevel: ASSET_DENSITY_DEFAULT,
+  responsiveTab: "viewport",
   selectedCollectionId: null, focusedCollectionId: null, collapsedCollectionIds: [], collapsedItemIds: [],
   outlinerItemHeight: 30, outlinerFontSize: 13, outlinerIncludeDescendants: true, outlinerWrapTitles: false
 };

@@ -1,6 +1,6 @@
 # Canvas Palette Responsive UI Design Specification
 
-Status: **approved**. Feature 2 is implemented for `0.3.42`; Features 6 and 8 remain governed by this source of truth.
+Status: **approved**. Feature 2 is implemented for `0.3.42`; Feature 6 is implemented for `0.3.43`; Feature 8 remains governed by this source of truth.
 
 ## Reference findings
 
