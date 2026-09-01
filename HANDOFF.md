@@ -2,11 +2,12 @@
 
 ## Current state
 
-- Version: `0.3.44`.
+- Version: `0.3.45`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest validated release target: `0.3.44`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Latest release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.44`.
+- Latest validated release target: `0.3.45`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Latest release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.45`.
+- Latest runtime change: `0.3.45`; Side responsive layout is now represented solely by `data-layout-mode`, so compact rules cannot remain after returning to Wide. The Wide Tag/Label split and Index splitter again follow their stored ratios. Mini Collect/Storage uses an explicit solid-accent selected state with text-on-accent foreground, while Side Viewport/Outliner uses an accent-tint selected state with accent foreground, including the Very Narrow icon-only tab.
 - Latest runtime change: `0.3.44`; Mini and Side share responsive interaction tokens for focus-visible, selected controls, Drawer/Flyout surfaces, and reduced motion. Shared icon buttons now always expose `aria-label`, native tooltip, and button type. Mini Collect/Storage and Side Viewport/Outliner tabs expose `tablist`/`tabpanel`, arrows, `Home`/`End`, and `Enter`/`Space`. Both attached Flyouts move focus to their first interactive control, close on `Escape` or outside click, and restore focus to the trigger without changing canonical Item state.
 - `0.3.44` Sandbox validation used the isolated `Obsidian Mini Palette Sandbox` on CDP `9237`. At Mini `360px`, keyboard `ArrowLeft` switched Storage to Collect with the active tab receiving the 2px focus-visible ring; Control Flyout focused within itself and `Escape` closed it, set `aria-expanded=false`, and returned focus to its trigger. Side retained the verified `300px` no-overflow, external Indexes Flyout behavior from `0.3.43`. A full Obsidian restart loaded `0.3.44`; `data.json`, Canvas, and workspace fixtures all matched their backup hashes afterward.
 - Latest runtime change: `0.3.43`; Side Palette measures its host at `520/360/300px`. Wide retains its Viewport/Outliner and Tag/Label split panes. Medium and Very Narrow use a Workspace-persisted `Viewport | Outliner` tab, retain the existing search, selection, Workspace, Collection, density, and hierarchy state, and open Tag/Label in a session-only Indexes flyout attached to the Canvas-side left edge of Side Palette. The flyout uses `Tags | Labels` tabs, closes through its trigger, close button, `Escape`, or outside click, and returns focus to the trigger. Header secondary actions move into native Overflow at compact widths without removing Export, Workspace Explorer, or linked-space access.

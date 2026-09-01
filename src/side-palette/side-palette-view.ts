@@ -78,7 +78,6 @@ export class SidePaletteView extends ItemView {
     root.dataset.cpWorkspaceId = workspace.id;
     this.layoutMode = sideLayoutMode(root.clientWidth || root.parentElement?.clientWidth || window.innerWidth);
     root.dataset.layoutMode = this.layoutMode;
-    root.addClass(`cp-side-layout--${this.layoutMode}`);
     if (this.layoutMode === "wide") this.indexesFlyoutOpen = false;
     this.applyLayoutVariables(root, workspace.sideLayout);
     this.renderHeader(root, workspace.id);
