@@ -2,12 +2,13 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.43**
+Current version: **0.3.44**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
+- Mini and Side now share focus, selected-control, flyout, and reduced-motion interaction tokens. Icon-only controls use an accessible name and native tooltip; responsive tabs use `tablist`/`tabpanel`, arrows, `Home`/`End`, `Enter`/`Space`; and each Flyout moves focus to its first control then returns focus to its trigger after dismissal.
 - Side Palette now derives `Wide`, `Medium`, and `Very Narrow` layouts from its measured view width at `520/360/300px`. Wide preserves both split panes; Medium and Very Narrow store a Workspace-local Viewport/Outliner tab and move Tag/Label Indexes into a session-only Canvas-side attached flyout. The flyout closes with `Escape` or outside click, restores trigger focus, and never changes the query, selection, Workspace, Collection, or canonical Item data.
 - Mini Palette now derives `Wide`, `Medium`, `Narrow`, and `Minimum` layouts from its measured outer width at the exact `900/680/480/360px` boundaries. Wide retains the resizable Control/Assets/Preview panes, Medium keeps Assets/Preview with quick controls, and narrower modes keep Assets visible while Control or Preview opens as an attached Canvas-side flyout. The flyout never owns selection, restores focus to its trigger, closes on `Escape` or outside click, and starts closed after reload. Search focus/cursor, selection, density, relay membership, pane widths, and scroll position survive width transitions; restored geometry is clamped into the current Obsidian viewport.
 - Canvas `Collect to Mini Palette` now always opens Mini Palette's `Collect` space. New Canvas material enters Collect, and an already known Canvas item reuses its existing identity in Collect without creating a duplicate or adding it to Storage. Removing that re-collected entry from Collect preserves its existing Side Workspace, Mini Storage membership, Canvas links, and Vault source. Sending from Side remains the separate, explicit route to Mini Storage.

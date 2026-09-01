@@ -11,7 +11,7 @@ export const TYPE_ICON: Record<PaletteItemType, string> = {
 };
 
 export function iconButton(parent: HTMLElement, icon: string, label: string, onClick: () => void): HTMLButtonElement {
-  const button = parent.createEl("button", { cls: "clickable-icon cp-icon-button", attr: { "aria-label": label } });
+  const button = parent.createEl("button", { cls: "clickable-icon cp-icon-button", attr: { "aria-label": label, title: label, "data-tooltip-position": "top", type: "button" } });
   setIcon(button, icon);
   button.addEventListener("click", onClick);
   return button;

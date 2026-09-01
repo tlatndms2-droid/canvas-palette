@@ -85,7 +85,7 @@ export class FloatingMiniPalette {
     this.applyAccent(panel);
     const header = panel.createDiv({ cls: "cp-mini-float__header" });
     const handle = header.createDiv({ cls: "cp-window-handle" }); setIcon(handle, "grip-vertical"); handle.createSpan({ text: "Mini Palette" }); this.makeDraggable(header, panel);
-    const tabs = header.createDiv({ cls: "cp-tabs" }); this.tabButton(tabs, "collect", `Collect (${this.plugin.store.data.pendingItemIds.length})`); this.tabButton(tabs, "storage", `Storage (${this.storageCandidates().length})`);
+    const tabs = header.createDiv({ cls: "cp-tabs", attr: { role: "tablist", "aria-label": "Mini Palette spaces" } }); this.tabButton(tabs, "collect", `Collect (${this.plugin.store.data.pendingItemIds.length})`); this.tabButton(tabs, "storage", `Storage (${this.storageCandidates().length})`);
     const actions = header.createDiv({ cls: "cp-window-actions" });
     iconButton(actions, "settings", "Canvas Palette settings", () => this.plugin.openSettings());
     iconButton(actions, "x", "Close Mini Palette", () => this.close());
@@ -101,12 +101,27 @@ export class FloatingMiniPalette {
   }
 
   private tabButton(parent: HTMLElement, tab: "collect" | "storage", label: string): void {
-    const button = parent.createEl("button", { text: label, cls: this.plugin.store.data.uiState.miniPalette.tab === tab ? "is-active" : "" });
-    button.addEventListener("click", () => { const state = this.plugin.store.data.uiState.miniPalette; state.tab = tab; this.inspectorItemId = null; if (tab === "storage") state.focusedItemId = null; this.plugin.store.changed(); });
+    const selected = this.plugin.store.data.uiState.miniPalette.tab === tab;
+    const button = parent.createEl("button", { text: label, cls: selected ? "is-active" : "", attr: { role: "tab", id: `cp-mini-tab-${tab}`, "aria-selected": String(selected), "aria-controls": "cp-mini-content", tabindex: selected ? "0" : "-1" } });
+    button.addEventListener("click", () => this.selectMiniTab(tab));
+    button.addEventListener("keydown", (event) => {
+      const tabs: Array<"collect" | "storage"> = ["collect", "storage"];
+      const index = tabs.indexOf(tab);
+      const next = event.key === "ArrowLeft" ? tabs[(index + 1) % tabs.length] : event.key === "ArrowRight" ? tabs[(index + 1) % tabs.length] : event.key === "Home" ? "collect" : event.key === "End" ? "storage" : event.key === "Enter" || event.key === " " ? tab : null;
+      if (!next) return;
+      event.preventDefault(); this.selectMiniTab(next);
+    });
+  }
+
+  private selectMiniTab(tab: "collect" | "storage"): void {
+    const state = this.plugin.store.data.uiState.miniPalette;
+    if (state.tab === tab) return;
+    state.tab = tab; this.inspectorItemId = null; if (tab === "storage") state.focusedItemId = null; this.plugin.store.changed();
+    queueMicrotask(() => this.panel?.querySelector<HTMLElement>(`#cp-mini-tab-${tab}`)?.focus());
   }
 
   private renderCollect(panel: HTMLElement): void {
-    const body = panel.createDiv({ cls: "cp-collect-screen" });
+    const body = panel.createDiv({ cls: "cp-collect-screen", attr: { id: "cp-mini-content", role: "tabpanel", "aria-labelledby": "cp-mini-tab-collect" } });
     const search = body.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search pending items…" }, value: this.search });
     const summary = body.createDiv({ cls: "cp-collect-summary" });
     const list = body.createDiv({ cls: "cp-pending-list cp-asset-grid" });
@@ -158,7 +173,7 @@ export class FloatingMiniPalette {
     const state = this.plugin.store.data.uiState.miniPalette;
     const showLeftPane = this.layoutMode === "wide" && state.leftPaneOpen;
     const showRightPane = (this.layoutMode === "wide" || this.layoutMode === "medium") && state.rightPaneOpen;
-    const shell = panel.createDiv({ cls: `cp-storage-shell${showLeftPane ? " has-left" : ""}${showRightPane ? " has-right" : ""}` });
+    const shell = panel.createDiv({ cls: `cp-storage-shell${showLeftPane ? " has-left" : ""}${showRightPane ? " has-right" : ""}`, attr: { id: "cp-mini-content", role: "tabpanel", "aria-labelledby": "cp-mini-tab-storage" } });
     if (showLeftPane) { const left = shell.createDiv({ cls: "cp-storage-left" }); this.renderLeftPane(left); const divider = shell.createDiv({ cls: "cp-divider cp-divider--vertical" }); makeHorizontalDivider(divider, (x) => { const rect = panel.getBoundingClientRect(); state.leftPaneWidth = Math.max(190, Math.min(390, x - rect.left)); panel.style.setProperty("--cp-left-pane-width", `${state.leftPaneWidth}px`); }, () => this.plugin.store.changed()); }
     const main = shell.createDiv({ cls: "cp-storage-main" }); this.renderStorageMain(main);
     if (showRightPane) { const divider = shell.createDiv({ cls: "cp-divider cp-divider--vertical" }); makeHorizontalDivider(divider, (x) => { const rect = panel.getBoundingClientRect(); state.rightPaneWidth = Math.max(240, Math.min(460, rect.right - x)); panel.style.setProperty("--cp-right-pane-width", `${state.rightPaneWidth}px`); }, () => this.plugin.store.changed()); const right = shell.createDiv({ cls: "cp-storage-right" }); this.rightPane = right; this.renderRightPane(right); }
