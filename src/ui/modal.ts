@@ -1,4 +1,4 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, Modal, Setting, TFile } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { Collection, PaletteItem, PaletteMetadata } from "../core/types";
 import { createLabelColorPicker } from "./label-color-picker";
@@ -131,6 +131,51 @@ export class ConfirmCanvasReplacementModal extends Modal {
     this.onResolve(confirmed);
     this.close();
   }
+}
+
+export class CanvasTargetModal extends Modal {
+  private selectedPath: string | null;
+  private resolved = false;
+  constructor(app: App, private readonly files: TFile[], activePath: string | null, private readonly onResolve: (file: TFile | null) => void) { super(app); this.selectedPath = activePath && files.some((file) => file.path === activePath) ? activePath : files[0]?.path ?? null; }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-canvas-target-modal");
+    this.contentEl.createEl("h2", { text: "Choose Canvas" });
+    this.contentEl.createEl("p", { text: "Choose an existing Canvas, then click an empty area to place the export." });
+    const search = this.contentEl.createEl("input", { attr: { type: "search", placeholder: "Search Canvas files…", "aria-label": "Search Canvas files" } });
+    const list = this.contentEl.createDiv({ cls: "cp-canvas-target-list" });
+    const render = (): void => {
+      list.empty(); const query = search.value.trim().toLocaleLowerCase();
+      for (const file of this.files.filter((candidate) => !query || candidate.path.toLocaleLowerCase().includes(query))) {
+        const row = list.createEl("button", { cls: "cp-canvas-target-row", text: file.path, attr: { type: "button", "aria-pressed": String(file.path === this.selectedPath) } });
+        if (file.path === this.selectedPath) row.addClass("is-active");
+        row.addEventListener("click", () => { this.selectedPath = file.path; render(); });
+      }
+      if (list.childElementCount === 0) list.createDiv({ cls: "cp-empty", text: "No matching Canvas files." });
+    };
+    search.addEventListener("input", render); render();
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.finish(null));
+    actions.createEl("button", { text: "Choose Canvas", cls: "mod-cta" }).addEventListener("click", () => this.finish(this.files.find((file) => file.path === this.selectedPath) ?? null));
+    window.requestAnimationFrame(() => search.focus());
+  }
+  onClose(): void { if (!this.resolved) this.finish(null); this.contentEl.empty(); }
+  private finish(file: TFile | null): void { if (this.resolved) return; this.resolved = true; this.onResolve(file); this.close(); }
+}
+
+export class ConfirmExportDuplicateModal extends Modal {
+  private resolved = false;
+  constructor(app: App, private readonly count: number, private readonly onResolve: (choice: "replace" | "copy" | null) => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-confirm-modal");
+    this.contentEl.createEl("h2", { text: "Some exported items are already on this Canvas" });
+    this.contentEl.createEl("p", { text: `${this.count} linked item${this.count === 1 ? " is" : "s are"} already placed on the target Canvas.` });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.finish(null));
+    actions.createEl("button", { text: "Keep existing and add", cls: "mod-cta" }).addEventListener("click", () => this.finish("copy"));
+    actions.createEl("button", { text: "Replace existing", cls: "mod-warning" }).addEventListener("click", () => this.finish("replace"));
+  }
+  onClose(): void { if (!this.resolved) this.finish(null); this.contentEl.empty(); }
+  private finish(choice: "replace" | "copy" | null): void { if (this.resolved) return; this.resolved = true; this.onResolve(choice); this.close(); }
 }
 
 export class TagLabelModal extends Modal {

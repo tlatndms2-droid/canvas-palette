@@ -1,5 +1,6 @@
 import { Editor, EventRef, Menu, Notice, Plugin, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
 import { CanvasAdapter } from "./canvas/canvas-adapter";
+import { ExportPlacementController } from "./canvas/export-placement-controller";
 import { mergeCanvasNodeIds } from "./core/canvas-node-presence";
 import { CanvasMetadataController } from "./canvas/canvas-metadata-controller";
 import { CanvasNodeToolbarController } from "./canvas/canvas-node-toolbar-controller";
@@ -14,7 +15,7 @@ import { PreviewService } from "./preview/preview-service";
 import { SearchService } from "./search/search-service";
 import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
-import { AlreadySavedToWorkspaceModal, ConfirmCanvasReplacementModal, ConfirmDeleteModal, ConfirmForeignCanvasWorkspaceModal, ItemEditorModal, MetadataEditorModal, TextPromptModal } from "./ui/modal";
+import { AlreadySavedToWorkspaceModal, CanvasTargetModal, ConfirmDeleteModal, ConfirmExportDuplicateModal, ConfirmForeignCanvasWorkspaceModal, ItemEditorModal, MetadataEditorModal, TextPromptModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 import { FindLinkModal } from "./ui/find-link-modal";
 import { WorkspaceExplorerModal } from "./ui/workspace-explorer-modal";
@@ -30,9 +31,9 @@ export default class CanvasPalettePlugin extends Plugin {
     (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId),
     (canvasPath, records) => this.store.restoreCanvasNodeMetadata(canvasPath, records),
     (item, canvasPath) => this.store.linkedCanvasNodes(item).filter((location) => location.canvasPath === canvasPath).map((location) => location.nodeId),
-    () => new Promise<boolean>((resolve) => new ConfirmCanvasReplacementModal(this.app, resolve).open()),
     (itemId, canvasPath, removedNodeIds, newNodeIds, existingNodeIds) => this.store.replaceCanvasPlacement(itemId, canvasPath, removedNodeIds, newNodeIds, existingNodeIds)
   );
+  exportPlacement = new ExportPlacementController(this.canvas);
   canvasMetadata = new CanvasMetadataController(this, this.canvas);
   canvasToolbar = new CanvasNodeToolbarController(this.canvas, {
     editMetadata: (nodes) => this.editCanvasNodesMetadata(nodes),
@@ -95,6 +96,7 @@ export default class CanvasPalettePlugin extends Plugin {
     this.registerEvent(this.app.vault.on("create", (file) => { if (file instanceof TFile && file.extension.toLowerCase() === "md") void this.reconnectMovedMarkdown(file); }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
       const context = this.canvas.activeContext();
+      if (!this.exportPlacement.isFor(context)) this.exportPlacement.cancel();
       if (context) {
         const changedCanvas = context.file.path !== this.lastCanvasPath;
         this.lastCanvasPath = context.file.path;
@@ -123,7 +125,7 @@ export default class CanvasPalettePlugin extends Plugin {
     this.canvasMetadata.refreshSoon();
   }
 
-  async onunload(): Promise<void> { for (const timer of this.canvasSyncTimers.values()) window.clearTimeout(timer); this.canvasSyncTimers.clear(); this.canvasToolbar.destroy(); this.canvasMetadata.destroy(); this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
+  async onunload(): Promise<void> { for (const timer of this.canvasSyncTimers.values()) window.clearTimeout(timer); this.canvasSyncTimers.clear(); this.exportPlacement.cancel(); this.canvasToolbar.destroy(); this.canvasMetadata.destroy(); this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
 
   activeWorkspace(): PaletteWorkspace | undefined {
     const id = this.store.data.uiState.activeWorkspaceId;
@@ -282,13 +284,8 @@ export default class CanvasPalettePlugin extends Plugin {
 
   async exportItemsToActiveCanvas(itemIds: string[]): Promise<boolean> {
     const items = [...new Set(itemIds)].map((id) => this.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
-    const canvas = this.canvas.activeContainer();
-    if (!canvas || items.length === 0) {
-      new Notice(items.length === 0 ? "Select one or more Mini Palette items first." : "Open a Canvas before exporting items.");
-      return false;
-    }
-    const rect = canvas.getBoundingClientRect();
-    return this.canvas.restoreItems(items, rect.left + rect.width / 2, rect.top + rect.height / 2);
+    if (items.length === 0) { new Notice("Select one or more Palette items first."); return false; }
+    return this.beginExport((context) => this.canvas.createItemBundle(items, context));
   }
 
   private editCanvasNodesMetadata(nodes: unknown[]): void {
@@ -578,13 +575,27 @@ export default class CanvasPalettePlugin extends Plugin {
   async exportActiveWorkspace(): Promise<void> {
     const workspace = this.activeWorkspace();
     if (!workspace) return;
-    await this.canvas.exportCollection(`${workspace.name} Export`, this.exportTree(workspace.id));
+    await this.beginExport((context) => this.canvas.createTreeBundle(this.exportTree(workspace.id), context));
   }
 
   async exportCollectionSubtree(collectionId: string): Promise<void> {
     const collection = this.store.data.collections[collectionId];
     if (!collection) return;
-    await this.canvas.exportCollection(`${collection.name} Export`, this.exportTree(collection.workspaceId, collectionId));
+    await this.beginExport((context) => this.canvas.createTreeBundle(this.exportTree(collection.workspaceId, collectionId), context));
+  }
+
+  private async beginExport(createBundle: (context: import("./canvas/canvas-adapter").CanvasContext) => import("./canvas/canvas-adapter").ExportBundle): Promise<boolean> {
+    const target = await new Promise<TFile | null>((resolve) => new CanvasTargetModal(this.app, this.canvas.canvasFiles(), this.canvas.activeContext()?.file.path ?? this.lastCanvasPath, resolve).open());
+    if (!target) return false;
+    const context = await this.canvas.openContext(target);
+    if (!context) { new Notice("Unable to open the selected Canvas."); return false; }
+    const bundle = createBundle(context);
+    if (bundle.nodes.length === 0) { new Notice(bundle.warnings[0] ?? "There is nothing available to export."); return false; }
+    const duplicateItemIds = this.canvas.bundleDuplicateItemIds(bundle, context);
+    const mode = duplicateItemIds.length === 0 ? "copy" : await new Promise<"replace" | "copy" | null>((resolve) => new ConfirmExportDuplicateModal(this.app, duplicateItemIds.length, resolve).open());
+    if (!mode) return false;
+    this.exportPlacement.start(context, bundle, mode);
+    return true;
   }
 
   private exportTree(workspaceId: string, rootCollectionId?: string): Array<{ id: string; name: string; parentId: string | null; item?: PaletteItem }> {

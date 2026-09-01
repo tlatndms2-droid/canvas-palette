@@ -9,7 +9,8 @@
 - Group restore remaps every node and edge ID.
 - Export materialization preserves canonical Mini IDs, restores Card/MD/Image/Group types, and reports skipped missing sources once per batch.
 - Group snapshot migration preserves legacy `nodeBacks` and per-node metadata when remapping Nodes and Edges.
-- Workspace and Collection subtree export preserve Outliner order, item child hierarchy, and right-to-left hierarchy edges.
+- Export Bundle creation keeps the Canvas and Palette Store unchanged until the final placement commit; no Export path creates a new `.canvas` file.
+- Workspace and Collection subtree bundles preserve Outliner order, item child hierarchy, and right-to-left hierarchy edges.
 
 ## Manual in Obsidian
 
@@ -17,7 +18,9 @@
 - Open a Canvas; verify the hover trigger mounts, Mini Palette opens, moves, resizes, and closes without affecting Canvas editing.
 - Collect a Canvas text node, MD node, image node, and Group; inspect, import, drag each to another Canvas, and confirm file references and Group edges/layout.
 - Right-click each Canvas Node type and verify the Canvas Palette menu has both Mini Palette and direct Side Palette Workspace destinations, with no equivalent File Explorer collection action.
-- Export a nested Collection to Canvas and verify the tree edge directions.
+- Every Item, Collection, and Workspace Export opens an existing-Canvas picker (active Canvas selected by default), then shows a non-mutating placement preview. Verify `Escape`, target-tab change, and plugin unload remove only the preview.
+- Place Item, nested Collection, and Workspace bundles at a chosen empty Canvas position. Verify an overlapping bundle shows the warning preview and cannot insert, and confirm no new `.canvas` file is created.
+- Export a duplicate bundle and verify `Replace existing`, `Keep existing and add`, and `Cancel` each affect the linked placement only as labelled.
 - From Side, use `Export to Mini Palette`; verify a second export leaves one Mini Storage link and retains the original Workspace and metadata.
 - In Mini Storage, use both the context-menu `Export to Canvas` action and `Place on Canvas`. Check Card text, MD/Image file references without Vault copies, missing MD Card fallback, and missing Image skip.
 - Export a Group with nested groups; verify relative placement, valid parent links, internal Edge directions, and each nested node's tags, label, caption, Front/Back metadata.

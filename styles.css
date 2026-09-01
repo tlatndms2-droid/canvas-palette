@@ -180,3 +180,14 @@
 
 /* Shared 0.3.44 interaction tokens for Mini and Side controls. */
 .canvas-palette{--cp-focus-ring:color-mix(in srgb,var(--cp-accent) 78%,white)}.canvas-palette :is(button,input,textarea,select,[role="tab"]):focus-visible{outline:2px solid var(--cp-focus-ring);outline-offset:2px}.canvas-palette .cp-tabs button[role="tab"][aria-selected="true"]{border-color:var(--cp-accent);background:var(--cp-accent);color:var(--text-on-accent,#fff)}.cp-mini-flyout,.cp-side-indexes-flyout{border-color:var(--cp-border);box-shadow:var(--cp-shadow)}@media(prefers-reduced-motion:reduce){.canvas-palette,.canvas-palette *,.cp-side-indexes-flyout,.cp-side-indexes-flyout *{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}
+/* Export placement preview: the Canvas stays unchanged until the final click. */
+.cp-export-placement { position: fixed; z-index: 1000; pointer-events: none; transform-origin: top left; color: var(--text-accent); }
+.cp-export-placement__bounds { position: absolute; inset: 0; border: 2px dashed currentColor; border-radius: var(--radius-s); background: color-mix(in srgb, var(--interactive-accent) 8%, transparent); }
+.cp-export-placement__node { position: absolute; box-sizing: border-box; overflow: hidden; padding: 8px; border: 2px solid currentColor; border-radius: var(--radius-s); background: color-mix(in srgb, var(--background-primary) 82%, var(--interactive-accent)); font-size: 12px; line-height: 1.3; }
+.cp-export-placement__node--group { border-style: dashed; background: color-mix(in srgb, var(--background-secondary) 76%, var(--interactive-accent)); }
+.cp-export-placement__edges { position: absolute; inset: 0; overflow: visible; }
+.cp-export-placement__edges line { stroke: currentColor; stroke-width: 2; stroke-dasharray: 6 4; }
+.cp-export-placement.is-collision { color: var(--text-error); }
+.cp-export-placement.is-collision .cp-export-placement__bounds, .cp-export-placement.is-collision .cp-export-placement__node { background: color-mix(in srgb, var(--background-primary) 78%, var(--text-error)); }
+.cp-canvas-target-list { display: grid; gap: 6px; max-height: 320px; margin: 12px 0; overflow: auto; }
+.cp-canvas-target-row { width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

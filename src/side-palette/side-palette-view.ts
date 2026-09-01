@@ -107,7 +107,7 @@ export class SidePaletteView extends ItemView {
       : iconButton(header, "send", "Export selected items to Mini Palette", () => this.plugin.sendItemsToMini(this.sideSelectedIds()));
     if (this.layoutMode === "wide") send.addEventListener("click", () => this.plugin.sendItemsToMini(this.sideSelectedIds()));
     if (this.layoutMode === "wide") {
-      const exportButton = header.createEl("button", { text: "Export" });
+      const exportButton = header.createEl("button", { text: "Export Workspace to Canvas" });
       exportButton.addEventListener("click", () => void this.plugin.exportActiveWorkspace());
     } else {
       const more = iconButton(header, "ellipsis", "More Canvas Palette actions", () => this.openHeaderMenu(more, workspaceId));
@@ -125,7 +125,7 @@ export class SidePaletteView extends ItemView {
 
   private openHeaderMenu(trigger: HTMLElement, workspaceId: string): void {
     const menu = new Menu();
-    menu.addItem((entry) => entry.setTitle("Export workspace").setIcon("download").onClick(() => void this.plugin.exportActiveWorkspace()));
+    menu.addItem((entry) => entry.setTitle("Export Workspace to Canvas").setIcon("download").onClick(() => void this.plugin.exportActiveWorkspace()));
     menu.addItem((entry) => entry.setTitle("Open Workspace Explorer").setIcon("folder-cog").onClick(() => this.plugin.openWorkspaceExplorer()));
     menu.addItem((entry) => entry.setTitle("Open linked spaces").setIcon("network").onClick(() => this.openLinkedSpaces(workspaceId)));
     const rect = trigger.getBoundingClientRect(); menu.showAtPosition({ x: rect.right, y: rect.bottom });
@@ -836,6 +836,7 @@ export class SidePaletteView extends ItemView {
       .setIcon(allInMini ? "unlink" : "send")
       .setChecked(allInMini)
       .onClick(() => allInMini ? this.plugin.store.removeMiniStorageItems(targetIds) : this.plugin.sendItemsToMini(targetIds)));
+    menu.addItem((entry) => entry.setTitle(`Export ${targetIds.length} item${targetIds.length === 1 ? "" : "s"} to Canvas`).setIcon("share-2").onClick(() => void this.plugin.exportItemsToActiveCanvas(targetIds)));
     if (workspace) menu.addItem((entry) => entry.setTitle("Move to…").setIcon("folder-input").onClick(() => new MoveItemsModal(this.app, workspace.name, Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id), targetIds.length, (collectionId) => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collectionId)).open()));
     const linkedLocations = this.plugin.store.linkedCanvasLocations(item);
     if (linkedLocations.length > 0) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => this.plugin.findLinkedCanvas(item)));

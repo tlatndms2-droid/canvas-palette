@@ -1,4 +1,4 @@
-import { App, Notice, TFile, normalizePath } from "obsidian";
+import { App, Notice, TFile } from "obsidian";
 import { createId } from "../core/ids";
 import { findMarkdownNodeReplacement } from "../core/canvas-node-replacement";
 import { SerialTaskQueue } from "../core/serial-task-queue";
@@ -31,6 +31,16 @@ export interface CanvasRuntimeNodeLike {
 interface CanvasViewLike { getViewType?: () => string; file?: TFile; containerEl?: HTMLElement; canvas?: CanvasRuntimeLike; }
 export interface CanvasContext { file: TFile; view: CanvasViewLike; runtime: CanvasRuntimeLike; }
 export interface CanvasExportEntry { id: string; name: string; parentId: string | null; item?: PaletteItem; }
+export interface ExportBundle {
+  nodes: CanvasNodeSnapshot[];
+  edges: CanvasEdgeSnapshot[];
+  bounds: { x: 0; y: 0; width: number; height: number };
+  placements: Array<{ itemId: string; nodeIds: string[] }>;
+  metadata: Array<{ nodeId: string; metadata: PaletteMetadata }>;
+  warnings: string[];
+  items: PaletteItem[];
+}
+export type BundleDuplicateMode = "replace" | "copy";
 
 interface RestoredMaterial {
   nodes: CanvasNodeSnapshot[];
@@ -47,7 +57,7 @@ export class CanvasAdapter {
   private readonly restoreQueue = new SerialTaskQueue();
   private readonly previousNodesByCanvas = new Map<string, Map<string, CanvasNodeSnapshot>>();
 
-  constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined, private readonly restoreNodeMetadata: (canvasPath: string, records: Array<{ nodeId: string; metadata: PaletteMetadata }>) => void, private readonly linkedNodes: (item: PaletteItem, canvasPath: string) => string[] = () => [], private readonly confirmReplacement: () => Promise<boolean> = async () => true, private readonly onReplaced: (itemId: string, canvasPath: string, removedNodeIds: string[], newNodeIds: string[], existingNodeIds: Set<string>) => void = () => {}) {}
+  constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined, private readonly restoreNodeMetadata: (canvasPath: string, records: Array<{ nodeId: string; metadata: PaletteMetadata }>) => void, private readonly linkedNodes: (item: PaletteItem, canvasPath: string) => string[] = () => [], private readonly onReplaced: (itemId: string, canvasPath: string, removedNodeIds: string[], newNodeIds: string[], existingNodeIds: Set<string>) => void = () => {}) {}
 
   activeContext(): CanvasContext | null {
     const leaf = this.app.workspace.activeLeaf;
@@ -366,7 +376,7 @@ export class CanvasAdapter {
     if (!context) { new Notice("Open a Canvas before dropping an item."); return false; }
     const point = context.runtime.posFromClient?.({ x: screenX, y: screenY });
     if (!point) { new Notice("Unable to calculate the Canvas drop position."); return false; }
-    return this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, item, point));
+    return this.restoreQueue.enqueue(context.file.path, () => this.commitBundle(context, this.createItemBundle([item], context), point, "copy"));
   }
 
   async restoreItems(items: PaletteItem[], screenX: number, screenY: number): Promise<boolean> {
@@ -374,13 +384,7 @@ export class CanvasAdapter {
     if (!context || items.length === 0) { if (!context) new Notice("Open a Canvas before placing items."); return false; }
     const point = context.runtime.posFromClient?.({ x: screenX, y: screenY });
     if (!point) { new Notice("Unable to calculate the Canvas position."); return false; }
-    const positions = this.batchRestorePositions(items, point);
-    let restored = 0;
-    for (let index = 0; index < items.length; index += 1) {
-      if (await this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, items[index], positions[index], false))) restored += 1;
-    }
-    if (items.length > 1) new Notice(restored === items.length ? `${restored} items added to Canvas.` : `${restored} of ${items.length} items added to Canvas; ${items.length - restored} skipped.`);
-    return restored > 0;
+    return this.restoreQueue.enqueue(context.file.path, () => this.commitBundle(context, this.createItemBundle(items, context), point, "copy"));
   }
 
   async restoreItemFromDrop(item: PaletteItem, event: DragEvent): Promise<boolean> {
@@ -388,7 +392,7 @@ export class CanvasAdapter {
     if (!context) return false;
     const point = context.runtime.posFromEvt?.(event);
     if (!point) { new Notice("Unable to calculate the Canvas drop position."); return false; }
-    return this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, item, point));
+    return this.restoreQueue.enqueue(context.file.path, () => this.commitBundle(context, this.createItemBundle([item], context), point, "copy"));
   }
 
   async restoreItemsFromDrop(items: PaletteItem[], event: DragEvent): Promise<boolean> {
@@ -396,13 +400,7 @@ export class CanvasAdapter {
     if (!context || items.length === 0) return false;
     const point = context.runtime.posFromEvt?.(event);
     if (!point) { new Notice("Unable to calculate the Canvas drop position."); return false; }
-    const positions = this.batchRestorePositions(items, point);
-    let restored = 0;
-    for (let index = 0; index < items.length; index++) {
-      if (await this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, items[index], positions[index], false))) restored++;
-    }
-    if (items.length > 1) new Notice(restored === items.length ? `${restored} items added to Canvas.` : `${restored} of ${items.length} items added to Canvas; ${items.length - restored} skipped.`);
-    return restored > 0;
+    return this.restoreQueue.enqueue(context.file.path, () => this.commitBundle(context, this.createItemBundle(items, context), point, "copy"));
   }
 
   private batchRestorePositions(items: PaletteItem[], point: { x: number; y: number }): Array<{ x: number; y: number }> {
@@ -417,14 +415,46 @@ export class CanvasAdapter {
     return items.map((_item, index) => ({ x: point.x + (index % columns) * columnWidth, y: point.y + Math.floor(index / columns) * rowHeight }));
   }
 
-  async exportCollection(name: string, entries: CanvasExportEntry[]): Promise<TFile | null> {
-    if (entries.length === 0) { new Notice("The collection is empty."); return null; }
-    const context = this.activeContext();
-    const folder = context?.file.parent?.path ?? "";
-    const path = await this.availablePath(normalizePath(`${folder}/${name || "Canvas Palette Export"}.canvas`));
+  createItemBundle(items: PaletteItem[], context: CanvasContext): ExportBundle {
+    const document = this.currentDocument(context);
+    const positions = this.batchRestorePositions(items, { x: 0, y: 0 });
+    const usedNodeIds = new Set(document.nodes.map((node) => node.id));
+    const usedEdgeIds = new Set(document.edges.map((edge) => edge.id));
+    const nodes: CanvasNodeSnapshot[] = [];
+    const edges: CanvasEdgeSnapshot[] = [];
+    const placements: ExportBundle["placements"] = [];
+    const metadata: ExportBundle["metadata"] = [];
+    const warnings: string[] = [];
+    for (const [index, item] of items.entries()) {
+      const point = positions[index] ?? { x: 0, y: 0 };
+      const material = this.materializeItem(item, point.x, point.y, usedNodeIds, usedEdgeIds);
+      if (!material) { warnings.push(`${item.displayTitle}: stored Group data is unavailable.`); continue; }
+      nodes.push(...material.nodes); edges.push(...material.edges); metadata.push(...material.metadata); warnings.push(...material.warnings);
+      if (material.placementNodeIds.length > 0) placements.push({ itemId: item.id, nodeIds: material.placementNodeIds });
+    }
+    return this.normalizeBundle({ nodes, edges, placements, metadata, warnings, items: [...items] });
+  }
+
+  canvasFiles(): TFile[] {
+    return this.app.vault.getFiles().filter((file) => file.extension.toLowerCase() === "canvas").sort((left, right) => left.path.localeCompare(right.path, undefined, { numeric: true }));
+  }
+
+  async openContext(file: TFile): Promise<CanvasContext | null> {
+    const existing = this.openContexts().find((context) => context.file.path === file.path);
+    if (existing) return existing;
+    const leaf = this.app.workspace.getLeaf("tab");
+    await leaf.openFile(file);
+    this.app.workspace.setActiveLeaf(leaf, { focus: true });
+    const view = leaf.view as unknown as CanvasViewLike;
+    return view.file?.path === file.path && view.canvas ? { file, view, runtime: view.canvas } : null;
+  }
+
+  createTreeBundle(entries: CanvasExportEntry[], context: CanvasContext): ExportBundle {
+    if (entries.length === 0) return this.emptyBundle();
     const positions = this.treeLayout(entries);
-    const usedNodeIds = new Set<string>();
-    const usedEdgeIds = new Set<string>();
+    const document = this.currentDocument(context);
+    const usedNodeIds = new Set(document.nodes.map((node) => node.id));
+    const usedEdgeIds = new Set(document.edges.map((edge) => edge.id));
     const canvasNodes: CanvasNodeSnapshot[] = [];
     const edges: CanvasEdgeSnapshot[] = [];
     const anchors = new Map<string, string>();
@@ -445,14 +475,19 @@ export class CanvasAdapter {
     }
     for (const entry of entries) {
       if (!entry.parentId) continue;
-      const fromNode = anchors.get(entry.parentId); const toNode = anchors.get(entry.id);
+      let parentId: string | null = entry.parentId;
+      while (parentId && !anchors.has(parentId)) parentId = entries.find((candidate) => candidate.id === parentId)?.parentId ?? null;
+      const fromNode = parentId ? anchors.get(parentId) : undefined; const toNode = anchors.get(entry.id);
       if (fromNode && toNode) edges.push({ id: this.uniqueId("edge", usedEdgeIds), fromNode, toNode, fromSide: "right", toSide: "left" });
     }
-    const file = await this.app.vault.create(path, JSON.stringify({ nodes: canvasNodes, edges }, null, 2));
-    for (const [itemId, nodeIds] of restoredByItem) this.onRestored(itemId, file.path, nodeIds);
-    this.restoreNodeMetadata(file.path, metadata);
-    new Notice(warnings.length > 0 ? `Collection exported to ${file.name}; ${warnings.length} item reference${warnings.length === 1 ? "" : "s"} need attention.` : `Collection exported to ${file.name}`);
-    return file;
+    return this.normalizeBundle({
+      nodes: canvasNodes,
+      edges,
+      placements: [...restoredByItem.entries()].map(([itemId, nodeIds]) => ({ itemId, nodeIds })),
+      metadata,
+      warnings,
+      items: entries.flatMap((entry) => entry.item ? [entry.item] : [])
+    });
   }
 
   private async itemFromNode(node: CanvasNodeSnapshot, canvasPath: string): Promise<PaletteItem> {
@@ -494,7 +529,8 @@ export class CanvasAdapter {
     }
     const restored = this.restoreNodeForItem(item, x, y, () => this.uniqueId("node", usedNodeIds));
     if (!restored.node) return { nodes: [], edges: [], anchorNodeId: null, placementNodeIds: [], metadata: [], warnings: restored.warning ? [restored.warning] : [] };
-    return { nodes: [restored.node], edges: [], anchorNodeId: restored.node.id, placementNodeIds: [restored.node.id], metadata: [], warnings: restored.warning ? [restored.warning] : [] };
+    const metadata: PaletteMetadata = { tags: [...item.tags], label: item.label, labelColor: item.labelColor, caption: item.caption, backContent: item.backContent, currentFace: "front", facesEnabled: item.facesEnabled, modifiedAt: item.modifiedAt };
+    return { nodes: [restored.node], edges: [], anchorNodeId: restored.node.id, placementNodeIds: [restored.node.id], metadata: [{ nodeId: restored.node.id, metadata }], warnings: restored.warning ? [restored.warning] : [] };
   }
 
   private restoreNodeForItem(item: PaletteItem, x: number, y: number, nextId: () => string): { node: CanvasNodeSnapshot | null; warning?: string } {
@@ -539,18 +575,97 @@ export class CanvasAdapter {
     const xByDepth = new Map<number, number>();
     for (let depth = 1; depth <= Math.max(0, ...maxWidth.keys()); depth++) xByDepth.set(depth, (xByDepth.get(depth - 1) ?? 0) + (maxWidth.get(depth - 1) ?? 300) + 80);
     const layout = new Map<string, { x: number; y: number }>();
-    let cursor = 0;
-    const place = (id: string): { y: number; height: number } => {
-      const entry = byId.get(id); if (!entry) return { y: cursor, height: 0 };
-      const childIds = children.get(id) ?? []; const own = size(entry);
-      const childBoxes = childIds.map(place);
-      const y = childBoxes.length === 0 ? cursor : (childBoxes[0].y + childBoxes.at(-1)!.y + childBoxes.at(-1)!.height - own.height) / 2;
-      if (childBoxes.length === 0) cursor += own.height + 56;
-      layout.set(id, { x: xByDepth.get(depthOf(id)) ?? 0, y });
-      return { y, height: own.height };
+    const footprint = new Map<string, number>();
+    const heightOf = (id: string): number => {
+      if (footprint.has(id)) return footprint.get(id)!;
+      const entry = byId.get(id); if (!entry) return 0;
+      const own = size(entry).height;
+      const childHeights = (children.get(id) ?? []).map(heightOf);
+      const height = Math.max(own, childHeights.reduce((sum, value) => sum + value, 0) + Math.max(0, childHeights.length - 1) * 56);
+      footprint.set(id, height);
+      return height;
     };
-    for (const id of roots) place(id);
+    const place = (id: string, top: number): void => {
+      const entry = byId.get(id); if (!entry) return;
+      const own = size(entry); const total = heightOf(id); const childIds = children.get(id) ?? [];
+      layout.set(id, { x: xByDepth.get(depthOf(id)) ?? 0, y: top + (total - own.height) / 2 });
+      const childrenHeight = childIds.reduce((sum, childId) => sum + heightOf(childId), 0) + Math.max(0, childIds.length - 1) * 56;
+      let childTop = top + (total - childrenHeight) / 2;
+      for (const childId of childIds) { place(childId, childTop); childTop += heightOf(childId) + 56; }
+    };
+    let rootTop = 0;
+    for (const id of roots) { place(id, rootTop); rootTop += heightOf(id) + 56; }
     return layout;
+  }
+
+  bundleDuplicateItemIds(bundle: ExportBundle, context: CanvasContext): string[] {
+    const document = this.currentDocument(context);
+    const present = new Set(document.nodes.map((node) => node.id));
+    return bundle.items.filter((item) => this.linkedNodes(item, context.file.path).some((id) => present.has(id))).map((item) => item.id);
+  }
+
+  bundleDuplicateNodeIds(bundle: ExportBundle, context: CanvasContext): Set<string> {
+    const document = this.currentDocument(context);
+    const roots = bundle.items.flatMap((item) => this.linkedNodes(item, context.file.path));
+    return new Set(this.expandGroupNodes(document.nodes, roots).map((node) => node.id));
+  }
+
+  bundleCollides(context: CanvasContext, bundle: ExportBundle, origin: { x: number; y: number }, ignoredNodeIds = new Set<string>()): boolean {
+    const document = this.currentDocument(context);
+    const left = origin.x; const top = origin.y; const right = left + bundle.bounds.width; const bottom = top + bundle.bounds.height;
+    return document.nodes.some((node) => !ignoredNodeIds.has(node.id) && left < node.x + node.width && right > node.x && top < node.y + node.height && bottom > node.y);
+  }
+
+  async commitBundle(context: CanvasContext, bundle: ExportBundle, origin: { x: number; y: number }, duplicateMode: BundleDuplicateMode): Promise<boolean> {
+    if (bundle.nodes.length === 0 || bundle.placements.length === 0) { new Notice(bundle.warnings[0] ?? "There is nothing available to place on Canvas."); return false; }
+    const current = context.runtime.getData?.();
+    if (!current || typeof current !== "object" || !context.runtime.setData) { new Notice("This Canvas runtime cannot accept placed items."); return false; }
+    const document = this.parse(JSON.stringify(current));
+    const linkedRoots = new Map<string, string[]>();
+    for (const item of bundle.items) linkedRoots.set(item.id, this.linkedNodes(item, context.file.path).filter((id) => document.nodes.some((node) => node.id === id)));
+    const removedNodeIds = new Set<string>();
+    if (duplicateMode === "replace") for (const ids of linkedRoots.values()) for (const node of this.expandGroupNodes(document.nodes, ids)) removedNodeIds.add(node.id);
+    if (this.bundleCollidesInDocument(document, bundle, origin, removedNodeIds)) { new Notice("Choose an empty Canvas area before placing this export."); return false; }
+    const retainedNodeIds = new Set(document.nodes.filter((node) => !removedNodeIds.has(node.id)).map((node) => node.id));
+    const retainedEdgeIds = new Set(document.edges.filter((edge) => !removedNodeIds.has(edge.fromNode) && !removedNodeIds.has(edge.toNode)).map((edge) => edge.id));
+    if (bundle.nodes.some((node) => retainedNodeIds.has(node.id)) || bundle.edges.some((edge) => retainedEdgeIds.has(edge.id))) { new Notice("Canvas changed while preparing this export. Start the placement again."); return false; }
+    const placedNodes = bundle.nodes.map((node) => ({ ...node, x: node.x + origin.x, y: node.y + origin.y }));
+    const next: CanvasDocument = {
+      ...document,
+      nodes: [...document.nodes.filter((node) => !removedNodeIds.has(node.id)), ...placedNodes],
+      edges: [...document.edges.filter((edge) => !removedNodeIds.has(edge.fromNode) && !removedNodeIds.has(edge.toNode)), ...bundle.edges]
+    };
+    try { await context.runtime.setData(next); }
+    catch (error) { console.error("Canvas Palette failed to place an export bundle", error); new Notice("Unable to place the export on Canvas."); return false; }
+    const existingNodeIds = new Set(next.nodes.map((node) => node.id));
+    for (const placement of bundle.placements) {
+      const previous = linkedRoots.get(placement.itemId) ?? [];
+      if (duplicateMode === "replace" && previous.length > 0) this.onReplaced(placement.itemId, context.file.path, previous, placement.nodeIds, existingNodeIds);
+      else this.onRestored(placement.itemId, context.file.path, placement.nodeIds);
+    }
+    this.restoreNodeMetadata(context.file.path, bundle.metadata);
+    context.runtime.requestSave?.();
+    new Notice(bundle.warnings.length > 0 ? `${bundle.placements.length} item${bundle.placements.length === 1 ? "" : "s"} placed with ${bundle.warnings.length} warning${bundle.warnings.length === 1 ? "" : "s"}.` : `${bundle.placements.length} item${bundle.placements.length === 1 ? "" : "s"} placed on Canvas.`);
+    return true;
+  }
+
+  private currentDocument(context: CanvasContext): CanvasDocument {
+    const current = context.runtime.getData?.();
+    return current && typeof current === "object" ? this.parse(JSON.stringify(current)) : { nodes: [], edges: [] };
+  }
+
+  private emptyBundle(): ExportBundle { return { nodes: [], edges: [], bounds: { x: 0, y: 0, width: 0, height: 0 }, placements: [], metadata: [], warnings: [], items: [] }; }
+
+  private normalizeBundle(input: Omit<ExportBundle, "bounds">): ExportBundle {
+    if (input.nodes.length === 0) return { ...input, bounds: { x: 0, y: 0, width: 0, height: 0 } };
+    const minX = Math.min(...input.nodes.map((node) => node.x)); const minY = Math.min(...input.nodes.map((node) => node.y));
+    const maxX = Math.max(...input.nodes.map((node) => node.x + node.width)); const maxY = Math.max(...input.nodes.map((node) => node.y + node.height));
+    return { ...input, nodes: input.nodes.map((node) => ({ ...node, x: node.x - minX, y: node.y - minY })), bounds: { x: 0, y: 0, width: maxX - minX, height: maxY - minY } };
+  }
+
+  private bundleCollidesInDocument(document: CanvasDocument, bundle: ExportBundle, origin: { x: number; y: number }, ignoredNodeIds: Set<string>): boolean {
+    const left = origin.x; const top = origin.y; const right = left + bundle.bounds.width; const bottom = top + bundle.bounds.height;
+    return document.nodes.some((node) => !ignoredNodeIds.has(node.id) && left < node.x + node.width && right > node.x && top < node.y + node.height && bottom > node.y);
   }
 
   private uniqueId(prefix: string, used: Set<string>): string {
@@ -610,47 +725,4 @@ export class CanvasAdapter {
     return node.x >= group.x && node.y >= group.y && node.x + node.width <= group.x + group.width && node.y + node.height <= group.y + group.height;
   }
 
-  private async restoreToRuntime(context: CanvasContext, item: PaletteItem, point: { x: number; y: number }, announce = true): Promise<boolean> {
-    const current = context.runtime.getData?.();
-    if (!current || typeof current !== "object" || !context.runtime.setData) { new Notice("This Canvas runtime cannot accept dropped items."); return false; }
-    const document = this.parse(JSON.stringify(current));
-    const linkedRootIds = this.linkedNodes(item, context.file.path).filter((nodeId) => document.nodes.some((node) => node.id === nodeId));
-    if (linkedRootIds.length > 0 && !(await this.confirmReplacement())) return false;
-    const material = this.materializeItem(item, point.x, point.y, new Set(document.nodes.map((node) => node.id)), new Set(document.edges.map((edge) => edge.id)));
-    if (!material || material.nodes.length === 0 || material.placementNodeIds.length === 0) {
-      if (announce) new Notice(material?.warnings[0] ?? `Stored group data for ${item.displayTitle} is unavailable.`);
-      return false;
-    }
-    const removedNodes = linkedRootIds.length > 0 ? this.expandGroupNodes(document.nodes, linkedRootIds) : [];
-    const removedNodeIds = new Set(removedNodes.map((node) => node.id));
-    if (removedNodeIds.size > 0) {
-      document.nodes = document.nodes.filter((node) => !removedNodeIds.has(node.id));
-      document.edges = document.edges.filter((edge) => !removedNodeIds.has(edge.fromNode) && !removedNodeIds.has(edge.toNode));
-    }
-    document.nodes.push(...material.nodes);
-    document.edges.push(...material.edges);
-    try {
-      await context.runtime.setData(document);
-    } catch (error) {
-      console.error("Canvas Palette failed to restore an item", error);
-      if (announce) new Notice(`Unable to add ${item.displayTitle} to Canvas.`);
-      return false;
-    }
-    if (linkedRootIds.length > 0) this.onReplaced(item.id, context.file.path, linkedRootIds, material.placementNodeIds, new Set(document.nodes.map((node) => node.id)));
-    else this.onRestored(item.id, context.file.path, material.placementNodeIds);
-    this.restoreNodeMetadata(context.file.path, material.metadata);
-    context.runtime.requestSave?.();
-    if (announce) new Notice(material.warnings.length > 0 ? `${linkedRootIds.length > 0 ? `${item.displayTitle} moved` : `${item.displayTitle} added`} with ${material.warnings.length} warning${material.warnings.length === 1 ? "" : "s"}.` : linkedRootIds.length > 0 ? `${item.displayTitle} moved to the new position` : `${item.displayTitle} added to Canvas`);
-    return true;
-  }
-
-  private async availablePath(path: string): Promise<string> {
-    if (!this.app.vault.getAbstractFileByPath(path)) return path;
-    const dot = path.lastIndexOf(".");
-    const base = dot >= 0 ? path.slice(0, dot) : path;
-    const extension = dot >= 0 ? path.slice(dot) : "";
-    let index = 2;
-    while (this.app.vault.getAbstractFileByPath(`${base} ${index}${extension}`)) index++;
-    return `${base} ${index}${extension}`;
-  }
 }
