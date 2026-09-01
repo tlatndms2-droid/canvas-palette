@@ -1,5 +1,10 @@
 import type { CanvasEdgeSnapshot, CanvasNodeSnapshot, GroupSnapshot } from "../core/types";
 
+export interface RestoredGroupSnapshot extends GroupSnapshot {
+  originalToRestored: Map<string, string>;
+  discardedReferences: number;
+}
+
 export function serializeGroup(nodes: CanvasNodeSnapshot[], edges: CanvasEdgeSnapshot[]): GroupSnapshot {
   if (nodes.length === 0) return { bounds: { width: 0, height: 0 }, nodes: [], edges: [] };
   const minX = Math.min(...nodes.map((node) => node.x));
@@ -14,12 +19,29 @@ export function serializeGroup(nodes: CanvasNodeSnapshot[], edges: CanvasEdgeSna
   };
 }
 
-export function restoreGroup(snapshot: GroupSnapshot, x: number, y: number, nodeIdFactory: () => string, edgeIdFactory: () => string): GroupSnapshot {
+export function restoreGroup(snapshot: GroupSnapshot, x: number, y: number, nodeIdFactory: () => string, edgeIdFactory: () => string): RestoredGroupSnapshot {
   const idMap = new Map<string, string>();
-  for (const node of snapshot.nodes) idMap.set(node.id, nodeIdFactory());
+  const nodes = snapshot.nodes.filter((node, index, all) => typeof node.id === "string" && node.id.length > 0 && all.findIndex((candidate) => candidate.id === node.id) === index);
+  let discardedReferences = snapshot.nodes.length - nodes.length;
+  for (const node of nodes) idMap.set(node.id, nodeIdFactory());
+  const restoredNodes = nodes.map((node) => {
+    const parentId = node.parentId && idMap.has(node.parentId) ? idMap.get(node.parentId) : undefined;
+    if (node.parentId && !parentId) discardedReferences++;
+    return { ...node, id: idMap.get(node.id)!, x: node.x + x, y: node.y + y, parentId };
+  });
+  const restoredEdges = snapshot.edges.flatMap((edge) => {
+    const fromNode = idMap.get(edge.fromNode);
+    const toNode = idMap.get(edge.toNode);
+    if (!fromNode || !toNode) { discardedReferences++; return []; }
+    return [{ ...edge, id: edgeIdFactory(), fromNode, toNode }];
+  });
   return {
     bounds: { ...snapshot.bounds },
-    nodes: snapshot.nodes.map((node) => ({ ...node, id: idMap.get(node.id)!, x: node.x + x, y: node.y + y, parentId: node.parentId ? idMap.get(node.parentId) : undefined })),
-    edges: snapshot.edges.map((edge) => ({ ...edge, id: edgeIdFactory(), fromNode: idMap.get(edge.fromNode)!, toNode: idMap.get(edge.toNode)! }))
+    nodes: restoredNodes,
+    edges: restoredEdges,
+    nodeBacks: snapshot.nodeBacks,
+    nodeMetadata: snapshot.nodeMetadata,
+    originalToRestored: idMap,
+    discardedReferences
   };
 }

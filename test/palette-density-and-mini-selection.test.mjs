@@ -28,11 +28,15 @@ test("Mini Palette keeps Collect and Storage selections independent", async () =
 
 test("Mini batch actions use selected IDs and guarded Canvas placement", async () => {
   const mini = await readFile(new URL("../src/mini-palette/floating-mini-palette.ts", import.meta.url), "utf8");
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
   const canvas = await readFile(new URL("../src/canvas/canvas-adapter.ts", import.meta.url), "utf8");
   assert.match(mini, /Place on Canvas/);
   assert.match(mini, /new ConfirmMiniStorageRemovalModal/);
   assert.match(mini, /dragItemIds: selected/);
   assert.match(mini, /application\/x-canvas-palette-items/);
+  assert.match(mini, /Export \$\{targetIds\.length\} item[\s\S]{0,100}to Canvas/);
+  assert.match(mini, /exportItemsToActiveCanvas\(targetIds\)/);
+  assert.match(main, /async exportItemsToActiveCanvas\(itemIds: string\[\]\)/);
   assert.match(canvas, /async restoreItems\(items: PaletteItem\[\], screenX: number, screenY: number\)/);
 });
 

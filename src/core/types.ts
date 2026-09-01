@@ -38,7 +38,15 @@ export interface CanvasEdgeSnapshot {
   [key: string]: unknown;
 }
 
-export interface GroupSnapshot { bounds: { width: number; height: number }; nodes: CanvasNodeSnapshot[]; edges: CanvasEdgeSnapshot[]; nodeBacks?: Record<string, string>; }
+export interface GroupSnapshot {
+  bounds: { width: number; height: number };
+  nodes: CanvasNodeSnapshot[];
+  edges: CanvasEdgeSnapshot[];
+  /** Legacy Front/Back-only snapshot; retained for data created before schema 22. */
+  nodeBacks?: Record<string, string>;
+  /** Per-node Palette metadata for a stored Canvas subgraph. */
+  nodeMetadata?: Record<string, PaletteMetadata>;
+}
 
 export interface PaletteItem {
   id: string;

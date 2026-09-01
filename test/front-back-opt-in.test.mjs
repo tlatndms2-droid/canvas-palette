@@ -25,7 +25,7 @@ test("Image Front Back remains opt-in instead of being enabled by item type", as
     }
   });
 
-  assert.equal(data.schemaVersion, 21);
+  assert.equal(data.schemaVersion, 22);
   assert.equal(data.items.ordinary.facesEnabled, false);
   assert.equal(data.items.chosen.facesEnabled, true);
   assert.equal(data.items.chosen.backContent, "Image notes");
@@ -34,7 +34,7 @@ test("Image Front Back remains opt-in instead of being enabled by item type", as
   await cleanup();
 });
 
-test("schema 21 does not turn the former automatic Mini browser into explicit relay links", async () => {
+test("schema 22 does not turn the former automatic Mini browser into explicit relay links", async () => {
   const { migrateData, cleanup } = await loadDefaults();
   const data = migrateData({
     schemaVersion: 20,
@@ -44,7 +44,7 @@ test("schema 21 does not turn the former automatic Mini browser into explicit re
     pendingItemIds: [],
     uiState: { miniPalette: { hiddenStorageItemIds: [] } }
   });
-  assert.equal(data.schemaVersion, 21);
+  assert.equal(data.schemaVersion, 22);
   assert.deepEqual(data.uiState.miniPalette.storageItemIds, []);
   assert.equal("hiddenStorageItemIds" in data.uiState.miniPalette, false);
   await cleanup();

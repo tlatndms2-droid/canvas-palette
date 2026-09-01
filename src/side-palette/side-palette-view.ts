@@ -103,8 +103,8 @@ export class SidePaletteView extends ItemView {
     const header = root.createDiv({ cls: "cp-side__header" });
     header.createDiv({ cls: "cp-brand", text: "Canvas Palette" });
     const send = this.layoutMode === "wide"
-      ? header.createEl("button", { text: "Send to Mini Palette" })
-      : iconButton(header, "send", "Send selected items to Mini Palette", () => this.plugin.sendItemsToMini(this.sideSelectedIds()));
+      ? header.createEl("button", { text: "Export to Mini Palette" })
+      : iconButton(header, "send", "Export selected items to Mini Palette", () => this.plugin.sendItemsToMini(this.sideSelectedIds()));
     if (this.layoutMode === "wide") send.addEventListener("click", () => this.plugin.sendItemsToMini(this.sideSelectedIds()));
     if (this.layoutMode === "wide") {
       const exportButton = header.createEl("button", { text: "Export" });
@@ -671,6 +671,12 @@ export class SidePaletteView extends ItemView {
     });
     row.addEventListener("dragstart", (event) => { event.dataTransfer?.setData("application/x-canvas-palette-collection", collection.id); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; row.addClass("is-dragging"); });
     row.addEventListener("dragend", () => row.removeClass("is-dragging"));
+    row.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      const menu = new Menu();
+      menu.addItem((entry) => entry.setTitle("Export collection to Canvas").setIcon("file-output").onClick(() => void this.plugin.exportCollectionSubtree(collection.id)));
+      menu.showAtMouseEvent(event);
+    });
     this.mountOutlineDropTarget(row, collection.workspaceId, collection.id);
     iconButton(row, "plus", "Add nested collection", () => this.promptCollection(collection.workspaceId, collection.id));
     iconButton(row, "pencil", "Rename collection", () => new TextPromptModal(this.app, "Rename collection", collection.name, (value) => this.plugin.store.renameCollection(collection.id, value)).open());
@@ -826,7 +832,7 @@ export class SidePaletteView extends ItemView {
     }
     const allInMini = targetIds.every((id) => this.plugin.store.miniStorageHas(id));
     menu.addItem((entry) => entry
-      .setTitle(allInMini ? "Mini Palette에서 제거" : "Mini Palette로 보내기")
+      .setTitle(allInMini ? "Remove from Mini Palette" : "Export to Mini Palette")
       .setIcon(allInMini ? "unlink" : "send")
       .setChecked(allInMini)
       .onClick(() => allInMini ? this.plugin.store.removeMiniStorageItems(targetIds) : this.plugin.sendItemsToMini(targetIds)));

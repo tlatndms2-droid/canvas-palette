@@ -2,11 +2,12 @@
 
 ## Current state
 
-- Version: `0.3.45`.
+- Version: `0.3.46`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest validated release target: `0.3.45`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Latest release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.45`.
+- Latest validated release target: `0.3.46`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
+- Latest release URL: `https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.46`.
+- Latest runtime change: `0.3.46`; Side exports selected canonical Item IDs to Mini Storage through the explicit `Export to Mini Palette` action, and Mini Storage exposes `Export to Canvas` alongside placement and drag/drop. Canvas materialization shares one type-aware path: Cards become text Nodes; existing Markdown and Image sources remain file Nodes; missing Markdown becomes a text Card without creating a Vault file; missing Images are skipped; and Groups remap IDs while retaining valid nesting, edges, and per-node Palette metadata. Right-clicking an Outliner Collection exports only that subtree; Header Export keeps its Workspace-wide role. The generated Canvas uses Outliner order, Item child hierarchy, right-to-left hierarchy Edges, and footprint-aware Tree Layout. Sandbox validation exercised Side-to-Mini ID/Workspace preservation, Mini Card placement, and Collection subtree output; the fixture was restored afterward.
 - Latest runtime change: `0.3.45`; Side responsive layout is now represented solely by `data-layout-mode`, so compact rules cannot remain after returning to Wide. The Wide Tag/Label split and Index splitter again follow their stored ratios. Mini Collect/Storage uses an explicit solid-accent selected state with text-on-accent foreground, while Side Viewport/Outliner uses an accent-tint selected state with accent foreground, including the Very Narrow icon-only tab.
 - Latest runtime change: `0.3.44`; Mini and Side share responsive interaction tokens for focus-visible, selected controls, Drawer/Flyout surfaces, and reduced motion. Shared icon buttons now always expose `aria-label`, native tooltip, and button type. Mini Collect/Storage and Side Viewport/Outliner tabs expose `tablist`/`tabpanel`, arrows, `Home`/`End`, and `Enter`/`Space`. Both attached Flyouts move focus to their first interactive control, close on `Escape` or outside click, and restore focus to the trigger without changing canonical Item state.
 - `0.3.44` Sandbox validation used the isolated `Obsidian Mini Palette Sandbox` on CDP `9237`. At Mini `360px`, keyboard `ArrowLeft` switched Storage to Collect with the active tab receiving the 2px focus-visible ring; Control Flyout focused within itself and `Escape` closed it, set `aria-expanded=false`, and returned focus to its trigger. Side retained the verified `300px` no-overflow, external Indexes Flyout behavior from `0.3.43`. A full Obsidian restart loaded `0.3.44`; `data.json`, Canvas, and workspace fixtures all matched their backup hashes afterward.

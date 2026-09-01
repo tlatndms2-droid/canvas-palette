@@ -30,6 +30,16 @@ export interface CanvasRuntimeNodeLike {
 }
 interface CanvasViewLike { getViewType?: () => string; file?: TFile; containerEl?: HTMLElement; canvas?: CanvasRuntimeLike; }
 export interface CanvasContext { file: TFile; view: CanvasViewLike; runtime: CanvasRuntimeLike; }
+export interface CanvasExportEntry { id: string; name: string; parentId: string | null; item?: PaletteItem; }
+
+interface RestoredMaterial {
+  nodes: CanvasNodeSnapshot[];
+  edges: CanvasEdgeSnapshot[];
+  anchorNodeId: string | null;
+  placementNodeIds: string[];
+  metadata: Array<{ nodeId: string; metadata: PaletteMetadata }>;
+  warnings: string[];
+}
 
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 
@@ -37,7 +47,7 @@ export class CanvasAdapter {
   private readonly restoreQueue = new SerialTaskQueue();
   private readonly previousNodesByCanvas = new Map<string, Map<string, CanvasNodeSnapshot>>();
 
-  constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined, private readonly restoreNodeBack: (canvasPath: string, nodeId: string, backContent: string) => void, private readonly linkedNodes: (item: PaletteItem, canvasPath: string) => string[] = () => [], private readonly confirmReplacement: () => Promise<boolean> = async () => true, private readonly onReplaced: (itemId: string, canvasPath: string, removedNodeIds: string[], newNodeIds: string[], existingNodeIds: Set<string>) => void = () => {}) {}
+  constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined, private readonly restoreNodeMetadata: (canvasPath: string, records: Array<{ nodeId: string; metadata: PaletteMetadata }>) => void, private readonly linkedNodes: (item: PaletteItem, canvasPath: string) => string[] = () => [], private readonly confirmReplacement: () => Promise<boolean> = async () => true, private readonly onReplaced: (itemId: string, canvasPath: string, removedNodeIds: string[], newNodeIds: string[], existingNodeIds: Set<string>) => void = () => {}) {}
 
   activeContext(): CanvasContext | null {
     const leaf = this.app.workspace.activeLeaf;
@@ -367,9 +377,9 @@ export class CanvasAdapter {
     const positions = this.batchRestorePositions(items, point);
     let restored = 0;
     for (let index = 0; index < items.length; index += 1) {
-      if (await this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, items[index], positions[index]))) restored += 1;
+      if (await this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, items[index], positions[index], false))) restored += 1;
     }
-    if (items.length > 1) new Notice(`${restored} of ${items.length} items added to Canvas.`);
+    if (items.length > 1) new Notice(restored === items.length ? `${restored} items added to Canvas.` : `${restored} of ${items.length} items added to Canvas; ${items.length - restored} skipped.`);
     return restored > 0;
   }
 
@@ -389,9 +399,9 @@ export class CanvasAdapter {
     const positions = this.batchRestorePositions(items, point);
     let restored = 0;
     for (let index = 0; index < items.length; index++) {
-      if (await this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, items[index], positions[index]))) restored++;
+      if (await this.restoreQueue.enqueue(context.file.path, () => this.restoreToRuntime(context, items[index], positions[index], false))) restored++;
     }
-    if (items.length > 1) new Notice(`${restored} of ${items.length} items added to Canvas.`);
+    if (items.length > 1) new Notice(restored === items.length ? `${restored} items added to Canvas.` : `${restored} of ${items.length} items added to Canvas; ${items.length - restored} skipped.`);
     return restored > 0;
   }
 
@@ -407,52 +417,41 @@ export class CanvasAdapter {
     return items.map((_item, index) => ({ x: point.x + (index % columns) * columnWidth, y: point.y + Math.floor(index / columns) * rowHeight }));
   }
 
-  async exportCollection(name: string, nodes: Array<{ id: string; name: string; depth: number; item?: PaletteItem }>): Promise<TFile | null> {
-    if (nodes.length === 0) { new Notice("The collection is empty."); return null; }
+  async exportCollection(name: string, entries: CanvasExportEntry[]): Promise<TFile | null> {
+    if (entries.length === 0) { new Notice("The collection is empty."); return null; }
     const context = this.activeContext();
     const folder = context?.file.parent?.path ?? "";
     const path = await this.availablePath(normalizePath(`${folder}/${name || "Canvas Palette Export"}.canvas`));
+    const positions = this.treeLayout(entries);
+    const usedNodeIds = new Set<string>();
+    const usedEdgeIds = new Set<string>();
     const canvasNodes: CanvasNodeSnapshot[] = [];
     const edges: CanvasEdgeSnapshot[] = [];
     const anchors = new Map<string, string>();
     const restoredByItem = new Map<string, string[]>();
-    const restoredBacks: Array<{ nodeId: string; backContent: string }> = [];
-    const rowByDepth = new Map<number, number>();
-    for (const entry of nodes) {
-      const row = rowByDepth.get(entry.depth) ?? 0;
-      rowByDepth.set(entry.depth, row + 1);
-      const position = { x: entry.depth * 330, y: row * 180 };
-      if (entry.item?.type === "group" && entry.item.group) {
-        const snapshot = restoreGroup(entry.item.group, position.x, position.y, () => createId("node"), () => createId("node"));
-        canvasNodes.push(...snapshot.nodes);
-        edges.push(...snapshot.edges);
-        const ids = snapshot.nodes.map((node) => node.id);
-        const anchor = snapshot.nodes.find((node) => node.type === "group")?.id ?? ids[0];
-        if (anchor) anchors.set(entry.id, anchor);
-        restoredByItem.set(entry.item.id, snapshot.nodes.filter((node) => node.type === "group").map((node) => node.id));
-        for (let index = 0; index < entry.item.group.nodes.length; index++) {
-          const backContent = entry.item.group.nodeBacks?.[entry.item.group.nodes[index].id];
-          const restored = snapshot.nodes[index];
-          if (backContent && restored) restoredBacks.push({ nodeId: restored.id, backContent });
-        }
-      } else {
-        const node = entry.item
-          ? this.nodeForItem(entry.item, position.x, position.y)
-          : { id: createId("node"), type: "text", text: entry.name, x: position.x, y: position.y, width: Math.max(180, 300 - entry.depth * 18), height: entry.depth === 0 ? 90 : 64 };
-        canvasNodes.push(node);
-        anchors.set(entry.id, node.id);
-        if (entry.item) restoredByItem.set(entry.item.id, [node.id]);
+    const metadata: Array<{ nodeId: string; metadata: PaletteMetadata }> = [];
+    const warnings: string[] = [];
+    for (const entry of entries) {
+      const position = positions.get(entry.id) ?? { x: 0, y: 0 };
+      if (!entry.item) {
+        const node = this.headingNode(entry.name, entry.parentId === null, position.x, position.y, () => this.uniqueId("node", usedNodeIds));
+        canvasNodes.push(node); anchors.set(entry.id, node.id); continue;
       }
+      const material = this.materializeItem(entry.item, position.x, position.y, usedNodeIds, usedEdgeIds);
+      if (!material) { warnings.push(`${entry.item.displayTitle}: stored Group data is unavailable.`); continue; }
+      canvasNodes.push(...material.nodes); edges.push(...material.edges); metadata.push(...material.metadata); warnings.push(...material.warnings);
+      if (material.anchorNodeId) anchors.set(entry.id, material.anchorNodeId);
+      if (material.placementNodeIds.length > 0) restoredByItem.set(entry.item.id, material.placementNodeIds);
     }
-    for (const entry of nodes) {
-      const parent = entry.id.split("/").slice(0, -1).join("/");
-      const fromNode = anchors.get(parent); const toNode = anchors.get(entry.id);
-      if (fromNode && toNode) edges.push({ id: createId("edge"), fromNode, toNode, fromSide: "right", toSide: "left" });
+    for (const entry of entries) {
+      if (!entry.parentId) continue;
+      const fromNode = anchors.get(entry.parentId); const toNode = anchors.get(entry.id);
+      if (fromNode && toNode) edges.push({ id: this.uniqueId("edge", usedEdgeIds), fromNode, toNode, fromSide: "right", toSide: "left" });
     }
     const file = await this.app.vault.create(path, JSON.stringify({ nodes: canvasNodes, edges }, null, 2));
     for (const [itemId, nodeIds] of restoredByItem) this.onRestored(itemId, file.path, nodeIds);
-    for (const state of restoredBacks) this.restoreNodeBack(file.path, state.nodeId, state.backContent);
-    new Notice(`Collection exported to ${file.name}`);
+    this.restoreNodeMetadata(file.path, metadata);
+    new Notice(warnings.length > 0 ? `Collection exported to ${file.name}; ${warnings.length} item reference${warnings.length === 1 ? "" : "s"} need attention.` : `Collection exported to ${file.name}`);
     return file;
   }
 
@@ -475,26 +474,90 @@ export class CanvasAdapter {
     const metadata = this.getMetadata(canvasPath, nodeId);
     const snapshot = serializeGroup(nodes, edges);
     snapshot.nodeBacks = Object.fromEntries(nodes.map((node) => [node.id, this.getMetadata(canvasPath, node.id)?.backContent ?? ""]).filter(([, back]) => Boolean(back)));
+    snapshot.nodeMetadata = Object.fromEntries(nodes.map((node) => [node.id, this.getMetadata(canvasPath, node.id)]).filter((entry): entry is [string, PaletteMetadata] => Boolean(entry[1])).map(([id, value]) => [id, { ...value, tags: [...value.tags] }]));
     const title = nodes.find((node) => node.type === "group")?.label ?? nodes.find((node) => node.text)?.text?.split(/\r?\n/, 1)[0] ?? "Canvas group";
     return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", backContent: "", facesEnabled: false, createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
   }
 
-  private nodeForItem(item: PaletteItem, x: number, y: number): CanvasNodeSnapshot {
-    if ((item.type === "markdown" || item.type === "image") && item.origin.filePath && !item.sourceDeletedAt) return { id: createId("node"), type: "file", file: item.origin.filePath, x, y, width: item.type === "image" ? 360 : 280, height: item.type === "image" ? 240 : 180 };
-    return { id: createId("node"), type: "text", text: item.content ?? item.displayTitle, x, y, width: 280, height: 180 };
+  private materializeItem(item: PaletteItem, x: number, y: number, usedNodeIds: Set<string>, usedEdgeIds: Set<string>): RestoredMaterial | null {
+    if (item.type === "group") {
+      if (!item.group) return null;
+      const snapshot = restoreGroup(item.group, x, y, () => this.uniqueId("node", usedNodeIds), () => this.uniqueId("edge", usedEdgeIds));
+      const placementNodeIds = snapshot.nodes.filter((node) => node.type === "group").map((node) => node.id);
+      const anchorNodeId = placementNodeIds[0] ?? snapshot.nodes[0]?.id ?? null;
+      const metadata = [...snapshot.originalToRestored.entries()].flatMap(([originalId, restoredId]) => {
+        const legacyBack = item.group?.nodeBacks?.[originalId];
+        const source = item.group?.nodeMetadata?.[originalId] ?? (legacyBack ? { tags: [], label: "", labelColor: "", caption: "", backContent: legacyBack, currentFace: "front" as const, facesEnabled: true, modifiedAt: item.modifiedAt } : null);
+        return source ? [{ nodeId: restoredId, metadata: { ...source, tags: [...source.tags] } }] : [];
+      });
+      return { nodes: snapshot.nodes, edges: snapshot.edges, anchorNodeId, placementNodeIds, metadata, warnings: snapshot.discardedReferences > 0 ? [`${item.displayTitle}: ${snapshot.discardedReferences} damaged Group reference${snapshot.discardedReferences === 1 ? " was" : "s were"} skipped.`] : [] };
+    }
+    const restored = this.restoreNodeForItem(item, x, y, () => this.uniqueId("node", usedNodeIds));
+    if (!restored.node) return { nodes: [], edges: [], anchorNodeId: null, placementNodeIds: [], metadata: [], warnings: restored.warning ? [restored.warning] : [] };
+    return { nodes: [restored.node], edges: [], anchorNodeId: restored.node.id, placementNodeIds: [restored.node.id], metadata: [], warnings: restored.warning ? [restored.warning] : [] };
   }
 
-  private restoreNodeForItem(item: PaletteItem, x: number, y: number): CanvasNodeSnapshot | null {
-    if (item.type === "markdown" && item.sourceDeletedAt) {
-      return { id: createId("node"), type: "text", text: item.content ?? item.displayTitle, x, y, width: 280, height: 180 };
+  private restoreNodeForItem(item: PaletteItem, x: number, y: number, nextId: () => string): { node: CanvasNodeSnapshot | null; warning?: string } {
+    if (item.type === "markdown") {
+      const file = !item.sourceDeletedAt && item.origin.filePath ? this.app.vault.getAbstractFileByPath(item.origin.filePath) : null;
+      if (file instanceof TFile) return { node: { id: nextId(), type: "file", file: file.path, x, y, width: 280, height: 180 } };
+      return { node: { id: nextId(), type: "text", text: item.content ?? item.displayTitle, x, y, width: 280, height: 180 }, warning: `${item.displayTitle}: Markdown source was unavailable, so stored content was exported as a Card.` };
     }
-    if (item.type === "markdown" || item.type === "image") {
+    if (item.type === "image") {
       const file = item.origin.filePath ? this.app.vault.getAbstractFileByPath(item.origin.filePath) : null;
-      if (!(file instanceof TFile)) { new Notice(`Original file for ${item.displayTitle} is unavailable.`); return null; }
-      return { id: createId("node"), type: "file", file: file.path, x, y, width: item.type === "image" ? 360 : 280, height: item.type === "image" ? 240 : 180 };
+      if (!(file instanceof TFile)) return { node: null, warning: `${item.displayTitle}: image source was unavailable and was skipped.` };
+      return { node: { id: nextId(), type: "file", file: file.path, x, y, width: 360, height: 240 } };
     }
-    if (item.type === "card") return { id: createId("node"), type: "text", text: item.content ?? "", x, y, width: 280, height: 180 };
-    return null;
+    return { node: { id: nextId(), type: "text", text: item.content ?? item.displayTitle, x, y, width: 280, height: 180 } };
+  }
+
+  private headingNode(name: string, root: boolean, x: number, y: number, nextId: () => string): CanvasNodeSnapshot {
+    return { id: nextId(), type: "text", text: name, x, y, width: root ? 300 : 240, height: root ? 90 : 64 };
+  }
+
+  private treeLayout(entries: CanvasExportEntry[]): Map<string, { x: number; y: number }> {
+    const byId = new Map(entries.map((entry) => [entry.id, entry]));
+    const children = new Map<string, string[]>();
+    const roots: string[] = [];
+    for (const entry of entries) {
+      if (!entry.parentId || !byId.has(entry.parentId)) roots.push(entry.id);
+      else children.set(entry.parentId, [...(children.get(entry.parentId) ?? []), entry.id]);
+    }
+    const depths = new Map<string, number>();
+    const depthOf = (id: string, visiting = new Set<string>()): number => {
+      if (depths.has(id)) return depths.get(id)!;
+      const entry = byId.get(id); if (!entry || !entry.parentId || !byId.has(entry.parentId) || visiting.has(id)) return 0;
+      visiting.add(id); const depth = depthOf(entry.parentId, visiting) + 1; visiting.delete(id); depths.set(id, depth); return depth;
+    };
+    const size = (entry: CanvasExportEntry): { width: number; height: number } => entry.item?.type === "group"
+      ? { width: Math.max(280, entry.item.group?.bounds.width ?? 280), height: Math.max(180, entry.item.group?.bounds.height ?? 180) }
+      : entry.item?.type === "image" ? { width: 360, height: 240 }
+      : entry.item ? { width: 280, height: 180 }
+      : { width: entry.parentId === null ? 300 : 240, height: entry.parentId === null ? 90 : 64 };
+    const maxWidth = new Map<number, number>();
+    for (const entry of entries) { const depth = depthOf(entry.id); maxWidth.set(depth, Math.max(maxWidth.get(depth) ?? 0, size(entry).width)); }
+    const xByDepth = new Map<number, number>();
+    for (let depth = 1; depth <= Math.max(0, ...maxWidth.keys()); depth++) xByDepth.set(depth, (xByDepth.get(depth - 1) ?? 0) + (maxWidth.get(depth - 1) ?? 300) + 80);
+    const layout = new Map<string, { x: number; y: number }>();
+    let cursor = 0;
+    const place = (id: string): { y: number; height: number } => {
+      const entry = byId.get(id); if (!entry) return { y: cursor, height: 0 };
+      const childIds = children.get(id) ?? []; const own = size(entry);
+      const childBoxes = childIds.map(place);
+      const y = childBoxes.length === 0 ? cursor : (childBoxes[0].y + childBoxes.at(-1)!.y + childBoxes.at(-1)!.height - own.height) / 2;
+      if (childBoxes.length === 0) cursor += own.height + 56;
+      layout.set(id, { x: xByDepth.get(depthOf(id)) ?? 0, y });
+      return { y, height: own.height };
+    };
+    for (const id of roots) place(id);
+    return layout;
+  }
+
+  private uniqueId(prefix: string, used: Set<string>): string {
+    let id = createId(prefix);
+    while (used.has(id)) id = createId(prefix);
+    used.add(id);
+    return id;
   }
 
   private async read(file: TFile): Promise<CanvasDocument> { return this.parse(await this.app.vault.cachedRead(file)); }
@@ -547,47 +610,37 @@ export class CanvasAdapter {
     return node.x >= group.x && node.y >= group.y && node.x + node.width <= group.x + group.width && node.y + node.height <= group.y + group.height;
   }
 
-  private async restoreToRuntime(context: CanvasContext, item: PaletteItem, point: { x: number; y: number }): Promise<boolean> {
+  private async restoreToRuntime(context: CanvasContext, item: PaletteItem, point: { x: number; y: number }, announce = true): Promise<boolean> {
     const current = context.runtime.getData?.();
     if (!current || typeof current !== "object" || !context.runtime.setData) { new Notice("This Canvas runtime cannot accept dropped items."); return false; }
     const document = this.parse(JSON.stringify(current));
     const linkedRootIds = this.linkedNodes(item, context.file.path).filter((nodeId) => document.nodes.some((node) => node.id === nodeId));
     if (linkedRootIds.length > 0 && !(await this.confirmReplacement())) return false;
+    const material = this.materializeItem(item, point.x, point.y, new Set(document.nodes.map((node) => node.id)), new Set(document.edges.map((edge) => edge.id)));
+    if (!material || material.nodes.length === 0 || material.placementNodeIds.length === 0) {
+      if (announce) new Notice(material?.warnings[0] ?? `Stored group data for ${item.displayTitle} is unavailable.`);
+      return false;
+    }
     const removedNodes = linkedRootIds.length > 0 ? this.expandGroupNodes(document.nodes, linkedRootIds) : [];
     const removedNodeIds = new Set(removedNodes.map((node) => node.id));
     if (removedNodeIds.size > 0) {
       document.nodes = document.nodes.filter((node) => !removedNodeIds.has(node.id));
       document.edges = document.edges.filter((edge) => !removedNodeIds.has(edge.fromNode) && !removedNodeIds.has(edge.toNode));
     }
-    let restoredNodeIds: string[];
-    if (item.type === "group") {
-      if (!item.group) { new Notice(`Stored group data for ${item.displayTitle} is unavailable.`); return false; }
-      const snapshot = restoreGroup(item.group, point.x, point.y, () => createId("node"), () => createId("edge"));
-      document.nodes.push(...snapshot.nodes);
-      document.edges.push(...snapshot.edges);
-      restoredNodeIds = snapshot.nodes.filter((node) => node.type === "group").map((node) => node.id);
-      for (let index = 0; index < item.group.nodes.length; index++) {
-        const back = item.group.nodeBacks?.[item.group.nodes[index].id];
-        const restored = snapshot.nodes[index];
-        if (back && restored) this.restoreNodeBack(context.file.path, restored.id, back);
-      }
-    } else {
-      const node = this.restoreNodeForItem(item, point.x, point.y);
-      if (!node) return false;
-      document.nodes.push(node);
-      restoredNodeIds = [node.id];
-    }
+    document.nodes.push(...material.nodes);
+    document.edges.push(...material.edges);
     try {
       await context.runtime.setData(document);
     } catch (error) {
       console.error("Canvas Palette failed to restore an item", error);
-      new Notice(`Unable to add ${item.displayTitle} to Canvas.`);
+      if (announce) new Notice(`Unable to add ${item.displayTitle} to Canvas.`);
       return false;
     }
-    if (linkedRootIds.length > 0) this.onReplaced(item.id, context.file.path, linkedRootIds, restoredNodeIds, new Set(document.nodes.map((node) => node.id)));
-    else this.onRestored(item.id, context.file.path, restoredNodeIds);
+    if (linkedRootIds.length > 0) this.onReplaced(item.id, context.file.path, linkedRootIds, material.placementNodeIds, new Set(document.nodes.map((node) => node.id)));
+    else this.onRestored(item.id, context.file.path, material.placementNodeIds);
+    this.restoreNodeMetadata(context.file.path, material.metadata);
     context.runtime.requestSave?.();
-    new Notice(linkedRootIds.length > 0 ? `${item.displayTitle} moved to the new position` : `${item.displayTitle} added to Canvas`);
+    if (announce) new Notice(material.warnings.length > 0 ? `${linkedRootIds.length > 0 ? `${item.displayTitle} moved` : `${item.displayTitle} added`} with ${material.warnings.length} warning${material.warnings.length === 1 ? "" : "s"}.` : linkedRootIds.length > 0 ? `${item.displayTitle} moved to the new position` : `${item.displayTitle} added to Canvas`);
     return true;
   }
 

@@ -59,6 +59,31 @@ test("a dropped Card becomes a linked placement with shared metadata", async () 
   await cleanup();
 });
 
+test("Group snapshot migration preserves legacy Front Back metadata and new per-node metadata", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const raw = fixture();
+  raw.items.group = {
+    ...structuredClone(raw.items.card), id: "group", type: "group", displayTitle: "Group", origin: {}, canvasPlacements: [], facesEnabled: false,
+    group: { bounds: { width: 300, height: 180 }, nodes: [{ id: "inside", type: "text", text: "Inside", x: 0, y: 0, width: 200, height: 100 }], edges: [], nodeBacks: { inside: "Legacy back" } }
+  };
+  raw.workspaces.workspace.looseItemIds.push("group");
+  const store = new PaletteStore({ loadData: async () => raw, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  await store.load();
+  assert.equal(store.data.schemaVersion, 22);
+  assert.equal(store.data.items.group.group.nodeMetadata.inside.backContent, "Legacy back");
+  assert.deepEqual(store.data.items.group.group.nodeMetadata.inside.tags, []);
+  await cleanup();
+});
+
+test("restored Group metadata can be recorded in one store operation", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  store.data = fixture();
+  store.restoreCanvasNodeMetadata("B.canvas", [{ nodeId: "group-child", metadata: { tags: ["group"], label: "Nested", labelColor: "#22c55e", caption: "Inside", backContent: "Back", currentFace: "back", facesEnabled: true, modifiedAt: 7 } }]);
+  assert.deepEqual(store.getCanvasNodeMetadata("B.canvas", "group-child"), { tags: ["group"], label: "Nested", labelColor: "#22c55e", caption: "Inside", backContent: "Back", currentFace: "back", facesEnabled: true, modifiedAt: 7 });
+  await cleanup();
+});
+
 test("collecting one linked Canvas node again reuses its canonical Palette item in Collect", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });

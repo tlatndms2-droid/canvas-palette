@@ -2,12 +2,14 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.45**
+Current version: **0.3.46**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
+- Export now keeps Side and Mini as canonical-ID relay surfaces: Side exports selected Items to Mini Storage, while Mini Storage can export selected Card, Markdown, Image, and Group Items back to the active Canvas. Markdown falls back to a Card only when its source is missing; missing Images are skipped without interrupting the rest of a batch. Group restoration remaps IDs, preserves valid nesting and edges, and retains nested Palette metadata.
+- Right-clicking an Outliner Collection exports only that subtree to a new Canvas. Header Export remains Workspace-wide. Both routes preserve Outliner order and Item child hierarchy, use right-to-left hierarchy edges, and lay out branches using their real Group/Image footprints.
 - Mini and Side now share focus, selected-control, flyout, and reduced-motion interaction tokens. Icon-only controls use an accessible name and native tooltip; responsive tabs use `tablist`/`tabpanel`, arrows, `Home`/`End`, `Enter`/`Space`; and each Flyout moves focus to its first control then returns focus to its trigger after dismissal.
 - Side Palette now derives `Wide`, `Medium`, and `Very Narrow` layouts from its measured view width at `520/360/300px`. Wide preserves both split panes; Medium and Very Narrow store a Workspace-local Viewport/Outliner tab and move Tag/Label Indexes into a session-only Canvas-side attached flyout. The flyout closes with `Escape` or outside click, restores trigger focus, and never changes the query, selection, Workspace, Collection, or canonical Item data.
 - Mini Palette now derives `Wide`, `Medium`, `Narrow`, and `Minimum` layouts from its measured outer width at the exact `900/680/480/360px` boundaries. Wide retains the resizable Control/Assets/Preview panes, Medium keeps Assets/Preview with quick controls, and narrower modes keep Assets visible while Control or Preview opens as an attached Canvas-side flyout. The flyout never owns selection, restores focus to its trigger, closes on `Escape` or outside click, and starts closed after reload. Search focus/cursor, selection, density, relay membership, pane widths, and scroll position survive width transitions; restored geometry is clamped into the current Obsidian viewport.

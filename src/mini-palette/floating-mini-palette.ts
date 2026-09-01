@@ -440,7 +440,10 @@ export class FloatingMiniPalette {
     }
     menu.addSeparator();
     if (tab === "collect") menu.addItem((entry) => entry.setTitle(`Delete ${targetIds.length} pending item${targetIds.length === 1 ? "" : "s"}`).setIcon("trash").onClick(() => this.confirmPendingDelete(targetIds)));
-    else menu.addItem((entry) => entry.setTitle(`Remove ${targetIds.length} link${targetIds.length === 1 ? "" : "s"} from Mini`).setIcon("unlink").onClick(() => this.confirmMiniStorageRemoval(targetIds)));
+    else {
+      menu.addItem((entry) => entry.setTitle(`Export ${targetIds.length} item${targetIds.length === 1 ? "" : "s"} to Canvas`).setIcon("share-2").onClick(() => void this.plugin.exportItemsToActiveCanvas(targetIds)));
+      menu.addItem((entry) => entry.setTitle(`Remove ${targetIds.length} link${targetIds.length === 1 ? "" : "s"} from Mini`).setIcon("unlink").onClick(() => this.confirmMiniStorageRemoval(targetIds)));
+    }
     menu.showAtMouseEvent(event);
   }
   private renderPendingCard(parent: HTMLElement, item: PaletteItem, orderedIds: string[]): void {
@@ -468,9 +471,7 @@ export class FloatingMiniPalette {
     }).open();
   }
   private async placeSelectedOnCanvas(): Promise<void> {
-    const items = this.storageSelectedIds().map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
-    const canvas = this.plugin.canvas.activeContainer(); if (!canvas || items.length === 0) { new Notice(items.length === 0 ? "Select items first." : "Open a Canvas first."); return; }
-    const rect = canvas.getBoundingClientRect(); await this.plugin.canvas.restoreItems(items, rect.left + rect.width / 2, rect.top + rect.height / 2);
+    await this.plugin.exportItemsToActiveCanvas(this.storageSelectedIds());
   }
   private dragIds(dataTransfer: DataTransfer | null | undefined): string[] {
     if (!dataTransfer) return [];

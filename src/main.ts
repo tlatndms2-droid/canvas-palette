@@ -28,7 +28,7 @@ export default class CanvasPalettePlugin extends Plugin {
     this.app,
     (itemId, canvasPath, nodeIds) => this.store.recordCanvasPlacement(itemId, canvasPath, nodeIds),
     (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId),
-    (canvasPath, nodeId, backContent) => this.store.setCanvasNodeBack(canvasPath, nodeId, backContent),
+    (canvasPath, records) => this.store.restoreCanvasNodeMetadata(canvasPath, records),
     (item, canvasPath) => this.store.linkedCanvasNodes(item).filter((location) => location.canvasPath === canvasPath).map((location) => location.nodeId),
     () => new Promise<boolean>((resolve) => new ConfirmCanvasReplacementModal(this.app, resolve).open()),
     (itemId, canvasPath, removedNodeIds, newNodeIds, existingNodeIds) => this.store.replaceCanvasPlacement(itemId, canvasPath, removedNodeIds, newNodeIds, existingNodeIds)
@@ -277,7 +277,18 @@ export default class CanvasPalettePlugin extends Plugin {
     const added = this.store.addMiniStorageItems(validIds);
     this.store.data.uiState.miniPalette.tab = "storage";
     this.miniPalette.open();
-    new Notice(added.length > 0 ? `${added.length} item${added.length === 1 ? "" : "s"} sent to Mini Palette.` : "The selected items are already in Mini Palette.");
+    new Notice(added.length > 0 ? `${added.length} item${added.length === 1 ? "" : "s"} exported to Mini Palette.` : "The selected items are already in Mini Palette.");
+  }
+
+  async exportItemsToActiveCanvas(itemIds: string[]): Promise<boolean> {
+    const items = [...new Set(itemIds)].map((id) => this.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
+    const canvas = this.canvas.activeContainer();
+    if (!canvas || items.length === 0) {
+      new Notice(items.length === 0 ? "Select one or more Mini Palette items first." : "Open a Canvas before exporting items.");
+      return false;
+    }
+    const rect = canvas.getBoundingClientRect();
+    return this.canvas.restoreItems(items, rect.left + rect.width / 2, rect.top + rect.height / 2);
   }
 
   private editCanvasNodesMetadata(nodes: unknown[]): void {
@@ -567,17 +578,51 @@ export default class CanvasPalettePlugin extends Plugin {
   async exportActiveWorkspace(): Promise<void> {
     const workspace = this.activeWorkspace();
     if (!workspace) return;
-    const rows: Array<{ id: string; name: string; depth: number; item?: PaletteItem }> = [];
-    const walk = (collectionId: string, depth: number, parentPath: string): void => {
-      const collection = this.store.data.collections[collectionId]; if (!collection) return;
-      const id = `${parentPath}/${collection.id}`; rows.push({ id, name: collection.name, depth });
-      for (const itemId of collection.itemIds) { const item = this.store.data.items[itemId]; if (item) rows.push({ id: `${id}/${item.id}`, name: item.displayTitle, depth: depth + 1, item }); }
-      for (const childId of collection.childCollectionIds) walk(childId, depth + 1, id);
+    await this.canvas.exportCollection(`${workspace.name} Export`, this.exportTree(workspace.id));
+  }
+
+  async exportCollectionSubtree(collectionId: string): Promise<void> {
+    const collection = this.store.data.collections[collectionId];
+    if (!collection) return;
+    await this.canvas.exportCollection(`${collection.name} Export`, this.exportTree(collection.workspaceId, collectionId));
+  }
+
+  private exportTree(workspaceId: string, rootCollectionId?: string): Array<{ id: string; name: string; parentId: string | null; item?: PaletteItem }> {
+    const workspace = this.store.data.workspaces[workspaceId];
+    if (!workspace) return [];
+    const entries: Array<{ id: string; name: string; parentId: string | null; item?: PaletteItem }> = [];
+    const itemStack = new Set<string>();
+    const addItem = (itemId: string, parentId: string): void => {
+      const item = this.store.data.items[itemId];
+      if (!item || itemStack.has(itemId)) return;
+      const id = `${parentId}/item:${item.id}`;
+      entries.push({ id, name: item.displayTitle, parentId, item });
+      itemStack.add(itemId);
+      for (const childId of item.childItemIds ?? []) addItem(childId, id);
+      itemStack.delete(itemId);
     };
-    const root = `${workspace.id}`; rows.push({ id: root, name: workspace.name, depth: 0 });
-    for (const itemId of workspace.looseItemIds) { const item = this.store.data.items[itemId]; if (item) rows.push({ id: `${root}/${item.id}`, name: item.displayTitle, depth: 1, item }); }
-    for (const collectionId of workspace.rootCollectionIds) walk(collectionId, 1, root);
-    await this.canvas.exportCollection(`${workspace.name} Export`, rows);
+    const addCollection = (collectionId: string, parentId: string): void => {
+      const collection = this.store.data.collections[collectionId];
+      if (!collection || collection.workspaceId !== workspaceId) return;
+      const id = `${parentId}/collection:${collection.id}`;
+      entries.push({ id, name: collection.name, parentId });
+      for (const itemId of collection.itemIds) addItem(itemId, id);
+      for (const childId of collection.childCollectionIds) addCollection(childId, id);
+    };
+    if (rootCollectionId) {
+      const collection = this.store.data.collections[rootCollectionId];
+      if (!collection || collection.workspaceId !== workspaceId) return [];
+      const root = `collection:${collection.id}`;
+      entries.push({ id: root, name: collection.name, parentId: null });
+      for (const itemId of collection.itemIds) addItem(itemId, root);
+      for (const childId of collection.childCollectionIds) addCollection(childId, root);
+      return entries;
+    }
+    const root = `workspace:${workspace.id}`;
+    entries.push({ id: root, name: workspace.name, parentId: null });
+    for (const collectionId of workspace.rootCollectionIds) addCollection(collectionId, root);
+    for (const itemId of workspace.looseItemIds) addItem(itemId, root);
+    return entries;
   }
 
   async openSidePalette(): Promise<void> { await this.activateSidePalette(); }

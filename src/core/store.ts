@@ -465,6 +465,14 @@ export class PaletteStore {
     else this.changed();
   }
 
+  restoreCanvasNodeMetadata(canvasPath: string, records: Array<{ nodeId: string; metadata: PaletteMetadata }>): void {
+    if (records.length === 0) return;
+    for (const { nodeId, metadata } of records) {
+      this.setMetadataRecord(canvasPath, nodeId, metadata, metadata.modifiedAt);
+    }
+    this.changed();
+  }
+
   linkedCanvasNodes(item: PaletteItem): Array<{ canvasPath: string; nodeId: string }> {
     const locations: Array<{ canvasPath: string; nodeId: string }> = [];
     if (item.origin.canvasPath && item.origin.canvasNodeId) locations.push({ canvasPath: item.origin.canvasPath, nodeId: item.origin.canvasNodeId });
