@@ -70,6 +70,8 @@ export interface PaletteItem {
 }
 
 export interface Collection { id: string; workspaceId: string; parentId: string | null; name: string; childCollectionIds: string[]; itemIds: string[]; }
+/** A visible Outliner row. This is session UI state, never persisted with a workspace. */
+export interface OutlineSelectionTarget { kind: "collection" | "item"; id: string; }
 
 export interface SideLayoutState {
   viewportRatio: number; topRatio: number; indexRatio: number; viewMode: AssetViewMode;

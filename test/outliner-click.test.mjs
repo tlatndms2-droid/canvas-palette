@@ -42,13 +42,21 @@ test("Outliner files support metadata, context menus, child files, and grouping 
   const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
   const store = await readFile(new URL("../src/core/store.ts", import.meta.url), "utf8");
   const defaults = await readFile(new URL("../src/core/defaults.ts", import.meta.url), "utf8");
-  assert.match(source, /row\.addEventListener\("contextmenu", \(event\) => this\.itemMenu\(event, item\)\)/);
+  assert.match(source, /row\.addEventListener\("contextmenu", \(event\) => \{ if \(!this\.outlineTargetSelected\(target\)\) this\.selectOutlineTarget\(target\); this\.itemMenu\(event, item, true\); \}\)/);
   assert.match(source, /cp-outline-item__metadata/);
   assert.match(source, /setTitle\("Group selected items…"\)/);
   assert.match(source, /zone === "inside"[\s\S]*targetId/);
   assert.match(store, /parentItemId: string \| null = null/);
   assert.match(store, /this\.isItemDescendant\(parentItemId, id\)/);
   assert.match(defaults, /schemaVersion: 22/);
+});
+
+test("Outliner selection uses one visible-row sequence while Viewport selection remains item-only", async () => {
+  const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
+  assert.match(source, /private outlineSelection: OutlineSelectionTarget\[\] = \[\]/);
+  assert.match(source, /this\.outlineRows\.push\(target\)/);
+  assert.match(source, /this\.outlineRows\.slice\(Math\.min\(start, end\), Math\.max\(start, end\) \+ 1\)/);
+  assert.match(source, /this\.outlineSelection = next\.map\(\(itemId\) => \(\{ kind: "item" as const, id: itemId \}\)\)/);
 });
 
 test("Viewport renders Collection and file-parent groups as vertical card stacks", async () => {

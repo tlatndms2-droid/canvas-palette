@@ -191,3 +191,4 @@
 .cp-export-placement.is-collision .cp-export-placement__bounds, .cp-export-placement.is-collision .cp-export-placement__node { background: color-mix(in srgb, var(--background-primary) 78%, var(--text-error)); }
 .cp-canvas-target-list { display: grid; gap: 6px; max-height: 320px; margin: 12px 0; overflow: auto; }
 .cp-canvas-target-row { width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-grid--grid .cp-item,.cp-asset-grid--grid .cp-item{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;align-content:start;overflow:hidden}.cp-grid--grid .cp-item__body,.cp-asset-grid--grid .cp-item__body{min-height:0;min-width:0}.cp-grid--grid .cp-item__canvas-links,.cp-asset-grid--grid .cp-item__canvas-links,.cp-grid--grid .cp-item__footer,.cp-asset-grid--grid .cp-item__footer{min-width:0;overflow:hidden}.cp-grid--grid .cp-item--card,.cp-asset-grid--grid .cp-item--card{border-bottom:1px solid var(--cp-border)}

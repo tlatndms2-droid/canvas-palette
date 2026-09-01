@@ -273,9 +273,9 @@ export class CanvasAdapter {
       if (!current || typeof current !== "object") return;
       const document = this.parse(JSON.stringify(current));
       const nodes = document.nodes.filter((candidate) => nodeIds.includes(candidate.id) && candidate.type === "text");
-      const changed = nodes.some((node) => node.text !== (item.content ?? ""));
+      const changed = nodes.some((node) => node.text !== this.syncedCardText(item, node.text ?? ""));
       if (!changed) return;
-      for (const node of nodes) node.text = item.content ?? "";
+      for (const node of nodes) node.text = this.syncedCardText(item, node.text ?? "");
       await open.runtime.setData(document);
       open.runtime.requestSave?.();
       return;
@@ -284,9 +284,9 @@ export class CanvasAdapter {
     if (!(file instanceof TFile)) return;
     const document = await this.read(file);
     const nodes = document.nodes.filter((candidate) => nodeIds.includes(candidate.id) && candidate.type === "text");
-    const changed = nodes.some((node) => node.text !== (item.content ?? ""));
+    const changed = nodes.some((node) => node.text !== this.syncedCardText(item, node.text ?? ""));
     if (!changed) return;
-    for (const node of nodes) node.text = item.content ?? "";
+    for (const node of nodes) node.text = this.syncedCardText(item, node.text ?? "");
     await this.app.vault.modify(file, JSON.stringify(document, null, 2));
   }
 
@@ -329,8 +329,11 @@ export class CanvasAdapter {
         : linkedNodes[0];
       if (!node) continue;
       if (item.type === "card" && node.type === "text") {
-        const content = node.text ?? "";
-        const displayTitle = content.split(/\r?\n/, 1)[0].slice(0, 80) || "Canvas card";
+        const rawContent = node.text ?? "";
+        const heading = this.readHeading(rawContent);
+        const normalizeHeading = Boolean(heading && this.plainTitle(item.displayTitle) === this.plainTitle(heading.title));
+        const content = normalizeHeading && heading ? heading.body : rawContent;
+        const displayTitle = normalizeHeading && heading ? this.plainTitle(heading.title) : rawContent.split(/\r?\n/, 1)[0].slice(0, 80) || "Canvas card";
         if (item.content !== content || item.displayTitle !== displayTitle) {
           item.content = content;
           item.displayTitle = displayTitle;
@@ -546,9 +549,7 @@ export class CanvasAdapter {
     if (item.type === "markdown") {
       const file = !item.sourceDeletedAt && item.origin.filePath ? this.app.vault.getAbstractFileByPath(item.origin.filePath) : null;
       if (file instanceof TFile) return { node: { id: nextId(), type: "file", file: file.path, x, y, width: size.width, height: size.height } };
-      const title = headingLevel ? `${"#".repeat(Math.min(6, headingLevel))} ${item.displayTitle}` : null;
-      const body = item.content ?? "";
-      const text = title ? `${title}${body.trim() && body.trim() !== item.displayTitle ? `\n\n${body}` : ""}` : body || item.displayTitle;
+      const text = this.exportCardText(item, headingLevel);
       return { node: { id: nextId(), type: "text", text, x, y, width: size.width, height: size.height }, warning: `${item.displayTitle}: Markdown source was unavailable, so stored content was exported as a Card.` };
     }
     if (item.type === "image") {
@@ -556,10 +557,33 @@ export class CanvasAdapter {
       if (!(file instanceof TFile)) return { node: null, warning: `${item.displayTitle}: image source was unavailable and was skipped.` };
       return { node: { id: nextId(), type: "file", file: file.path, x, y, width: size.width, height: size.height } };
     }
-    const body = item.content ?? "";
-    const title = headingLevel ? `${"#".repeat(Math.min(6, headingLevel))} ${item.displayTitle}` : null;
-    const text = title ? `${title}${body.trim() && body.trim() !== item.displayTitle ? `\n\n${body}` : ""}` : body || item.displayTitle;
+    const text = this.exportCardText(item, headingLevel);
     return { node: { id: nextId(), type: "text", text, x, y, width: size.width, height: size.height } };
+  }
+
+  /** Split Canvas Markdown headings from the stored Palette title/body. */
+  private readHeading(text: string): { level: number; title: string; body: string } | null {
+    const lines = text.split(/\r?\n/); const match = /^(#{1,6})[ \t]+(.+?)\s*$/.exec(lines[0] ?? "");
+    if (!match) return null;
+    return { level: match[1].length, title: match[2], body: lines.slice(1).join("\n").replace(/^\s*\n?/, "") };
+  }
+  private plainTitle(value: string): string {
+    let title = value.trim(); while (/^#{1,6}[ \t]+/.test(title)) title = title.replace(/^#{1,6}[ \t]+/, "").trim();
+    return title.slice(0, 80) || "Canvas card";
+  }
+  private bodyWithoutOwnHeading(item: PaletteItem): string {
+    const content = item.content ?? ""; const heading = this.readHeading(content);
+    if (heading && this.plainTitle(heading.title) === this.plainTitle(item.displayTitle)) return heading.body;
+    return content.trim() === this.plainTitle(item.displayTitle) ? "" : content;
+  }
+  private exportCardText(item: PaletteItem, headingLevel?: number): string {
+    const body = this.bodyWithoutOwnHeading(item); if (!headingLevel) return body || item.displayTitle;
+    const title = this.plainTitle(item.displayTitle); return `${"#".repeat(Math.min(6, headingLevel))} ${title}${body.trim() ? `\n\n${body}` : ""}`;
+  }
+  private syncedCardText(item: PaletteItem, existingText: string): string {
+    const existingHeading = this.readHeading(existingText);
+    if (!existingHeading || this.plainTitle(existingHeading.title) !== this.plainTitle(item.displayTitle)) return item.content ?? "";
+    const body = this.bodyWithoutOwnHeading(item); return `${"#".repeat(existingHeading.level)} ${this.plainTitle(item.displayTitle)}${body.trim() ? `\n\n${body}` : ""}`;
   }
 
   private headingNode(name: string, headingLevel: number, x: number, y: number, nextId: () => string): CanvasNodeSnapshot {

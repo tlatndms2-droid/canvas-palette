@@ -1,6 +1,6 @@
 import { ItemView, Menu, setIcon, WorkspaceLeaf } from "obsidian";
 import type CanvasPalettePlugin from "../main";
-import type { Collection, PaletteItem, SideLayoutState } from "../core/types";
+import type { Collection, OutlineSelectionTarget, PaletteItem, SideLayoutState } from "../core/types";
 import { CardToMarkdownModal, ConfirmDeleteCollectionModal, ConfirmDeleteModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
@@ -15,10 +15,12 @@ export class SidePaletteView extends ItemView {
   private unsubscribe?: () => void;
   private query = "";
   private selectionAnchorId: string | null = null;
-  private selectedOutlineCollectionId: string | null = null;
+  /** Unified, visible-row Outliner selection. Collection selection deliberately stays out of persisted item state. */
+  private outlineSelection: OutlineSelectionTarget[] = [];
+  private outlineSelectionAnchorKey: string | null = null;
   private lastCollectionClick: { id: string; at: number } | null = null;
   private visibleItemIds: string[] = [];
-  private outlineItemIds: string[] = [];
+  private outlineRows: OutlineSelectionTarget[] = [];
   private suppressBlankClick = false;
   private viewSettingsOpen = false;
   private outlinerSettingsOpen = false;
@@ -44,6 +46,8 @@ export class SidePaletteView extends ItemView {
   revealItem(itemId: string): void {
     this.query = "";
     this.selectionAnchorId = itemId;
+    this.outlineSelection = [{ kind: "item", id: itemId }];
+    this.outlineSelectionAnchorKey = "item:" + itemId;
     const workspace = this.plugin.activeWorkspace();
     if (workspace) {
       const collection = Object.values(this.plugin.store.data.collections).find((entry) => entry.workspaceId === workspace.id && entry.itemIds.includes(itemId));
@@ -623,15 +627,7 @@ export class SidePaletteView extends ItemView {
     while (cursor) { path.unshift(cursor); cursor = cursor.parentId ? this.plugin.store.data.collections[cursor.parentId] : undefined; }
     const crumb = (name: string, id: string | null): void => { const button = breadcrumb.createEl("button", { text: name }); button.addEventListener("click", () => { workspace.sideLayout.focusedCollectionId = id; workspace.sideLayout.selectedCollectionId = id; this.plugin.store.changed(); }); };
     crumb(workspace.name, null); for (const entry of path) { breadcrumb.createSpan({ text: "›" }); crumb(entry.name, entry.id); }
-    this.outlineItemIds = [];
-    const indexCollectionItems = (collectionId: string): void => {
-      const candidate = this.plugin.store.data.collections[collectionId];
-      if (!candidate) return;
-      for (const itemId of candidate.itemIds) this.indexOutlineItem(itemId);
-      for (const childId of candidate.childCollectionIds) indexCollectionItems(childId);
-    };
-    for (const collectionId of workspace.rootCollectionIds) indexCollectionItems(collectionId);
-    for (const itemId of workspace.looseItemIds) this.indexOutlineItem(itemId);
+    this.outlineRows = [];
     const rootRow = parent.createDiv({ cls: `cp-outline-root${workspace.sideLayout.selectedCollectionId === null ? " is-selected" : ""}`, text: workspace.sideLayout.focusedCollectionId ? "Current collection" : workspace.name });
     rootRow.addEventListener("click", () => { workspace.sideLayout.selectedCollectionId = workspace.sideLayout.focusedCollectionId; this.plugin.store.changed(); });
     this.mountOutlineDropTarget(rootRow, workspaceId, null);
@@ -650,8 +646,10 @@ export class SidePaletteView extends ItemView {
 
   private renderCollection(parent: HTMLElement, collection: Collection | undefined, depth: number): void {
     if (!collection) return;
+    const target: OutlineSelectionTarget = { kind: "collection", id: collection.id };
+    this.outlineRows.push(target);
     const layout = this.plugin.store.data.workspaces[collection.workspaceId].sideLayout; const collapsed = layout.collapsedCollectionIds.includes(collection.id);
-    const row = parent.createDiv({ cls: `cp-outline-row${this.selectedOutlineCollectionId === collection.id ? " is-selected" : ""}${layout.focusedCollectionId === collection.id ? " is-current" : ""}`, attr: { style: `--cp-depth:${depth}`, title: "한 번 클릭: 선택 · 빠른 더블클릭: 내부 진입" } }); row.dataset.collectionId = collection.id; row.draggable = true;
+    const row = parent.createDiv({ cls: `cp-outline-row${this.outlineTargetSelected(target) ? " is-selected" : ""}${layout.focusedCollectionId === collection.id ? " is-current" : ""}`, attr: { style: `--cp-depth:${depth}`, title: "한 번 클릭: 선택 · Ctrl: 추가/해제 · Shift: 보이는 행 범위 · 빠른 더블클릭: 내부 진입" } }); row.dataset.collectionId = collection.id; row.draggable = true;
     const arrow = row.createEl("button", { cls: "cp-outline-arrow", attr: { "aria-label": collapsed ? "Expand" : "Collapse" } }); setIcon(arrow, collapsed ? "chevron-right" : "chevron-down");
     arrow.addEventListener("click", (event) => { event.stopPropagation(); layout.collapsedCollectionIds = collapsed ? layout.collapsedCollectionIds.filter((id) => id !== collection.id) : [...layout.collapsedCollectionIds, collection.id]; this.plugin.store.changed(); });
     row.createSpan({ cls: "cp-outline-row__title", text: collection.name });
@@ -659,9 +657,7 @@ export class SidePaletteView extends ItemView {
       if ((event.target as HTMLElement).closest("button")) return;
       const now = performance.now();
       const entersCollection = this.lastCollectionClick?.id === collection.id && now - this.lastCollectionClick.at <= 220;
-      this.selectedOutlineCollectionId = collection.id;
-      this.plugin.store.data.uiState.sideSelectedItemIds = [];
-      this.plugin.store.data.uiState.selectedItemId = null;
+      this.selectOutlineTarget(target, event);
       if (entersCollection) {
         layout.focusedCollectionId = collection.id;
         layout.selectedCollectionId = collection.id;
@@ -673,7 +669,9 @@ export class SidePaletteView extends ItemView {
     row.addEventListener("dragend", () => row.removeClass("is-dragging"));
     row.addEventListener("contextmenu", (event) => {
       event.preventDefault();
+      if (!this.outlineTargetSelected(target)) this.selectOutlineTarget(target);
       const menu = new Menu();
+      menu.addItem((entry) => entry.setTitle("Export selection as MindMap to Canvas").setIcon("git-branch").onClick(() => void this.plugin.exportOutlineSelectionAsMindMap(this.outlineSelection)));
       menu.addItem((entry) => entry.setTitle("Export collection to Canvas").setIcon("file-output").onClick(() => void this.plugin.exportCollectionSubtree(collection.id)));
       menu.showAtMouseEvent(event);
     });
@@ -684,7 +682,7 @@ export class SidePaletteView extends ItemView {
       const parentCollection = collection.parentId ? this.plugin.store.data.collections[collection.parentId] : null;
       const destination = parentCollection?.name ?? this.plugin.store.data.workspaces[collection.workspaceId]?.name ?? "the Workspace";
       new ConfirmDeleteCollectionModal(this.app, collection.name, destination, collection.itemIds.length, collection.childCollectionIds.length, () => {
-        if (this.selectedOutlineCollectionId === collection.id) this.selectedOutlineCollectionId = collection.parentId;
+        this.outlineSelection = this.outlineSelection.filter((entry) => entry.kind !== "collection" || entry.id !== collection.id);
         this.plugin.store.removeCollection(collection.id);
       }).open();
     });
@@ -695,8 +693,10 @@ export class SidePaletteView extends ItemView {
   }
 
   private renderOutlineItem(parent: HTMLElement, item: PaletteItem, depth: number, collectionId: string | null): void {
-    const selected = this.sideSelectedIds().includes(item.id);
-    const showMarker = selected && this.sideSelectedIds().length > 1;
+    const target: OutlineSelectionTarget = { kind: "item", id: item.id };
+    this.outlineRows.push(target);
+    const selected = this.outlineTargetSelected(target);
+    const showMarker = selected && this.outlineSelection.length > 1;
     const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${selected ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.itemId = item.id; row.draggable = true;
     const children = item.childItemIds ?? [];
     const layout = this.plugin.activeWorkspace()?.sideLayout;
@@ -712,9 +712,9 @@ export class SidePaletteView extends ItemView {
     for (const tag of item.tags) metadata.createSpan({ cls: "cp-outline-item__tag", text: `#${tag}` });
     if (item.label) { const label = metadata.createSpan({ cls: "cp-outline-item__label", text: item.label }); if (item.labelColor) label.style.setProperty("--cp-label-color", item.labelColor); }
     let clickTimer: number | null = null;
-    row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.pendingReveal = "viewport"; this.selectSideItem(item.id, event, this.outlineItemIds); }, 220); });
+    row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.pendingReveal = "viewport"; this.selectOutlineTarget(target, event); }, 220); });
     row.addEventListener("dblclick", () => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; void this.plugin.openSideItemPreview(item.id); });
-    row.addEventListener("contextmenu", (event) => this.itemMenu(event, item));
+    row.addEventListener("contextmenu", (event) => { if (!this.outlineTargetSelected(target)) this.selectOutlineTarget(target); this.itemMenu(event, item, true); });
     row.addEventListener("dragstart", (event) => { const selectedIds = this.sideSelectedIds(); event.dataTransfer?.setData("application/x-canvas-palette-item", item.id); event.dataTransfer?.setData("application/x-canvas-palette-items", JSON.stringify(selectedIds.includes(item.id) ? selectedIds : [item.id])); if (event.dataTransfer) event.dataTransfer.effectAllowed = "copyMove"; row.addClass("is-dragging"); });
     row.addEventListener("dragend", () => row.removeClass("is-dragging"));
     this.mountOutlineItemDropTarget(row, item.id, collectionId, item.parentItemId ?? null);
@@ -765,12 +765,6 @@ export class SidePaletteView extends ItemView {
     collect(focusedId); return ids.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
   }
 
-  private indexOutlineItem(itemId: string): void {
-    const item = this.plugin.store.data.items[itemId];
-    if (!item) return;
-    this.outlineItemIds.push(itemId);
-    for (const childId of item.childItemIds ?? []) this.indexOutlineItem(childId);
-  }
   private applyLayoutVariables(root: HTMLElement, layout: SideLayoutState): void {
     root.style.setProperty("--cp-side-upper-left", `${layout.viewportRatio}fr`);
     root.style.setProperty("--cp-side-upper-right", `${1 - layout.viewportRatio}fr`);
@@ -800,7 +794,7 @@ export class SidePaletteView extends ItemView {
   private clamp(value: number, minimum: number, maximum: number): number { return Math.max(minimum, Math.min(maximum, value)); }
   private setSideView(viewMode: "grid" | "list"): void { const workspace = this.plugin.activeWorkspace(); if (!workspace) return; workspace.sideLayout.viewMode = viewMode; workspace.sideLayout.densityLevel = viewMode === "list" ? 0 : Math.max(1, workspace.sideLayout.densityLevel || ASSET_DENSITY_DEFAULT); this.plugin.store.changed(); }
   private promptCollection(workspaceId: string, parentId: string | null): void { new TextPromptModal(this.app, "New collection", "", (value) => this.plugin.store.createCollection(workspaceId, value, parentId), "Collection name").open(); }
-  private itemMenu(event: MouseEvent, item: PaletteItem): void {
+  private itemMenu(event: MouseEvent, item: PaletteItem, fromOutliner = false): void {
     event.preventDefault(); const menu = new Menu(); const workspace = this.plugin.activeWorkspace();
     const selected = this.sideSelectedIds(); const targetIds = selected.includes(item.id) ? selected : [item.id];
     if (!selected.includes(item.id)) this.selectSideItem(item.id);
@@ -837,7 +831,7 @@ export class SidePaletteView extends ItemView {
       .setChecked(allInMini)
       .onClick(() => allInMini ? this.plugin.store.removeMiniStorageItems(targetIds) : this.plugin.sendItemsToMini(targetIds)));
     menu.addItem((entry) => entry.setTitle(`Export ${targetIds.length} item${targetIds.length === 1 ? "" : "s"} to Canvas`).setIcon("share-2").onClick(() => void this.plugin.exportItemsToActiveCanvas(targetIds)));
-    menu.addItem((entry) => entry.setTitle("Export from MindMap to Canvas").setIcon("git-branch").onClick(() => void this.plugin.exportItemsAsMindMap(targetIds)));
+    menu.addItem((entry) => entry.setTitle(fromOutliner ? "Export selection as MindMap to Canvas" : "Export from MindMap to Canvas").setIcon("git-branch").onClick(() => fromOutliner ? void this.plugin.exportOutlineSelectionAsMindMap(this.outlineSelection) : void this.plugin.exportItemsAsMindMap(targetIds)));
     if (workspace) menu.addItem((entry) => entry.setTitle("Move to…").setIcon("folder-input").onClick(() => new MoveItemsModal(this.app, workspace.name, Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id), targetIds.length, (collectionId) => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collectionId)).open()));
     const linkedLocations = this.plugin.store.linkedCanvasLocations(item);
     if (linkedLocations.length > 0) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => this.plugin.findLinkedCanvas(item)));
@@ -847,6 +841,23 @@ export class SidePaletteView extends ItemView {
   }
 
   private sideSelectedIds(): string[] { return this.plugin.store.data.uiState.sideSelectedItemIds; }
+  private outlineKey(target: OutlineSelectionTarget): string { return `${target.kind}:${target.id}`; }
+  private outlineTargetSelected(target: OutlineSelectionTarget): boolean { return this.outlineSelection.some((entry) => this.outlineKey(entry) === this.outlineKey(target)); }
+  private selectOutlineTarget(target: OutlineSelectionTarget, event?: Pick<MouseEvent | KeyboardEvent, "ctrlKey" | "metaKey" | "shiftKey">): void {
+    const targetKey = this.outlineKey(target); const toggle = Boolean(event?.ctrlKey || event?.metaKey);
+    if (event?.shiftKey && this.outlineSelectionAnchorKey) {
+      const start = this.outlineRows.findIndex((entry) => this.outlineKey(entry) === this.outlineSelectionAnchorKey);
+      const end = this.outlineRows.findIndex((entry) => this.outlineKey(entry) === targetKey);
+      this.outlineSelection = start >= 0 && end >= 0 ? this.outlineRows.slice(Math.min(start, end), Math.max(start, end) + 1) : [target];
+    } else if (toggle) {
+      this.outlineSelection = this.outlineTargetSelected(target) ? this.outlineSelection.filter((entry) => this.outlineKey(entry) !== targetKey) : [...this.outlineSelection, target];
+      this.outlineSelectionAnchorKey = targetKey;
+    } else { this.outlineSelection = [target]; this.outlineSelectionAnchorKey = targetKey; }
+    const itemIds = this.outlineSelection.filter((entry) => entry.kind === "item").map((entry) => entry.id);
+    this.plugin.store.data.uiState.sideSelectedItemIds = itemIds;
+    this.plugin.store.data.uiState.selectedItemId = itemIds.at(-1) ?? null;
+    this.plugin.store.changed();
+  }
   private selectSideItem(id: string, event?: Pick<MouseEvent | KeyboardEvent, "ctrlKey" | "metaKey" | "shiftKey">, orderedItemIds = this.visibleItemIds): void {
     const selected = this.sideSelectedIds();
     const toggle = Boolean(event?.ctrlKey || event?.metaKey);
@@ -865,11 +876,16 @@ export class SidePaletteView extends ItemView {
     }
     this.plugin.store.data.uiState.sideSelectedItemIds = next;
     this.plugin.store.data.uiState.selectedItemId = next.includes(id) ? id : next.at(-1) ?? null;
+    // Viewport selection is item-only, so it deliberately replaces any Outliner Collection rows.
+    this.outlineSelection = next.map((itemId) => ({ kind: "item" as const, id: itemId }));
+    this.outlineSelectionAnchorKey = this.selectionAnchorId ? `item:${this.selectionAnchorId}` : null;
     this.plugin.store.changed();
   }
   private clearSideSelection(): void {
     if (this.sideSelectedIds().length === 0) return;
     this.selectionAnchorId = null;
+    this.outlineSelection = [];
+    this.outlineSelectionAnchorKey = null;
     this.plugin.store.data.uiState.sideSelectedItemIds = [];
     this.plugin.store.data.uiState.selectedItemId = null;
     this.plugin.store.changed();

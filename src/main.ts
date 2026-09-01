@@ -8,7 +8,7 @@ import { PaletteDropController } from "./canvas/palette-drop-controller";
 import { TextScrapHighlights } from "./canvas/text-scrap-highlights";
 import { createId } from "./core/ids";
 import { PaletteStore } from "./core/store";
-import type { PaletteItem, PaletteWorkspace } from "./core/types";
+import type { OutlineSelectionTarget, PaletteItem, PaletteWorkspace } from "./core/types";
 import { PaletteEditorManager } from "./editor/editor-manager";
 import { FloatingMiniPalette } from "./mini-palette/floating-mini-palette";
 import { PreviewService } from "./preview/preview-service";
@@ -291,6 +291,12 @@ export default class CanvasPalettePlugin extends Plugin {
   async exportItemsAsMindMap(itemIds: string[]): Promise<boolean> {
     const tree = this.exportSelectedItemTree(itemIds);
     if (tree.length === 0) { new Notice("Select one or more Palette items first."); return false; }
+    return this.beginExport((context) => this.canvas.createTreeBundle(tree, context));
+  }
+
+  async exportOutlineSelectionAsMindMap(targets: OutlineSelectionTarget[]): Promise<boolean> {
+    const tree = this.exportOutlineSelectionTree(targets);
+    if (tree.length === 0) { new Notice("Select one or more Outliner rows first."); return false; }
     return this.beginExport((context) => this.canvas.createTreeBundle(tree, context));
   }
 
@@ -669,6 +675,32 @@ export default class CanvasPalettePlugin extends Plugin {
       for (const childId of item.childItemIds ?? []) addItem(childId, id, nextPath);
     };
     for (const itemId of selected) if (!hasSelectedAncestor(itemId)) addItem(itemId, null, new Set<string>());
+    return entries;
+  }
+
+  private exportOutlineSelectionTree(targets: OutlineSelectionTarget[]): Array<{ id: string; name: string; parentId: string | null; item?: PaletteItem }> {
+    const workspace = this.activeWorkspace();
+    if (!workspace) return [];
+    const selectedCollections = new Set(targets.filter((target) => target.kind === "collection").map((target) => target.id)
+      .filter((id) => this.store.data.collections[id]?.workspaceId === workspace.id));
+    const selectedItems = new Set(targets.filter((target) => target.kind === "item").map((target) => target.id)
+      .filter((id) => Boolean(this.store.data.items[id])));
+    const entries: Array<{ id: string; name: string; parentId: string | null; item?: PaletteItem }> = [];
+    for (const collectionId of selectedCollections) {
+      const collection = this.store.data.collections[collectionId];
+      entries.push({ id: `mindmap:collection:${collection.id}`, name: collection.name, parentId: collection.parentId && selectedCollections.has(collection.parentId) ? `mindmap:collection:${collection.parentId}` : null });
+    }
+    const parentByChild = new Map<string, string>();
+    for (const candidate of this.store.allItems()) for (const childId of candidate.childItemIds ?? []) if (!parentByChild.has(childId)) parentByChild.set(childId, candidate.id);
+    for (const itemId of selectedItems) {
+      const item = this.store.data.items[itemId];
+      const parentItemId = item.parentItemId ?? parentByChild.get(item.id) ?? null;
+      const containingCollection = Object.values(this.store.data.collections).find((collection) => collection.workspaceId === workspace.id && collection.itemIds.includes(item.id));
+      const parentId = parentItemId && selectedItems.has(parentItemId)
+        ? `mindmap:item:${parentItemId}`
+        : containingCollection && selectedCollections.has(containingCollection.id) ? `mindmap:collection:${containingCollection.id}` : null;
+      entries.push({ id: `mindmap:item:${item.id}`, name: item.displayTitle, parentId, item });
+    }
     return entries;
   }
 
