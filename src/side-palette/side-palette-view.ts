@@ -837,6 +837,7 @@ export class SidePaletteView extends ItemView {
       .setChecked(allInMini)
       .onClick(() => allInMini ? this.plugin.store.removeMiniStorageItems(targetIds) : this.plugin.sendItemsToMini(targetIds)));
     menu.addItem((entry) => entry.setTitle(`Export ${targetIds.length} item${targetIds.length === 1 ? "" : "s"} to Canvas`).setIcon("share-2").onClick(() => void this.plugin.exportItemsToActiveCanvas(targetIds)));
+    menu.addItem((entry) => entry.setTitle("Export from MindMap to Canvas").setIcon("git-branch").onClick(() => void this.plugin.exportItemsAsMindMap(targetIds)));
     if (workspace) menu.addItem((entry) => entry.setTitle("Move to…").setIcon("folder-input").onClick(() => new MoveItemsModal(this.app, workspace.name, Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id), targetIds.length, (collectionId) => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collectionId)).open()));
     const linkedLocations = this.plugin.store.linkedCanvasLocations(item);
     if (linkedLocations.length > 0) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => this.plugin.findLinkedCanvas(item)));

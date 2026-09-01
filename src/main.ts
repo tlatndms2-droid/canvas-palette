@@ -288,6 +288,12 @@ export default class CanvasPalettePlugin extends Plugin {
     return this.beginExport((context) => this.canvas.createItemBundle(items, context));
   }
 
+  async exportItemsAsMindMap(itemIds: string[]): Promise<boolean> {
+    const tree = this.exportSelectedItemTree(itemIds);
+    if (tree.length === 0) { new Notice("Select one or more Palette items first."); return false; }
+    return this.beginExport((context) => this.canvas.createTreeBundle(tree, context));
+  }
+
   private editCanvasNodesMetadata(nodes: unknown[]): void {
     const targets = nodes.map((node) => this.canvas.nodeContext(node)).filter((target): target is { canvasPath: string; nodeId: string } => Boolean(target));
     if (targets.length === 0) { new Notice("Unable to identify the selected Canvas items."); return; }
@@ -633,6 +639,36 @@ export default class CanvasPalettePlugin extends Plugin {
     entries.push({ id: root, name: workspace.name, parentId: null });
     for (const collectionId of workspace.rootCollectionIds) addCollection(collectionId, root);
     for (const itemId of workspace.looseItemIds) addItem(itemId, root);
+    return entries;
+  }
+
+  private exportSelectedItemTree(itemIds: string[]): Array<{ id: string; name: string; parentId: string | null; item: PaletteItem }> {
+    const selected = new Set(itemIds.filter((id) => Boolean(this.store.data.items[id])));
+    if (selected.size === 0) return [];
+    const parentByChild = new Map<string, string>();
+    for (const item of this.store.allItems()) for (const childId of item.childItemIds ?? []) if (!parentByChild.has(childId)) parentByChild.set(childId, item.id);
+    const hasSelectedAncestor = (itemId: string): boolean => {
+      const visited = new Set<string>();
+      let parentId = this.store.data.items[itemId]?.parentItemId ?? parentByChild.get(itemId) ?? null;
+      while (parentId && !visited.has(parentId)) {
+        if (selected.has(parentId)) return true;
+        visited.add(parentId);
+        parentId = this.store.data.items[parentId]?.parentItemId ?? parentByChild.get(parentId) ?? null;
+      }
+      return false;
+    };
+    const entries: Array<{ id: string; name: string; parentId: string | null; item: PaletteItem }> = [];
+    const added = new Set<string>();
+    const addItem = (itemId: string, parentId: string | null, path: Set<string>): void => {
+      const item = this.store.data.items[itemId];
+      if (!item || path.has(itemId) || added.has(itemId)) return;
+      const id = `mindmap:item:${item.id}`;
+      entries.push({ id, name: item.displayTitle, parentId, item });
+      added.add(itemId);
+      const nextPath = new Set(path); nextPath.add(itemId);
+      for (const childId of item.childItemIds ?? []) addItem(childId, id, nextPath);
+    };
+    for (const itemId of selected) if (!hasSelectedAncestor(itemId)) addItem(itemId, null, new Set<string>());
     return entries;
   }
 

@@ -452,6 +452,7 @@ export class CanvasAdapter {
   createTreeBundle(entries: CanvasExportEntry[], context: CanvasContext): ExportBundle {
     if (entries.length === 0) return this.emptyBundle();
     const positions = this.treeLayout(entries);
+    const depths = this.treeDepths(entries);
     const document = this.currentDocument(context);
     const usedNodeIds = new Set(document.nodes.map((node) => node.id));
     const usedEdgeIds = new Set(document.edges.map((edge) => edge.id));
@@ -463,11 +464,12 @@ export class CanvasAdapter {
     const warnings: string[] = [];
     for (const entry of entries) {
       const position = positions.get(entry.id) ?? { x: 0, y: 0 };
+      const headingLevel = Math.min(6, (depths.get(entry.id) ?? 0) + 1);
       if (!entry.item) {
-        const node = this.headingNode(entry.name, entry.parentId === null, position.x, position.y, () => this.uniqueId("node", usedNodeIds));
+        const node = this.headingNode(entry.name, headingLevel, position.x, position.y, () => this.uniqueId("node", usedNodeIds));
         canvasNodes.push(node); anchors.set(entry.id, node.id); continue;
       }
-      const material = this.materializeItem(entry.item, position.x, position.y, usedNodeIds, usedEdgeIds);
+      const material = this.materializeItem(entry.item, position.x, position.y, usedNodeIds, usedEdgeIds, headingLevel);
       if (!material) { warnings.push(`${entry.item.displayTitle}: stored Group data is unavailable.`); continue; }
       canvasNodes.push(...material.nodes); edges.push(...material.edges); metadata.push(...material.metadata); warnings.push(...material.warnings);
       if (material.anchorNodeId) anchors.set(entry.id, material.anchorNodeId);
@@ -514,12 +516,18 @@ export class CanvasAdapter {
     return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", backContent: "", facesEnabled: false, createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
   }
 
-  private materializeItem(item: PaletteItem, x: number, y: number, usedNodeIds: Set<string>, usedEdgeIds: Set<string>): RestoredMaterial | null {
+  private materializeItem(item: PaletteItem, x: number, y: number, usedNodeIds: Set<string>, usedEdgeIds: Set<string>, headingLevel?: number): RestoredMaterial | null {
     if (item.type === "group") {
       if (!item.group) return null;
       const snapshot = restoreGroup(item.group, x, y, () => this.uniqueId("node", usedNodeIds), () => this.uniqueId("edge", usedEdgeIds));
-      const placementNodeIds = snapshot.nodes.filter((node) => node.type === "group").map((node) => node.id);
-      const anchorNodeId = placementNodeIds[0] ?? snapshot.nodes[0]?.id ?? null;
+      const groupNodeIds = snapshot.nodes.filter((node) => node.type === "group").map((node) => node.id);
+      const placementNodeIds = groupNodeIds.length > 0 ? groupNodeIds : snapshot.nodes.map((node) => node.id);
+      const outerGroup = snapshot.nodes.find((node) => node.type === "group" && !node.parentId) ?? snapshot.nodes.find((node) => node.type === "group");
+      const anchorNodeId = snapshot.nodes.find((node) => node.parentId === outerGroup?.id && node.type !== "group")?.id
+        ?? snapshot.nodes.find((node) => node.type !== "group")?.id
+        ?? outerGroup?.id
+        ?? snapshot.nodes[0]?.id
+        ?? null;
       const metadata = [...snapshot.originalToRestored.entries()].flatMap(([originalId, restoredId]) => {
         const legacyBack = item.group?.nodeBacks?.[originalId];
         const source = item.group?.nodeMetadata?.[originalId] ?? (legacyBack ? { tags: [], label: "", labelColor: "", caption: "", backContent: legacyBack, currentFace: "front" as const, facesEnabled: true, modifiedAt: item.modifiedAt } : null);
@@ -527,28 +535,36 @@ export class CanvasAdapter {
       });
       return { nodes: snapshot.nodes, edges: snapshot.edges, anchorNodeId, placementNodeIds, metadata, warnings: snapshot.discardedReferences > 0 ? [`${item.displayTitle}: ${snapshot.discardedReferences} damaged Group reference${snapshot.discardedReferences === 1 ? " was" : "s were"} skipped.`] : [] };
     }
-    const restored = this.restoreNodeForItem(item, x, y, () => this.uniqueId("node", usedNodeIds));
+    const restored = this.restoreNodeForItem(item, x, y, () => this.uniqueId("node", usedNodeIds), headingLevel);
     if (!restored.node) return { nodes: [], edges: [], anchorNodeId: null, placementNodeIds: [], metadata: [], warnings: restored.warning ? [restored.warning] : [] };
     const metadata: PaletteMetadata = { tags: [...item.tags], label: item.label, labelColor: item.labelColor, caption: item.caption, backContent: item.backContent, currentFace: "front", facesEnabled: item.facesEnabled, modifiedAt: item.modifiedAt };
     return { nodes: [restored.node], edges: [], anchorNodeId: restored.node.id, placementNodeIds: [restored.node.id], metadata: [{ nodeId: restored.node.id, metadata }], warnings: restored.warning ? [restored.warning] : [] };
   }
 
-  private restoreNodeForItem(item: PaletteItem, x: number, y: number, nextId: () => string): { node: CanvasNodeSnapshot | null; warning?: string } {
+  private restoreNodeForItem(item: PaletteItem, x: number, y: number, nextId: () => string, headingLevel?: number): { node: CanvasNodeSnapshot | null; warning?: string } {
+    const size = this.itemNodeSize(item, headingLevel);
     if (item.type === "markdown") {
       const file = !item.sourceDeletedAt && item.origin.filePath ? this.app.vault.getAbstractFileByPath(item.origin.filePath) : null;
-      if (file instanceof TFile) return { node: { id: nextId(), type: "file", file: file.path, x, y, width: 280, height: 180 } };
-      return { node: { id: nextId(), type: "text", text: item.content ?? item.displayTitle, x, y, width: 280, height: 180 }, warning: `${item.displayTitle}: Markdown source was unavailable, so stored content was exported as a Card.` };
+      if (file instanceof TFile) return { node: { id: nextId(), type: "file", file: file.path, x, y, width: size.width, height: size.height } };
+      const title = headingLevel ? `${"#".repeat(Math.min(6, headingLevel))} ${item.displayTitle}` : null;
+      const body = item.content ?? "";
+      const text = title ? `${title}${body.trim() && body.trim() !== item.displayTitle ? `\n\n${body}` : ""}` : body || item.displayTitle;
+      return { node: { id: nextId(), type: "text", text, x, y, width: size.width, height: size.height }, warning: `${item.displayTitle}: Markdown source was unavailable, so stored content was exported as a Card.` };
     }
     if (item.type === "image") {
       const file = item.origin.filePath ? this.app.vault.getAbstractFileByPath(item.origin.filePath) : null;
       if (!(file instanceof TFile)) return { node: null, warning: `${item.displayTitle}: image source was unavailable and was skipped.` };
-      return { node: { id: nextId(), type: "file", file: file.path, x, y, width: 360, height: 240 } };
+      return { node: { id: nextId(), type: "file", file: file.path, x, y, width: size.width, height: size.height } };
     }
-    return { node: { id: nextId(), type: "text", text: item.content ?? item.displayTitle, x, y, width: 280, height: 180 } };
+    const body = item.content ?? "";
+    const title = headingLevel ? `${"#".repeat(Math.min(6, headingLevel))} ${item.displayTitle}` : null;
+    const text = title ? `${title}${body.trim() && body.trim() !== item.displayTitle ? `\n\n${body}` : ""}` : body || item.displayTitle;
+    return { node: { id: nextId(), type: "text", text, x, y, width: size.width, height: size.height } };
   }
 
-  private headingNode(name: string, root: boolean, x: number, y: number, nextId: () => string): CanvasNodeSnapshot {
-    return { id: nextId(), type: "text", text: name, x, y, width: root ? 300 : 240, height: root ? 90 : 64 };
+  private headingNode(name: string, headingLevel: number, x: number, y: number, nextId: () => string): CanvasNodeSnapshot {
+    const size = this.headingSize(headingLevel);
+    return { id: nextId(), type: "text", text: `${"#".repeat(headingLevel)} ${name}`, x, y, width: size.width, height: size.height };
   }
 
   private treeLayout(entries: CanvasExportEntry[]): Map<string, { x: number; y: number }> {
@@ -559,17 +575,11 @@ export class CanvasAdapter {
       if (!entry.parentId || !byId.has(entry.parentId)) roots.push(entry.id);
       else children.set(entry.parentId, [...(children.get(entry.parentId) ?? []), entry.id]);
     }
-    const depths = new Map<string, number>();
-    const depthOf = (id: string, visiting = new Set<string>()): number => {
-      if (depths.has(id)) return depths.get(id)!;
-      const entry = byId.get(id); if (!entry || !entry.parentId || !byId.has(entry.parentId) || visiting.has(id)) return 0;
-      visiting.add(id); const depth = depthOf(entry.parentId, visiting) + 1; visiting.delete(id); depths.set(id, depth); return depth;
-    };
-    const size = (entry: CanvasExportEntry): { width: number; height: number } => entry.item?.type === "group"
-      ? { width: Math.max(280, entry.item.group?.bounds.width ?? 280), height: Math.max(180, entry.item.group?.bounds.height ?? 180) }
-      : entry.item?.type === "image" ? { width: 360, height: 240 }
-      : entry.item ? { width: 280, height: 180 }
-      : { width: entry.parentId === null ? 300 : 240, height: entry.parentId === null ? 90 : 64 };
+    const depths = this.treeDepths(entries);
+    const depthOf = (id: string): number => depths.get(id) ?? 0;
+    const size = (entry: CanvasExportEntry): { width: number; height: number } => entry.item
+      ? this.itemNodeSize(entry.item, Math.min(6, depthOf(entry.id) + 1))
+      : this.headingSize(Math.min(6, depthOf(entry.id) + 1));
     const maxWidth = new Map<number, number>();
     for (const entry of entries) { const depth = depthOf(entry.id); maxWidth.set(depth, Math.max(maxWidth.get(depth) ?? 0, size(entry).width)); }
     const xByDepth = new Map<number, number>();
@@ -596,6 +606,36 @@ export class CanvasAdapter {
     let rootTop = 0;
     for (const id of roots) { place(id, rootTop); rootTop += heightOf(id) + 56; }
     return layout;
+  }
+
+  private treeDepths(entries: CanvasExportEntry[]): Map<string, number> {
+    const byId = new Map(entries.map((entry) => [entry.id, entry]));
+    const depths = new Map<string, number>();
+    const depthOf = (id: string, visiting = new Set<string>()): number => {
+      if (depths.has(id)) return depths.get(id)!;
+      const entry = byId.get(id);
+      if (!entry?.parentId || !byId.has(entry.parentId) || visiting.has(id)) return 0;
+      visiting.add(id);
+      const depth = depthOf(entry.parentId, visiting) + 1;
+      visiting.delete(id);
+      depths.set(id, depth);
+      return depth;
+    };
+    for (const entry of entries) depthOf(entry.id);
+    return depths;
+  }
+
+  private headingSize(headingLevel: number): { width: number; height: number } {
+    if (headingLevel <= 1) return { width: 300, height: 96 };
+    if (headingLevel === 2) return { width: 270, height: 80 };
+    return { width: 240, height: 68 };
+  }
+
+  private itemNodeSize(item: PaletteItem, headingLevel?: number): { width: number; height: number } {
+    if (item.type === "group") return { width: Math.max(280, item.group?.bounds.width ?? 280), height: Math.max(180, item.group?.bounds.height ?? 180) };
+    const scale = headingLevel ? Math.max(0.72, 1 - (headingLevel - 1) * 0.08) : 1;
+    if (item.type === "image") return { width: Math.round(360 * scale), height: Math.round(240 * scale) };
+    return { width: Math.round(280 * scale), height: Math.round(180 * scale) };
   }
 
   bundleDuplicateItemIds(bundle: ExportBundle, context: CanvasContext): string[] {
