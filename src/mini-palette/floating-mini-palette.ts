@@ -5,6 +5,7 @@ import { ConfirmDeleteModal, ConfirmMiniStorageRemovalModal, TagLabelModal } fro
 import { makeHorizontalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
 import { applyAssetDensity, assetDensityLabel, ASSET_DENSITY_MAX, ASSET_DENSITY_MIN, nextAssetDensity } from "../ui/asset-density";
+import { attachedFlyoutPlacement, miniLayoutMode, type FlyoutSide, type MiniLayoutMode } from "../ui/responsive-layout";
 
 type TypeFilter = "all" | PaletteItemType;
 
@@ -22,6 +23,15 @@ export class FloatingMiniPalette {
   private rightPane?: HTMLElement;
   private detachDrop?: () => void;
   private suppressBlankClick = false;
+  private layoutMode: MiniLayoutMode = "wide";
+  private resizeObserver?: ResizeObserver;
+  private openFlyout: "control" | "preview" | null = null;
+  private flyoutSide: FlyoutSide = "right";
+  private flyoutWidth = 320;
+  private responsivePanelLeft: number | null = null;
+  private flyoutCleanup?: () => void;
+  private isResizing = false;
+  private readonly scrollMemory: Record<string, number> = {};
 
   constructor(private readonly plugin: CanvasPalettePlugin) {}
 
@@ -56,15 +66,21 @@ export class FloatingMiniPalette {
     this.detachDrop = () => { canvas.removeEventListener("dragover", onDragOver, true); canvas.removeEventListener("drop", onDrop, true); };
   }
 
-  private destroyPanel(): void { this.panel?.remove(); this.panel = undefined; this.rightPane = undefined; this.inspectorItemId = null; this.hoverItemId = null; }
+  private destroyPanel(): void { this.resizeObserver?.disconnect(); this.resizeObserver = undefined; this.flyoutCleanup?.(); this.flyoutCleanup = undefined; this.panel?.remove(); this.panel = undefined; this.rightPane = undefined; this.inspectorItemId = null; this.hoverItemId = null; this.openFlyout = null; this.responsivePanelLeft = null; }
 
   private render(): void {
     if (!this.host || !this.plugin.store.data.uiState.miniPalette.isOpen) return;
+    const viewState = this.captureViewState();
+    this.resizeObserver?.disconnect(); this.resizeObserver = undefined;
+    this.flyoutCleanup?.(); this.flyoutCleanup = undefined;
     this.panel?.remove();
     const state = this.plugin.store.data.uiState.miniPalette;
-    const panel = this.host.createDiv({ cls: `canvas-palette cp-mini-float cp-theme-${this.plugin.store.data.settings.theme}` });
+    const geometryChanged = this.clampGeometry();
+    this.layoutMode = miniLayoutMode(state.size.width);
+    const panel = this.host.createDiv({ cls: `canvas-palette cp-mini-float cp-mini-layout--${this.layoutMode} cp-theme-${this.plugin.store.data.settings.theme}` });
     this.panel = panel;
-    panel.style.left = `${state.position.x}px`; panel.style.top = `${state.position.y}px`; panel.style.width = `${state.size.width}px`; panel.style.height = `${state.size.height}px`;
+    panel.dataset.layoutMode = this.layoutMode;
+    panel.style.left = `${this.responsivePanelLeft ?? state.position.x}px`; panel.style.top = `${state.position.y}px`; panel.style.width = `${state.size.width}px`; panel.style.height = `${state.size.height}px`;
     panel.style.setProperty("--cp-left-pane-width", `${state.leftPaneWidth}px`); panel.style.setProperty("--cp-right-pane-width", `${state.rightPaneWidth}px`);
     this.applyAccent(panel);
     const header = panel.createDiv({ cls: "cp-mini-float__header" });
@@ -79,6 +95,9 @@ export class FloatingMiniPalette {
       this.makeResizable(resize, panel, direction);
     }
     if (state.tab === "collect" && this.inspectorItemId) this.renderInspector();
+    this.observePanel(panel);
+    this.restoreViewState(viewState);
+    if (geometryChanged) window.setTimeout(() => this.plugin.store.changed(), 0);
   }
 
   private tabButton(parent: HTMLElement, tab: "collect" | "storage", label: string): void {
@@ -137,26 +156,38 @@ export class FloatingMiniPalette {
 
   private renderStorage(panel: HTMLElement): void {
     const state = this.plugin.store.data.uiState.miniPalette;
-    const shell = panel.createDiv({ cls: `cp-storage-shell${state.leftPaneOpen ? " has-left" : ""}${state.rightPaneOpen ? " has-right" : ""}` });
-    if (state.leftPaneOpen) { const left = shell.createDiv({ cls: "cp-storage-left" }); this.renderLeftPane(left); const divider = shell.createDiv({ cls: "cp-divider cp-divider--vertical" }); makeHorizontalDivider(divider, (x) => { const rect = panel.getBoundingClientRect(); state.leftPaneWidth = Math.max(190, Math.min(390, x - rect.left)); panel.style.setProperty("--cp-left-pane-width", `${state.leftPaneWidth}px`); }, () => this.plugin.store.changed()); }
+    const showLeftPane = this.layoutMode === "wide" && state.leftPaneOpen;
+    const showRightPane = (this.layoutMode === "wide" || this.layoutMode === "medium") && state.rightPaneOpen;
+    const shell = panel.createDiv({ cls: `cp-storage-shell${showLeftPane ? " has-left" : ""}${showRightPane ? " has-right" : ""}` });
+    if (showLeftPane) { const left = shell.createDiv({ cls: "cp-storage-left" }); this.renderLeftPane(left); const divider = shell.createDiv({ cls: "cp-divider cp-divider--vertical" }); makeHorizontalDivider(divider, (x) => { const rect = panel.getBoundingClientRect(); state.leftPaneWidth = Math.max(190, Math.min(390, x - rect.left)); panel.style.setProperty("--cp-left-pane-width", `${state.leftPaneWidth}px`); }, () => this.plugin.store.changed()); }
     const main = shell.createDiv({ cls: "cp-storage-main" }); this.renderStorageMain(main);
-    if (state.rightPaneOpen) { const divider = shell.createDiv({ cls: "cp-divider cp-divider--vertical" }); makeHorizontalDivider(divider, (x) => { const rect = panel.getBoundingClientRect(); state.rightPaneWidth = Math.max(240, Math.min(460, rect.right - x)); panel.style.setProperty("--cp-right-pane-width", `${state.rightPaneWidth}px`); }, () => this.plugin.store.changed()); const right = shell.createDiv({ cls: "cp-storage-right" }); this.rightPane = right; this.renderRightPane(right); }
+    if (showRightPane) { const divider = shell.createDiv({ cls: "cp-divider cp-divider--vertical" }); makeHorizontalDivider(divider, (x) => { const rect = panel.getBoundingClientRect(); state.rightPaneWidth = Math.max(240, Math.min(460, rect.right - x)); panel.style.setProperty("--cp-right-pane-width", `${state.rightPaneWidth}px`); }, () => this.plugin.store.changed()); const right = shell.createDiv({ cls: "cp-storage-right" }); this.rightPane = right; this.renderRightPane(right); }
     const visibleIds = new Set(this.storageItems().map((item) => item.id));
     const selected = this.storageSelectedIds();
     const hiddenCount = selected.filter((id) => !visibleIds.has(id)).length;
     const bottom = panel.createDiv({ cls: "cp-bottom cp-bottom--float" }); bottom.createSpan({ text: `Total ${this.storageItems().length} · Selected ${selected.length}${hiddenCount > 0 ? ` (${hiddenCount} hidden)` : ""}` });
     const placeButton = bottom.createEl("button", { text: "Place on Canvas" }); placeButton.disabled = selected.length === 0; placeButton.addEventListener("click", () => void this.placeSelectedOnCanvas());
-    const tagEdit = bottom.createEl("button", { text: "Edit metadata" }); tagEdit.addEventListener("click", () => this.editSelectedMetadata());
-    const remove = bottom.createEl("button", { text: "Remove from Mini" }); remove.disabled = selected.length === 0; remove.addEventListener("click", () => this.confirmMiniStorageRemoval(selected));
+    if (this.layoutMode === "minimum") {
+      const more = iconButton(bottom, "ellipsis", "More Mini Palette actions", () => {
+        const menu = new Menu();
+        menu.addItem((entry) => entry.setTitle("Edit metadata").setIcon("tags").onClick(() => this.editSelectedMetadata()));
+        menu.addItem((entry) => entry.setTitle("Remove from Mini").setIcon("unlink").setDisabled(selected.length === 0).onClick(() => this.confirmMiniStorageRemoval(selected)));
+        const rect = more.getBoundingClientRect(); menu.showAtPosition({ x: rect.right, y: rect.top });
+      });
+    } else {
+      const tagEdit = bottom.createEl("button", { text: "Edit metadata" }); tagEdit.addEventListener("click", () => this.editSelectedMetadata());
+      const remove = bottom.createEl("button", { text: "Remove from Mini" }); remove.disabled = selected.length === 0; remove.addEventListener("click", () => this.confirmMiniStorageRemoval(selected));
+    }
+    if (this.openFlyout) this.renderResponsiveFlyout(panel, this.openFlyout);
   }
 
-  private renderLeftPane(parent: HTMLElement): void {
-    const head = parent.createDiv({ cls: "cp-pane-heading" }); head.createEl("h4", { text: "Control panel" }); iconButton(head, "panel-left-close", "Close left pane", () => { this.plugin.store.data.uiState.miniPalette.leftPaneOpen = false; this.plugin.store.changed(); });
-    parent.createEl("label", { text: "Search" }); const search = parent.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Title, tag, caption" }, value: this.search }); search.addEventListener("input", () => { this.search = search.value; this.refreshStorageItems(); });
+  private renderLeftPane(parent: HTMLElement, close?: () => void): void {
+    const head = parent.createDiv({ cls: "cp-pane-heading" }); head.createEl("h4", { text: "Control panel" }); iconButton(head, close ? "x" : "panel-left-close", close ? "Close control flyout" : "Close left pane", close ?? (() => { this.plugin.store.data.uiState.miniPalette.leftPaneOpen = false; this.plugin.store.changed(); }));
+    parent.createEl("label", { text: "Search" }); const search = parent.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Title, tag, caption", "data-cp-focus": "mini-control-search" }, value: this.search }); search.addEventListener("input", () => { this.search = search.value; this.refreshStorageItems(); });
     parent.createEl("label", { text: "Sort" }); const sort = parent.createEl("select", { cls: "dropdown" }); for (const [value, label] of [["modified-desc", "Modified (newest)"], ["modified-asc", "Modified (oldest)"], ["title-asc", "Title (A-Z)"], ["title-desc", "Title (Z-A)"]] as const) sort.createEl("option", { value, text: label }); sort.value = this.plugin.store.data.uiState.miniPalette.sort; sort.addEventListener("change", () => { this.plugin.store.data.uiState.miniPalette.sort = sort.value as typeof this.plugin.store.data.uiState.miniPalette.sort; this.plugin.store.changed(); });
     this.renderDensityControl(parent, "Mini Palette item size");
     parent.createEl("label", { text: "Date" }); const date = parent.createEl("select", { cls: "dropdown" }); for (const [value, text] of [["all", "All dates"], ["today", "Today"], ["week", "Last 7 days"], ["month", "Last 30 days"]] as const) date.createEl("option", { value, text }); date.value = this.dateFilter; date.addEventListener("change", () => { this.dateFilter = date.value as typeof this.dateFilter; this.refreshStorageItems(); });
-    parent.createEl("label", { text: "Filter type" }); const types = parent.createDiv({ cls: "cp-filter-chips" }); for (const type of ["all", "card", "markdown", "image", "group"] as const) { const button = types.createEl("button", { text: type === "all" ? "All" : type === "markdown" ? "MD" : type, cls: this.typeFilter === type ? "is-active" : "" }); button.addEventListener("click", () => { this.typeFilter = type; this.render(); }); }
+    parent.createEl("label", { text: "Filter type" }); const types = parent.createDiv({ cls: "cp-filter-chips" }); for (const type of ["all", "card", "markdown", "image", "group"] as const) { const button = types.createEl("button", { text: type === "all" ? "All" : type === "markdown" ? "MD" : type, cls: this.typeFilter === type ? "is-active" : "" }); button.addEventListener("click", () => { this.typeFilter = type; for (const chip of Array.from(types.querySelectorAll("button"))) chip.toggleClass("is-active", chip === button); this.refreshStorageItems(); }); }
     parent.createEl("label", { text: "Tag filter" }); const tag = parent.createEl("input", { attr: { placeholder: "#tag" }, value: this.tagFilter }); tag.addEventListener("input", () => { this.tagFilter = tag.value.replace(/^#/, ""); this.refreshStorageItems(); });
     parent.createEl("label", { text: "Label filter" }); const label = parent.createEl("input", { attr: { placeholder: "Label" }, value: this.labelFilter }); label.addEventListener("input", () => { this.labelFilter = label.value; this.refreshStorageItems(); });
   }
@@ -164,22 +195,36 @@ export class FloatingMiniPalette {
   private renderStorageMain(parent: HTMLElement): void {
     const state = this.plugin.store.data.uiState.miniPalette;
     const heading = parent.createDiv({ cls: "cp-storage-heading" });
-    if (!this.plugin.store.data.uiState.miniPalette.leftPaneOpen) iconButton(heading, "panel-left-open", "Open left pane", () => { this.plugin.store.data.uiState.miniPalette.leftPaneOpen = true; this.plugin.store.changed(); });
+    if (this.layoutMode !== "wide") this.flyoutTrigger(heading, "control", "panel-left-open", "Open control flyout");
+    else if (!state.leftPaneOpen) iconButton(heading, "panel-left-open", "Open left pane", () => { state.leftPaneOpen = true; this.plugin.store.changed(); });
     heading.createSpan({ text: "Assets" });
     for (const [mode, icon, label] of [["grid", "layout-grid", "Grid view"], ["list", "list", "List view"]] as const) { const button = iconButton(heading, icon, label, () => { state.viewMode = mode; state.densityLevel = mode === "list" ? 0 : Math.max(1, state.densityLevel || 4); this.plugin.store.changed(); }); if (state.viewMode === mode) button.addClass("is-active"); }
-    if (!this.plugin.store.data.uiState.miniPalette.rightPaneOpen) iconButton(heading, "panel-right-open", "Open preview pane", () => { this.plugin.store.data.uiState.miniPalette.rightPaneOpen = true; this.plugin.store.changed(); });
-    if (!state.leftPaneOpen) {
+    if (this.layoutMode === "narrow" || this.layoutMode === "minimum") this.flyoutTrigger(heading, "preview", "panel-right-open", "Open preview flyout");
+    else if (!state.rightPaneOpen) iconButton(heading, "panel-right-open", "Open preview pane", () => { state.rightPaneOpen = true; this.plugin.store.changed(); });
+    if (this.layoutMode !== "wide" || !state.leftPaneOpen) {
       const quick = parent.createDiv({ cls: "cp-mini-quick-controls" });
-      const search = quick.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search assets" }, value: this.search }); search.addEventListener("input", () => { this.search = search.value; this.refreshStorageItems(); });
+      const search = quick.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search assets", "data-cp-focus": "mini-quick-search" }, value: this.search }); search.addEventListener("input", () => { this.search = search.value; this.refreshStorageItems(); });
       const type = quick.createEl("select", { cls: "dropdown", attr: { "aria-label": "Type filter" } });
       for (const value of ["all", "card", "markdown", "image", "group"] as const) type.createEl("option", { value, text: value === "all" ? "All types" : value === "markdown" ? "MD" : value });
       type.value = this.typeFilter; type.addEventListener("change", () => { this.typeFilter = type.value as TypeFilter; this.refreshStorageItems(); });
       this.renderDensityControl(quick, "Item size", true);
     }
     const grid = parent.createDiv({ cls: "cp-asset-grid" });
+    this.configureStorageGrid(parent, grid);
+  }
+
+  private configureStorageGrid(parent: HTMLElement, grid: HTMLElement): void {
+    const state = this.plugin.store.data.uiState.miniPalette;
     state.densityLevel = applyAssetDensity(grid, state.densityLevel, "cp-asset-grid");
     state.viewMode = state.densityLevel === 0 ? "list" : "grid";
     grid.addEventListener("wheel", (event) => { if (!event.ctrlKey && !event.metaKey) return; event.preventDefault(); event.stopPropagation(); state.densityLevel = nextAssetDensity(state.densityLevel, event.deltaY); state.viewMode = state.densityLevel === 0 ? "list" : "grid"; applyAssetDensity(grid, state.densityLevel, "cp-asset-grid"); this.plugin.store.changed(); }, { passive: false });
+    this.populateStorageGrid(grid);
+    this.mountStorageSelection(parent, grid);
+  }
+
+  private populateStorageGrid(grid: HTMLElement): void {
+    const state = this.plugin.store.data.uiState.miniPalette;
+    applyAssetDensity(grid, state.densityLevel, "cp-asset-grid");
     const storageItems = this.storageItems();
     const orderedIds = storageItems.map((item) => item.id);
     for (const item of storageItems) {
@@ -192,12 +237,11 @@ export class FloatingMiniPalette {
       card.addEventListener("mouseleave", () => { if (this.hoverItemId === item.id) { this.hoverItemId = null; if (this.rightPane) this.renderRightPane(this.rightPane); } });
     }
     if (grid.childElementCount === 0) grid.createDiv({ cls: "cp-empty", text: "No items match these filters." });
-    this.mountStorageSelection(parent, grid);
   }
 
-  private renderRightPane(parent: HTMLElement): void {
+  private renderRightPane(parent: HTMLElement, close?: () => void): void {
     parent.empty();
-    const head = parent.createDiv({ cls: "cp-pane-heading" }); head.createEl("h4", { text: this.hoverItemId ? "Temporary preview" : "Preview" }); iconButton(head, "panel-right-close", "Close preview pane", () => { this.plugin.store.data.uiState.miniPalette.rightPaneOpen = false; this.plugin.store.changed(); });
+    const head = parent.createDiv({ cls: "cp-pane-heading" }); head.createEl("h4", { text: this.hoverItemId ? "Temporary preview" : "Preview" }); iconButton(head, close ? "x" : "panel-right-close", close ? "Close preview flyout" : "Close preview pane", close ?? (() => { this.plugin.store.data.uiState.miniPalette.rightPaneOpen = false; this.plugin.store.changed(); }));
     const item = this.plugin.store.data.items[this.hoverItemId ?? this.plugin.store.data.uiState.selectedItemId ?? ""];
     if (!item) { parent.createDiv({ cls: "cp-empty", text: "Select an item to preview it." }); return; }
     parent.createEl("h3", { text: item.displayTitle }); const preview = parent.createDiv({ cls: "cp-preview" }); void this.plugin.preview.render(preview, item);
@@ -206,6 +250,108 @@ export class FloatingMiniPalette {
     const actions = parent.createDiv({ cls: "cp-preview-actions" }); const copy = actions.createEl("button", { text: "Copy" }); copy.addEventListener("click", () => void navigator.clipboard?.writeText(item.content ?? item.origin.filePath ?? item.displayTitle));
     if (item.origin.canvasPath && item.origin.canvasNodeId) actions.createEl("button", { text: "Locate on Canvas" }).addEventListener("click", () => void this.plugin.locateItemOnCanvas(item));
     else if (item.origin.filePath) actions.createEl("button", { text: "Open source file" }).addEventListener("click", () => void this.plugin.openOriginal(item));
+  }
+
+  private flyoutTrigger(parent: HTMLElement, kind: "control" | "preview", icon: string, label: string): HTMLButtonElement {
+    const button = iconButton(parent, icon, label, () => this.toggleResponsiveFlyout(kind));
+    button.dataset.cpFlyoutTrigger = kind;
+    button.setAttribute("aria-controls", `cp-mini-${kind}-flyout`);
+    button.setAttribute("aria-expanded", String(this.openFlyout === kind));
+    if (this.openFlyout === kind) button.addClass("is-active");
+    return button;
+  }
+
+  private toggleResponsiveFlyout(kind: "control" | "preview"): void {
+    if (this.openFlyout === kind) { this.closeResponsiveFlyout(kind); return; }
+    const state = this.plugin.store.data.uiState.miniPalette;
+    const requestedWidth = kind === "control" ? Math.max(280, state.leftPaneWidth) : Math.max(300, state.rightPaneWidth);
+    const measuredHostWidth = this.host?.clientWidth ?? 0;
+    const hostWidth = measuredHostWidth >= 360 ? measuredHostWidth : window.innerWidth;
+    const panelLeft = this.responsivePanelLeft ?? state.position.x;
+    const placement = attachedFlyoutPlacement(hostWidth, panelLeft, state.size.width, kind === "preview" ? "right" : "left", requestedWidth);
+    this.openFlyout = kind;
+    this.flyoutSide = placement.side;
+    this.flyoutWidth = placement.width;
+    this.responsivePanelLeft = placement.panelLeft;
+    this.render();
+    window.setTimeout(() => this.panel?.querySelector<HTMLElement>(`#cp-mini-${kind}-flyout button, #cp-mini-${kind}-flyout input, #cp-mini-${kind}-flyout select`)?.focus(), 0);
+  }
+
+  private closeResponsiveFlyout(kind = this.openFlyout): void {
+    if (!kind) return;
+    this.openFlyout = null;
+    this.responsivePanelLeft = null;
+    this.render();
+    window.setTimeout(() => this.panel?.querySelector<HTMLElement>(`[data-cp-flyout-trigger="${kind}"]`)?.focus(), 0);
+  }
+
+  private renderResponsiveFlyout(panel: HTMLElement, kind: "control" | "preview"): void {
+    panel.style.setProperty("--cp-mini-flyout-width", `${this.flyoutWidth}px`);
+    const flyout = panel.createDiv({ cls: `cp-mini-flyout ${kind === "control" ? "cp-storage-left" : "cp-storage-right"} cp-mini-flyout--${kind} is-${this.flyoutSide}`, attr: { id: `cp-mini-${kind}-flyout`, role: "region", "aria-label": kind === "control" ? "Mini Palette controls" : "Mini Palette preview" } });
+    if (kind === "control") this.renderLeftPane(flyout, () => this.closeResponsiveFlyout(kind));
+    else { this.rightPane = flyout; this.renderRightPane(flyout, () => this.closeResponsiveFlyout(kind)); }
+    const dismissPointer = (event: PointerEvent): void => {
+      const target = event.target;
+      if (!(target instanceof Node) || flyout.contains(target) || this.panel?.querySelector(`[data-cp-flyout-trigger="${kind}"]`)?.contains(target)) return;
+      this.closeResponsiveFlyout(kind);
+    };
+    const dismissKey = (event: KeyboardEvent): void => { if (event.key === "Escape") { event.preventDefault(); this.closeResponsiveFlyout(kind); } };
+    window.setTimeout(() => { window.addEventListener("pointerdown", dismissPointer, true); window.addEventListener("keydown", dismissKey, true); }, 0);
+    this.flyoutCleanup = () => { window.removeEventListener("pointerdown", dismissPointer, true); window.removeEventListener("keydown", dismissKey, true); };
+  }
+
+  private captureViewState(): { scroll: Record<string, number>; focus: string | null; selection: [number | null, number | null] } | null {
+    if (!this.panel) return null;
+    const scroll: Record<string, number> = {};
+    for (const selector of [".cp-collect-screen", ".cp-storage-left", ".cp-storage-main", ".cp-storage-right", ".cp-mini-flyout"] as const) {
+      const element = this.panel.querySelector<HTMLElement>(selector); if (!element) continue;
+      if (element.scrollHeight > element.clientHeight || this.scrollMemory[selector] === undefined) this.scrollMemory[selector] = element.scrollTop;
+      scroll[selector] = this.scrollMemory[selector];
+    }
+    const active = document.activeElement instanceof HTMLElement && this.panel.contains(document.activeElement) ? document.activeElement : null;
+    const focus = active?.dataset.cpFocus ?? null;
+    const input = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active : null;
+    return { scroll, focus, selection: [input?.selectionStart ?? null, input?.selectionEnd ?? null] };
+  }
+
+  private restoreViewState(state: ReturnType<FloatingMiniPalette["captureViewState"]>): void {
+    if (!state) return;
+    window.setTimeout(() => {
+      if (!this.panel) return;
+      for (const [selector, top] of Object.entries(state.scroll)) { const element = this.panel.querySelector<HTMLElement>(selector); if (element) element.scrollTop = top; }
+      if (!state.focus) return;
+      const active = this.panel.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-cp-focus="${state.focus}"]`); if (!active) return;
+      active.focus(); if (state.selection[0] !== null && state.selection[1] !== null) active.setSelectionRange(state.selection[0], state.selection[1]);
+    }, 0);
+  }
+
+  private clampGeometry(): boolean {
+    const state = this.plugin.store.data.uiState.miniPalette;
+    const measuredHostWidth = this.host?.clientWidth ?? 0;
+    const measuredHostHeight = this.host?.clientHeight ?? 0;
+    const hostWidth = measuredHostWidth >= 360 ? measuredHostWidth : window.innerWidth;
+    const hostHeight = measuredHostHeight >= 300 ? measuredHostHeight : window.innerHeight;
+    const width = Math.min(Math.max(360, state.size.width), Math.max(1, hostWidth));
+    const height = Math.min(Math.max(300, state.size.height), Math.max(1, hostHeight));
+    const x = Math.max(0, Math.min(state.position.x, Math.max(0, hostWidth - width)));
+    const y = Math.max(0, Math.min(state.position.y, Math.max(0, hostHeight - height)));
+    const changed = width !== state.size.width || height !== state.size.height || x !== state.position.x || y !== state.position.y;
+    if (changed) { state.size = { width, height }; state.position = { x, y }; this.responsivePanelLeft = null; }
+    return changed;
+  }
+
+  private observePanel(panel: HTMLElement): void {
+    this.resizeObserver = new ResizeObserver(([entry]) => {
+      if (this.isResizing) return;
+      const borderBox = Array.isArray(entry.borderBoxSize) ? entry.borderBoxSize[0] : entry.borderBoxSize;
+      const next = miniLayoutMode(borderBox?.inlineSize ?? panel.getBoundingClientRect().width);
+      if (next === this.layoutMode) return;
+      this.layoutMode = next;
+      this.openFlyout = null;
+      this.responsivePanelLeft = null;
+      this.render();
+    });
+    this.resizeObserver.observe(panel);
   }
 
   private renderInspector(): void {
@@ -246,7 +392,7 @@ export class FloatingMiniPalette {
   private storageCandidates(): PaletteItem[] { return this.plugin.store.data.uiState.miniPalette.storageItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item)); }
   private storageItems(): PaletteItem[] { const now = Date.now(); const cutoff = this.dateFilter === "today" ? new Date().setHours(0, 0, 0, 0) : this.dateFilter === "week" ? now - 7 * 86400000 : this.dateFilter === "month" ? now - 30 * 86400000 : 0; return this.sort(this.filtered(this.storageCandidates()).filter((item) => item.modifiedAt >= cutoff)); }
   private filtered(items: PaletteItem[]): PaletteItem[] { return this.plugin.search.filter(items, this.search).filter((item) => (this.typeFilter === "all" || item.type === this.typeFilter) && (!this.tagFilter || item.tags.some((tag) => tag.toLocaleLowerCase().includes(this.tagFilter.toLocaleLowerCase()))) && (!this.labelFilter || item.label.toLocaleLowerCase().includes(this.labelFilter.toLocaleLowerCase()))); }
-  private refreshStorageItems(): void { const main = this.panel?.querySelector<HTMLElement>(".cp-storage-main"); if (!main) return; main.empty(); this.renderStorageMain(main); const total = this.panel?.querySelector<HTMLElement>(".cp-bottom--float > span"); if (total) total.setText(`Total ${this.storageItems().length} · Selected ${this.storageSelectedIds().length}`); }
+  private refreshStorageItems(): void { const grid = this.panel?.querySelector<HTMLElement>(".cp-storage-main .cp-asset-grid"); if (!grid) return; grid.empty(); this.populateStorageGrid(grid); const total = this.panel?.querySelector<HTMLElement>(".cp-bottom--float > span"); if (total) total.setText(`Total ${this.storageItems().length} · Selected ${this.storageSelectedIds().length}`); }
   private sort(items: PaletteItem[]): PaletteItem[] { const mode = this.plugin.store.data.uiState.miniPalette.sort; return [...items].sort((a, b) => mode === "modified-desc" ? b.modifiedAt - a.modifiedAt : mode === "modified-asc" ? a.modifiedAt - b.modifiedAt : mode === "title-desc" ? b.displayTitle.localeCompare(a.displayTitle) : a.displayTitle.localeCompare(b.displayTitle)); }
   private workspaceName(id?: string): string { return id ? this.plugin.store.data.workspaces[id]?.name ?? "Unknown workspace" : "Pending"; }
   private editSelectedMetadata(): void { const ids = this.storageSelectedIds().filter((id) => this.plugin.store.data.items[id]); if (ids.length === 0) { new Notice("Select items first."); return; } new TagLabelModal(this.plugin.app, this.plugin, ids).open(); }
@@ -341,6 +487,14 @@ export class FloatingMiniPalette {
     });
   }
   private applyAccent(panel: HTMLElement): void { const settings = this.plugin.store.data.settings; if (settings.accentMode === "custom") panel.style.setProperty("--cp-accent", settings.accentColor); }
-  private makeDraggable(handle: HTMLElement, panel: HTMLElement): void { handle.addEventListener("pointerdown", (event) => { if ((event.target as HTMLElement).closest("button,input,select")) return; event.preventDefault(); handle.setPointerCapture(event.pointerId); const state = this.plugin.store.data.uiState.miniPalette; const start = { x: event.clientX, y: event.clientY, left: state.position.x, top: state.position.y }; const move = (pointer: PointerEvent) => { const host = this.host?.getBoundingClientRect(); const maxLeft = Math.max(0, (host?.width ?? window.innerWidth) - panel.offsetWidth); const maxTop = Math.max(0, (host?.height ?? window.innerHeight) - panel.offsetHeight); state.position = { x: Math.max(0, Math.min(maxLeft, start.left + pointer.clientX - start.x)), y: Math.max(0, Math.min(maxTop, start.top + pointer.clientY - start.y)) }; panel.style.left = `${state.position.x}px`; panel.style.top = `${state.position.y}px`; }; const end = () => { handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", end); handle.removeEventListener("pointercancel", end); this.plugin.store.changed(); }; handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", end); handle.addEventListener("pointercancel", end); }); }
-  private makeResizable(handle: HTMLElement, panel: HTMLElement, direction: string): void { handle.addEventListener("pointerdown", (event) => { event.preventDefault(); event.stopPropagation(); handle.setPointerCapture(event.pointerId); const state = this.plugin.store.data.uiState.miniPalette; const start = { x: event.clientX, y: event.clientY, left: state.position.x, top: state.position.y, width: state.size.width, height: state.size.height }; const move = (pointer: PointerEvent) => { const dx = pointer.clientX - start.x; const dy = pointer.clientY - start.y; const host = this.host?.getBoundingClientRect(); const hostWidth = host?.width ?? window.innerWidth; const hostHeight = host?.height ?? window.innerHeight; const minWidth = 360; const minHeight = 300; let left = start.left; let top = start.top; let width = start.width; let height = start.height; if (direction.includes("e")) width = start.width + dx; if (direction.includes("s")) height = start.height + dy; if (direction.includes("w")) { width = start.width - dx; left = start.left + dx; } if (direction.includes("n")) { height = start.height - dy; top = start.top + dy; } if (width < minWidth) { if (direction.includes("w")) left -= minWidth - width; width = minWidth; } if (height < minHeight) { if (direction.includes("n")) top -= minHeight - height; height = minHeight; } left = Math.max(0, left); top = Math.max(0, top); width = Math.min(width, Math.max(minWidth, hostWidth - left)); height = Math.min(height, Math.max(minHeight, hostHeight - top)); state.position = { x: left, y: top }; state.size = { width, height }; panel.style.left = `${left}px`; panel.style.top = `${top}px`; panel.style.width = `${width}px`; panel.style.height = `${height}px`; }; const end = () => { handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", end); handle.removeEventListener("pointercancel", end); this.plugin.store.changed(); }; handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", end); handle.addEventListener("pointercancel", end); }); }
+  private makeDraggable(handle: HTMLElement, panel: HTMLElement): void { handle.addEventListener("pointerdown", (event) => { if ((event.target as HTMLElement).closest("button,input,select")) return; event.preventDefault(); this.commitResponsivePanelPosition(panel); handle.setPointerCapture(event.pointerId); const state = this.plugin.store.data.uiState.miniPalette; const start = { x: event.clientX, y: event.clientY, left: state.position.x, top: state.position.y }; const move = (pointer: PointerEvent) => { const host = this.host?.getBoundingClientRect(); const maxLeft = Math.max(0, (host?.width ?? window.innerWidth) - panel.offsetWidth); const maxTop = Math.max(0, (host?.height ?? window.innerHeight) - panel.offsetHeight); state.position = { x: Math.max(0, Math.min(maxLeft, start.left + pointer.clientX - start.x)), y: Math.max(0, Math.min(maxTop, start.top + pointer.clientY - start.y)) }; panel.style.left = `${state.position.x}px`; panel.style.top = `${state.position.y}px`; }; const end = () => { handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", end); handle.removeEventListener("pointercancel", end); this.plugin.store.changed(); }; handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", end); handle.addEventListener("pointercancel", end); }); }
+  private makeResizable(handle: HTMLElement, panel: HTMLElement, direction: string): void { handle.addEventListener("pointerdown", (event) => { event.preventDefault(); event.stopPropagation(); this.commitResponsivePanelPosition(panel); this.isResizing = true; handle.setPointerCapture(event.pointerId); const state = this.plugin.store.data.uiState.miniPalette; const start = { x: event.clientX, y: event.clientY, left: state.position.x, top: state.position.y, width: state.size.width, height: state.size.height }; const move = (pointer: PointerEvent) => { const dx = pointer.clientX - start.x; const dy = pointer.clientY - start.y; const host = this.host?.getBoundingClientRect(); const hostWidth = host?.width ?? window.innerWidth; const hostHeight = host?.height ?? window.innerHeight; const minWidth = 360; const minHeight = 300; let left = start.left; let top = start.top; let width = start.width; let height = start.height; if (direction.includes("e")) width = start.width + dx; if (direction.includes("s")) height = start.height + dy; if (direction.includes("w")) { width = start.width - dx; left = start.left + dx; } if (direction.includes("n")) { height = start.height - dy; top = start.top + dy; } if (width < minWidth) { if (direction.includes("w")) left -= minWidth - width; width = minWidth; } if (height < minHeight) { if (direction.includes("n")) top -= minHeight - height; height = minHeight; } left = Math.max(0, left); top = Math.max(0, top); width = Math.min(width, Math.max(minWidth, hostWidth - left)); height = Math.min(height, Math.max(minHeight, hostHeight - top)); state.position = { x: left, y: top }; state.size = { width, height }; panel.style.left = `${left}px`; panel.style.top = `${top}px`; panel.style.width = `${width}px`; panel.style.height = `${height}px`; }; const end = () => { this.isResizing = false; handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", end); handle.removeEventListener("pointercancel", end); this.plugin.store.changed(); }; handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", end); handle.addEventListener("pointercancel", end); }); }
+  private commitResponsivePanelPosition(panel: HTMLElement): void {
+    if (this.responsivePanelLeft === null) return;
+    this.plugin.store.data.uiState.miniPalette.position.x = panel.offsetLeft;
+    this.responsivePanelLeft = null;
+    this.openFlyout = null;
+    this.flyoutCleanup?.(); this.flyoutCleanup = undefined;
+    panel.querySelector(".cp-mini-flyout")?.remove();
+  }
 }

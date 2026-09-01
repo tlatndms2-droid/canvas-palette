@@ -2,12 +2,13 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.41**
+Current version: **0.3.42**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
+- Mini Palette now derives `Wide`, `Medium`, `Narrow`, and `Minimum` layouts from its measured outer width at the exact `900/680/480/360px` boundaries. Wide retains the resizable Control/Assets/Preview panes, Medium keeps Assets/Preview with quick controls, and narrower modes keep Assets visible while Control or Preview opens as an attached Canvas-side flyout. The flyout never owns selection, restores focus to its trigger, closes on `Escape` or outside click, and starts closed after reload. Search focus/cursor, selection, density, relay membership, pane widths, and scroll position survive width transitions; restored geometry is clamped into the current Obsidian viewport.
 - Canvas `Collect to Mini Palette` now always opens Mini Palette's `Collect` space. New Canvas material enters Collect, and an already known Canvas item reuses its existing identity in Collect without creating a duplicate or adding it to Storage. Removing that re-collected entry from Collect preserves its existing Side Workspace, Mini Storage membership, Canvas links, and Vault source. Sending from Side remains the separate, explicit route to Mini Storage.
 - In the Side Palette Workspace selector, the representative Workspace for the active Canvas uses a filled black star (`★`), while representatives belonging to other Canvases use a white star (`☆`). General Workspaces have no star.
 - Saving to another Canvas's representative Workspace now asks for confirmation before either route continues: direct Canvas-to-Side save and Mini Palette-to-Workspace import. The dialog names the destination and explains that the Item will be stored without a link to that destination Canvas. Saving to the current Canvas representative or a general Workspace proceeds normally.
