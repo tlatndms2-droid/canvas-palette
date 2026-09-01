@@ -1,7 +1,32 @@
 # Canvas Palette Handoff
 
+## Development workflow
+
+Current development proceeds through **Plan mode → Goal/Implementation mode → Verification → Release**.
+
+| Stage | Purpose | Work performed | Changes allowed |
+| --- | --- | --- | --- |
+| Plan mode | Confirm the requirement precisely | Inspect product plans, screenshots, relevant existing code, and Sandbox state when needed; document cause, target files, sequence, exceptions, and verification criteria | No product-code edits |
+| Approval | Fix the implementation scope | The user reviews the plan and explicitly authorizes implementation, for example with `PLEASE IMPLEMENT THIS PLAN` | No implementation before approval |
+| Goal / implementation mode | Apply the approved plan | Implement shared data flow first, connect UI entry points, add tests, and update docs/version | Product-code edits allowed |
+| Automated verification | Prevent code regressions | Focused tests, full test suite, TypeScript no-emit, production build, and `git diff --check` | Repeat after relevant changes |
+| Sandbox verification | Confirm real Obsidian behavior | Use the isolated Sandbox for actual pointer, drag/drop, keyboard, Canvas persistence, and console-error checks | Back up fixtures first |
+| Fixture restore | Leave no test residue | Restore `data.json`, Canvas, and workspace settings and verify hashes | Sandbox only |
+| Release | Publish a completed version | Update version and CHANGE/HANDOFF docs, commit, push `main`, create an annotated tag, and verify GitHub Release assets | Only when the user requests release |
+
+### Working principles
+
+- Product plans and the user's conversation define the feature contract; do not change behavior by assumption.
+- Requests to inspect, explain, or enter Plan mode stop at investigation and briefing.
+- Modify code only after an explicit request such as “수정해”, “구현해”, or `PLEASE IMPLEMENT THIS PLAN`.
+- Prefer one shared execution path for related features. For example, Export uses the shared sequence: target Canvas selection → Bundle Preview → collision check → click insertion for Side Items, Mini Items, Collections, and Workspaces.
+- Do not claim runtime behavior from a build alone; verify it in the isolated Sandbox.
+- Never operate the user's real Vault for validation; restore Sandbox fixtures after verification.
+- Create a release only after implementation and verification are complete and the user requests it.
+
 ## Current state
 
+- Known follow-up — Outliner Export hierarchy Edge: exporting the Outliner structure can restore parent and child Nodes without the expected Canvas hierarchy Edge. The required result is a real parent → child Canvas connection (for example, `md material plugin` → `하이라이트 관리`), not only a visually adjacent placement. Investigate the Collection/Workspace Export tree-anchor and hierarchy-edge generation path before changing layout or styling.
 - Version: `0.3.47`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
