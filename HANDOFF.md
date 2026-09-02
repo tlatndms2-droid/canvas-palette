@@ -50,8 +50,8 @@ The user distinguishes these modes precisely:
 
 ## Current state
 
-- Version: `0.3.54`.
-- Latest runtime change: opening or switching a Canvas no longer creates a Canvas-owned Workspace. When the active Canvas has no representative Workspace, Side Palette keeps the user's current Workspace selected and shows `이 Canvas용 Workspace가 없습니다` with a `Workspace 만들기` action. That action and `Current Canvas` open the same empty-name dialog with a read-only `소속 Canvas` row. Canvas Workspace titles are user-defined; selectors and Workspace Explorer show the owning Canvas separately, and Canvas path renames update only that ownership label.
+- Version: `0.3.55`.
+- Latest runtime change: opening or switching a Canvas no longer creates a Canvas-owned Workspace. When the active Canvas has no representative Workspace, Side Palette keeps the user's current Workspace selected and shows that the Canvas has no dedicated Workspace while explicitly stating that the selected Workspace remains usable. `전용 Workspace 만들기` and `Current Canvas` open the same empty-name dialog with a read-only `소속 Canvas` row. Canvas Workspace titles are user-defined; selectors and Workspace Explorer show the owning Canvas separately, and Canvas path renames update only that ownership label.
 - `0.3.54` validation: 103 automated tests, TypeScript no-emit, production bundling, and `git diff --check` passed. In the isolated `Obsidian Mini Palette Sandbox 0353`, a new Canvas left the existing general Workspace unchanged and showed the no-Workspace message; both creation entry points opened the same dialog with an empty `예: 튜토리얼 링크` input and correct owner Canvas. A manually named representative Workspace appeared in Explorer and the selector with a separate ownership label; renaming the Canvas preserved its Workspace title and updated only the owner label. A full Sandbox restart loaded `0.3.54` and did not auto-create a Workspace. `data.json`, the existing Canvas, and `workspace.json` were restored to their backup hashes, and the temporary Canvas was removed.
 
 - Version: `0.3.51` (local implementation, automated and Sandbox-validated; not yet published).

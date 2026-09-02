@@ -110,9 +110,9 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   assert.match(side, /Open current Canvas Workspace/);
   assert.match(side, /Open Workspace Explorer/);
   assert.match(side, /openWorkspaceExplorer/);
-  assert.match(side, /이 Canvas용 Workspace가 없습니다/);
-  assert.match(side, /Canvas를 열어도 자동 생성되지 않습니다/);
-  assert.match(side, /Workspace 만들기/);
+  assert.match(side, /이 Canvas에는 전용 Workspace가 연결되지 않았습니다/);
+  assert.match(side, /현재 선택한 Workspace는 계속 사용할 수 있습니다/);
+  assert.match(side, /전용 Workspace 만들기/);
   assert.doesNotMatch(mini, /option\.disabled = Boolean\(workspace/);
   assert.doesNotMatch(mini, /only accepts items that exist in its own Canvas/);
 });

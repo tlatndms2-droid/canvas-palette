@@ -130,9 +130,9 @@ export class SidePaletteView extends ItemView {
     root.toggleClass("has-canvas-workspace-empty", missingCanvasWorkspace);
     if (canvasPath && missingCanvasWorkspace) {
       const empty = root.createDiv({ cls: "cp-current-canvas-empty" });
-      empty.createDiv({ cls: "cp-current-canvas-empty__title", text: "이 Canvas용 Workspace가 없습니다" });
-      empty.createDiv({ cls: "cp-current-canvas-empty__hint", text: "Canvas를 열어도 자동 생성되지 않습니다." });
-      empty.createEl("button", { text: "Workspace 만들기" }).addEventListener("click", () => this.plugin.openCanvasWorkspaceCreator(canvasPath));
+      empty.createDiv({ cls: "cp-current-canvas-empty__title", text: "이 Canvas에는 전용 Workspace가 연결되지 않았습니다" });
+      empty.createDiv({ cls: "cp-current-canvas-empty__hint", text: "현재 선택한 Workspace는 계속 사용할 수 있습니다." });
+      empty.createEl("button", { text: "전용 Workspace 만들기" }).addEventListener("click", () => this.plugin.openCanvasWorkspaceCreator(canvasPath));
     }
   }
 
