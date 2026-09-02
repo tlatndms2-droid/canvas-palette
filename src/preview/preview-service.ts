@@ -50,6 +50,22 @@ export class PreviewService {
     parent.setText(compact ? source.slice(0, 180) : source);
   }
 
+  renderYouTubePlayer(parent: HTMLElement, url: string): boolean {
+    const videoId = this.youTubeVideoId(url);
+    if (!videoId) return false;
+    const frame = parent.createEl("iframe", { cls: "cp-youtube-player", attr: { src: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}`, title: "YouTube video player", allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share", allowfullscreen: "true", referrerpolicy: "strict-origin-when-cross-origin" } });
+    frame.setAttribute("loading", "lazy");
+    return true;
+  }
+
+  private youTubeVideoId(url: string): string | null {
+    try {
+      const parsed = new URL(url); const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+      const value = host === "youtu.be" ? parsed.pathname.slice(1) : host.endsWith("youtube.com") ? parsed.searchParams.get("v") ?? (/^\/(?:embed|shorts|live)\/([^/?#]+)/.exec(parsed.pathname)?.[1] ?? null) : null;
+      return value && /^[A-Za-z0-9_-]{11}$/.test(value) ? value : null;
+    } catch { return null; }
+  }
+
   private async renderCanvasGroup(parent: HTMLElement, snapshot: GroupSnapshot, sourcePath: string, compact: boolean): Promise<void> {
     const width = Math.max(snapshot.bounds.width, 1);
     const height = Math.max(snapshot.bounds.height, 1);

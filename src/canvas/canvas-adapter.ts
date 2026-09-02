@@ -525,6 +525,12 @@ export class CanvasAdapter {
   private async captureLinkPreview(url: string, fallback: { title: string; siteName: string; description: string; thumbnailUrl: string }): Promise<{ title: string; siteName: string; description: string; thumbnailUrl: string }> {
     if (!/^https?:\/\//i.test(url)) return fallback;
     try {
+      const videoId = this.youTubeVideoId(url);
+      if (videoId) {
+        const oembed = await requestUrl({ url: `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`, method: "GET", throw: false });
+        const data = oembed.json as { title?: string; author_name?: string; thumbnail_url?: string };
+        return { title: data.title?.trim() || fallback.title, siteName: data.author_name?.trim() || "YouTube", description: fallback.description, thumbnailUrl: data.thumbnail_url?.trim() || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` };
+      }
       const response = await requestUrl({ url, method: "GET", headers: { "User-Agent": "Canvas-Palette/0.3" }, throw: false });
       const html = response.text.slice(0, 512_000);
       const meta = (name: string): string => {
@@ -536,6 +542,10 @@ export class CanvasAdapter {
       let thumbnailUrl = ""; try { thumbnailUrl = image ? new URL(image, url).href : ""; } catch { /* URL fallback remains empty. */ }
       return { title, siteName: meta("og:site_name") || fallback.siteName, description: meta("og:description") || meta("description") || fallback.description, thumbnailUrl };
     } catch { return fallback; }
+  }
+
+  private youTubeVideoId(url: string): string | null {
+    try { const parsed = new URL(url); const host = parsed.hostname.replace(/^www\./, "").toLowerCase(); const value = host === "youtu.be" ? parsed.pathname.slice(1) : host.endsWith("youtube.com") ? parsed.searchParams.get("v") ?? (/^\/(?:embed|shorts|live)\/([^/?#]+)/.exec(parsed.pathname)?.[1] ?? null) : null; return value && /^[A-Za-z0-9_-]{11}$/.test(value) ? value : null; } catch { return null; }
   }
 
   private groupItem(nodes: CanvasNodeSnapshot[], edges: CanvasEdgeSnapshot[], canvasPath: string, nodeId: string): PaletteItem | null {

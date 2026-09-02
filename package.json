@@ -1,6 +1,6 @@
 {
   "name": "canvas-palette",
-  "version": "0.3.51",
+  "version": "0.3.52",
   "private": true,
   "type": "module",
   "description": "Visual asset library for Obsidian Canvas",

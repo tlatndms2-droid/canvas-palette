@@ -23,3 +23,13 @@ test("Link items have explicit opening and no Front Back control", async () => {
   assert.match(mini, /Open web link/);
   assert.match(side, /\["Link", "link"\]/);
 });
+
+test("YouTube Link preview provides an in-palette player and retains the external open action", async () => {
+  const adapter = await source("src/canvas/canvas-adapter.ts");
+  const preview = await source("src/preview/preview-service.ts");
+  const modal = await source("src/ui/item-preview-modal.ts");
+  assert.match(adapter, /youtube\.com\/oembed/);
+  assert.match(preview, /youtube-nocookie\.com\/embed/);
+  assert.match(modal, /renderYouTubePlayer/);
+  assert.match(modal, /Open web link/);
+});

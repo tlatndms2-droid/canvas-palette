@@ -19,6 +19,10 @@ export class ItemPreviewModal extends Modal {
     const body = this.contentEl.createDiv({ cls: "cp-large-preview__body" });
     if (item.type === "image") void this.renderZoomableImage(body, item, header);
     else if (item.type === "markdown") void this.renderCurrentMarkdown(body, item);
+    else if (item.type === "link" && item.webLink && this.plugin.preview.renderYouTubePlayer(body, item.webLink.url)) {
+      const actions = this.contentEl.createDiv({ cls: "cp-modal-actions cp-link-preview-actions" });
+      actions.createEl("button", { text: "Open web link" }).addEventListener("click", () => this.plugin.openWebLink(item));
+    }
     else void this.plugin.preview.render(body, item, false);
   }
 
