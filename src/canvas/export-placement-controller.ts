@@ -1,7 +1,7 @@
 import { Notice } from "obsidian";
-import type { BundleDuplicateMode, CanvasAdapter, CanvasContext, ExportBundle } from "./canvas-adapter";
+import type { BundleDuplicateMode, CanvasAdapter, CanvasContext, ExportBundle, PlacementCollisionPolicy } from "./canvas-adapter";
 
-interface PlacementSession { context: CanvasContext; bundle: ExportBundle; mode: BundleDuplicateMode; overlay: HTMLElement; lastClient: { x: number; y: number } | null; }
+interface PlacementSession { context: CanvasContext; bundle: ExportBundle; mode: BundleDuplicateMode; collisionPolicy: PlacementCollisionPolicy; overlay: HTMLElement; lastClient: { x: number; y: number } | null; }
 
 /** Keeps export data out of the Canvas until the user chooses a collision-free location. */
 export class ExportPlacementController {
@@ -18,12 +18,13 @@ export class ExportPlacementController {
     if (!document || !context.view.containerEl) { new Notice("Unable to show the Canvas placement preview."); return; }
     const overlay = document.body.createDiv({ cls: "cp-export-placement" });
     overlay.setAttribute("aria-hidden", "true");
-    this.session = { context, bundle, mode, overlay, lastClient: null };
+    const collisionPolicy: PlacementCollisionPolicy = bundle.placements.length > 1 ? "avoid-content-overlap" : "allow-overlap";
+    this.session = { context, bundle, mode, collisionPolicy, overlay, lastClient: null };
     this.render(overlay, bundle);
     document.addEventListener("pointermove", this.onMove, true);
     document.addEventListener("pointerdown", this.onDown, true);
     document.addEventListener("keydown", this.onKey, true);
-    new Notice("Move to an empty Canvas area and click to place. Press Escape to cancel.");
+    new Notice(collisionPolicy === "avoid-content-overlap" ? "Move to a clear Canvas position and click to place. Press Escape to cancel." : "Move to a Canvas position and click to place. Press Escape to cancel.");
   }
 
   cancel(): void {
@@ -49,7 +50,7 @@ export class ExportPlacementController {
     session.lastClient = { x: clientX, y: clientY };
     session.overlay.style.left = `${clientX}px`; session.overlay.style.top = `${clientY}px`;
     session.overlay.style.transform = `scale(${scaleX}, ${scaleY})`;
-    const collision = this.adapter.bundleCollides(session.context, session.bundle, point, this.ignoredNodeIds(session));
+    const collision = this.adapter.bundleCollides(session.context, session.bundle, point, this.ignoredNodeIds(session), session.collisionPolicy);
     session.overlay.toggleClass("is-collision", collision);
   }
 
@@ -57,9 +58,9 @@ export class ExportPlacementController {
     const session = this.session;
     if (!session || !session.context.view.containerEl?.contains(event.target as Node)) return;
     const point = session.context.runtime.posFromClient?.({ x: event.clientX, y: event.clientY });
-    if (!point || this.adapter.bundleCollides(session.context, session.bundle, point, this.ignoredNodeIds(session))) { new Notice("That location overlaps an existing Canvas item."); return; }
+    if (!point || this.adapter.bundleCollides(session.context, session.bundle, point, this.ignoredNodeIds(session), session.collisionPolicy)) { new Notice("That location overlaps an existing Canvas item."); return; }
     event.preventDefault(); event.stopPropagation();
-    const committed = await this.adapter.commitBundle(session.context, session.bundle, point, session.mode);
+    const committed = await this.adapter.commitBundle(session.context, session.bundle, point, session.mode, session.collisionPolicy);
     if (committed) this.cancel();
   }
 

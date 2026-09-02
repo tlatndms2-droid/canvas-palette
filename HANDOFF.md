@@ -50,6 +50,9 @@ The user distinguishes these modes precisely:
 
 ## Current state
 
+- Version: `0.3.53`.
+- Latest runtime change: direct drag/drop and single-item Export now honor the exact user-selected Canvas location without collision rejection. Multi-item Export retains its placement preview and blocks only actual content-node overlap. Canvas Group frames are containers rather than occupied obstacles, so Group empty interiors and gaps inside an Export bundle are valid placement locations. The preview and final commit share the same content-only collision calculation; replacement targets remain excluded.
+
 - Version: `0.3.51` (local implementation, automated and Sandbox-validated; not yet published).
 - Latest runtime change: native Canvas external links are canonical `link` Palette Items rather than blank Cards. Capture stores the exact URL plus one-time title/site/description/thumbnail metadata; Link filtering, explicit `Open web link`, type-safe Front/Back exclusion, and native link-node restoration apply across Side, Mini, direct placement, Collection/Workspace export, and MindMap. A `Link` inside a Group preview is rendered as a link label and the Group serializer retains its original URL/edges. Sandbox validation used the separate `canvas-palette-link-0351-Sandbox` process on port `9241`: a selected native YouTube link collected through the registered Canvas Palette collect command into a visible Mini Link card, restored to a second Canvas as `{ type: "link" }` with its exact URL, `360×220` size and color `6`, and persisted after plugin reload at version `0.3.51`. The disposable Sandbox fixtures must be restored after the pass.
 

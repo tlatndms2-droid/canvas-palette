@@ -23,9 +23,13 @@ test("all Export entry points choose a target Canvas and start placement", () =>
   assert.match(main, /this\.exportPlacement\.start\(context, bundle, mode\)/);
 });
 
-test("preview blocks collision and commits only after a Canvas click", () => {
+test("only multi-item Export previews block content collision before a Canvas click", () => {
   assert.match(controller, /bundleCollides\(/);
+  assert.match(controller, /bundle\.placements\.length > 1/);
+  assert.match(controller, /avoid-content-overlap/);
   assert.match(controller, /Press Escape to cancel/);
   assert.match(controller, /commitBundle\(/);
+  assert.match(adapter, /allow-overlap/);
+  assert.match(adapter, /bundleContentCollides/);
   assert.match(styles, /\.cp-export-placement \{[^}]*pointer-events: none/);
 });

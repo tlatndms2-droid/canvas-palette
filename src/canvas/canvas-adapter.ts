@@ -4,6 +4,7 @@ import { findMarkdownNodeReplacement } from "../core/canvas-node-replacement";
 import { SerialTaskQueue } from "../core/serial-task-queue";
 import type { CanvasEdgeSnapshot, CanvasNodeSnapshot, PaletteItem, PaletteItemType, PaletteMetadata } from "../core/types";
 import { restoreGroup, serializeGroup } from "./group-serializer";
+import { bundleContentCollides } from "./placement-collision";
 
 interface CanvasDocument { nodes: CanvasNodeSnapshot[]; edges: CanvasEdgeSnapshot[]; [key: string]: unknown; }
 interface CanvasRuntimeLike {
@@ -41,6 +42,7 @@ export interface ExportBundle {
   items: PaletteItem[];
 }
 export type BundleDuplicateMode = "replace" | "copy";
+export type PlacementCollisionPolicy = "allow-overlap" | "avoid-content-overlap";
 
 interface RestoredMaterial {
   nodes: CanvasNodeSnapshot[];
@@ -380,7 +382,7 @@ export class CanvasAdapter {
     if (!context) { new Notice("Open a Canvas before dropping an item."); return false; }
     const point = context.runtime.posFromClient?.({ x: screenX, y: screenY });
     if (!point) { new Notice("Unable to calculate the Canvas drop position."); return false; }
-    return this.restoreQueue.enqueue(context.file.path, () => this.commitBundle(context, this.createItemBundle([item], context), point, "copy"));
+    return this.restoreQueue.enqueue(context.file.path, () => this.commitBundle(context, this.createItemBundle([item], context), point, "copy", "allow-overlap"));
   }
 
   async restoreItems(items: PaletteItem[], screenX: number, screenY: number): Promise<boolean> {
@@ -388,7 +390,7 @@ export class CanvasAdapter {
     if (!context || items.length === 0) { if (!context) new Notice("Open a Canvas before placing items."); return false; }
     const point = context.runtime.posFromClient?.({ x: screenX, y: screenY });
     if (!point) { new Notice("Unable to calculate the Canvas position."); return false; }
-    return this.restoreQueue.enqueue(context.file.path, () => this.commitBundle(context, this.createItemBundle(items, context), point, "copy"));
+    return this.restoreQueue.enqueue(context.file.path, () => this.commitBundle(context, this.createItemBundle(items, context), point, "copy", "allow-overlap"));
   }
 
   async restoreItemFromDrop(item: PaletteItem, event: DragEvent): Promise<boolean> {
@@ -396,7 +398,7 @@ export class CanvasAdapter {
     if (!context) return false;
     const point = context.runtime.posFromEvt?.(event);
     if (!point) { new Notice("Unable to calculate the Canvas drop position."); return false; }
-    return this.restoreQueue.enqueue(context.file.path, () => this.commitBundle(context, this.createItemBundle([item], context), point, "copy"));
+    return this.restoreQueue.enqueue(context.file.path, () => this.commitBundle(context, this.createItemBundle([item], context), point, "copy", "allow-overlap"));
   }
 
   async restoreItemsFromDrop(items: PaletteItem[], event: DragEvent): Promise<boolean> {
@@ -404,7 +406,7 @@ export class CanvasAdapter {
     if (!context || items.length === 0) return false;
     const point = context.runtime.posFromEvt?.(event);
     if (!point) { new Notice("Unable to calculate the Canvas drop position."); return false; }
-    return this.restoreQueue.enqueue(context.file.path, () => this.commitBundle(context, this.createItemBundle(items, context), point, "copy"));
+    return this.restoreQueue.enqueue(context.file.path, () => this.commitBundle(context, this.createItemBundle(items, context), point, "copy", "allow-overlap"));
   }
 
   private batchRestorePositions(items: PaletteItem[], point: { x: number; y: number }): Array<{ x: number; y: number }> {
@@ -719,13 +721,13 @@ export class CanvasAdapter {
     return new Set(this.expandGroupNodes(document.nodes, roots).map((node) => node.id));
   }
 
-  bundleCollides(context: CanvasContext, bundle: ExportBundle, origin: { x: number; y: number }, ignoredNodeIds = new Set<string>()): boolean {
+  bundleCollides(context: CanvasContext, bundle: ExportBundle, origin: { x: number; y: number }, ignoredNodeIds: Set<string>, policy: PlacementCollisionPolicy): boolean {
+    if (policy === "allow-overlap") return false;
     const document = this.currentDocument(context);
-    const left = origin.x; const top = origin.y; const right = left + bundle.bounds.width; const bottom = top + bundle.bounds.height;
-    return document.nodes.some((node) => !ignoredNodeIds.has(node.id) && left < node.x + node.width && right > node.x && top < node.y + node.height && bottom > node.y);
+    return bundleContentCollides(document.nodes, bundle.nodes, origin, ignoredNodeIds);
   }
 
-  async commitBundle(context: CanvasContext, bundle: ExportBundle, origin: { x: number; y: number }, duplicateMode: BundleDuplicateMode): Promise<boolean> {
+  async commitBundle(context: CanvasContext, bundle: ExportBundle, origin: { x: number; y: number }, duplicateMode: BundleDuplicateMode, collisionPolicy: PlacementCollisionPolicy): Promise<boolean> {
     if (bundle.nodes.length === 0 || bundle.placements.length === 0) { new Notice(bundle.warnings[0] ?? "There is nothing available to place on Canvas."); return false; }
     const current = context.runtime.getData?.();
     if (!current || typeof current !== "object" || !context.runtime.setData) { new Notice("This Canvas runtime cannot accept placed items."); return false; }
@@ -734,7 +736,7 @@ export class CanvasAdapter {
     for (const item of bundle.items) linkedRoots.set(item.id, this.linkedNodes(item, context.file.path).filter((id) => document.nodes.some((node) => node.id === id)));
     const removedNodeIds = new Set<string>();
     if (duplicateMode === "replace") for (const ids of linkedRoots.values()) for (const node of this.expandGroupNodes(document.nodes, ids)) removedNodeIds.add(node.id);
-    if (this.bundleCollidesInDocument(document, bundle, origin, removedNodeIds)) { new Notice("Choose an empty Canvas area before placing this export."); return false; }
+    if (this.bundleCollidesInDocument(document, bundle, origin, removedNodeIds, collisionPolicy)) { new Notice("That location overlaps an existing Canvas item."); return false; }
     const retainedNodeIds = new Set(document.nodes.filter((node) => !removedNodeIds.has(node.id)).map((node) => node.id));
     const retainedEdgeIds = new Set(document.edges.filter((edge) => !removedNodeIds.has(edge.fromNode) && !removedNodeIds.has(edge.toNode)).map((edge) => edge.id));
     if (bundle.nodes.some((node) => retainedNodeIds.has(node.id)) || bundle.edges.some((edge) => retainedEdgeIds.has(edge.id))) { new Notice("Canvas changed while preparing this export. Start the placement again."); return false; }
@@ -772,9 +774,9 @@ export class CanvasAdapter {
     return { ...input, nodes: input.nodes.map((node) => ({ ...node, x: node.x - minX, y: node.y - minY })), bounds: { x: 0, y: 0, width: maxX - minX, height: maxY - minY } };
   }
 
-  private bundleCollidesInDocument(document: CanvasDocument, bundle: ExportBundle, origin: { x: number; y: number }, ignoredNodeIds: Set<string>): boolean {
-    const left = origin.x; const top = origin.y; const right = left + bundle.bounds.width; const bottom = top + bundle.bounds.height;
-    return document.nodes.some((node) => !ignoredNodeIds.has(node.id) && left < node.x + node.width && right > node.x && top < node.y + node.height && bottom > node.y);
+  private bundleCollidesInDocument(document: CanvasDocument, bundle: ExportBundle, origin: { x: number; y: number }, ignoredNodeIds: Set<string>, policy: PlacementCollisionPolicy): boolean {
+    if (policy === "allow-overlap") return false;
+    return bundleContentCollides(document.nodes, bundle.nodes, origin, ignoredNodeIds);
   }
 
   private uniqueId(prefix: string, used: Set<string>): string {
