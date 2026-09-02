@@ -473,6 +473,12 @@ export default class CanvasPalettePlugin extends Plugin {
     new Notice("The original item is unavailable.");
   }
 
+  openWebLink(item: PaletteItem): void {
+    const url = item.webLink?.url ?? "";
+    if (!/^https?:\/\//i.test(url)) { new Notice("Only http and https web links can be opened."); return; }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   async convertCardToMarkdown(itemId: string, requestedName: string, requestedFolder: string): Promise<boolean> {
     const item = this.store.data.items[itemId];
     if (!item || item.type !== "card") { new Notice("Only Card items can be converted to Markdown."); return false; }

@@ -1,12 +1,14 @@
 # Canvas Palette
 
-Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
+Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, web links, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.50**
+Current version: **0.3.51**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
+
+- Native Canvas web links, including YouTube links, now collect as a dedicated `Link` Item instead of an empty Card. Side Palette and Mini Palette expose a `Link` filter. The card saves the address plus its collection-time title, site, description, and thumbnail reference without later automatic refresh. Choose `Open web link` deliberately from the preview or context menu; normal clicks still only select the Item. Export, placement, Collection/Workspace export, and MindMap restore an Obsidian-native `link` node with the exact URL, original width, height, and color. Individual Link export does not invent surrounding edges; Group snapshots retain their existing internal edges.
 
 - Canvas links now expose a per-Canvas sequential address. Every linked Canvas node has the existing top-left chain control plus a compact numbered Accent badge. Link numbers start at `1` independently in every Canvas, follow the saved origin/placement order, compact immediately after Unlink or node deletion, and retain their slot when a linked node is replaced during conversion. Side cards summarize each Canvas with its linked-node count. `Locate on Canvas` now shares one flow across Side, Mini, and Item detail: one location opens immediately; one Canvas with many links opens a numbered picker; multiple Canvases first choose Canvas, then link number. The full-height numbered row list scrolls internally while its title and navigation remain fixed.
 - Export now keeps Side and Mini as canonical-ID relay surfaces: Side exports selected Items to Mini Storage, while Mini Storage can export selected Card, Markdown, Image, and Group Items back to the active Canvas. Markdown falls back to a Card only when its source is missing; missing Images are skipped without interrupting the rest of a batch. Group restoration remaps IDs, preserves valid nesting and edges, and retains nested Palette metadata.
@@ -65,6 +67,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - **Card**: a text snapshot or Side Palette memo.
 - **Markdown**: references an existing Vault Markdown file; it is not copied or renamed.
 - **Image**: references an existing Vault image; it is not copied or renamed.
+- **Link**: preserves a native Canvas external-link address and a one-time display snapshot; it is not copied into the Vault.
 - **Group**: a reusable Canvas subgraph snapshot containing nodes, internal edges, sizes, and relative layout.
 
 ## Use

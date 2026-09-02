@@ -9,7 +9,7 @@ export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
 };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 22,
+  schemaVersion: 23,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
@@ -44,16 +44,18 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 22,
+    schemaVersion: 23,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
       const repairedType = item.type === "markdown" && !item.origin?.filePath ? "card" : item.type;
-      const supportsFaces = repairedType !== "group";
+      const supportsFaces = repairedType !== "group" && repairedType !== "link";
       const group = repairedType === "group" && item.group ? {
         ...item.group,
         nodeBacks: item.group.nodeBacks ?? {},
         nodeMetadata: item.group.nodeMetadata ?? Object.fromEntries(Object.entries(item.group.nodeBacks ?? {}).map(([nodeId, backContent]) => [nodeId, { tags: [], label: "", labelColor: "", caption: "", backContent, currentFace: "front", facesEnabled: true, modifiedAt: item.modifiedAt ?? migratedAt }]))
       } : item.group;
-      return [id, { ...item, group, type: repairedType, sourceDeletedAt: repairedType === "markdown" ? item.sourceDeletedAt : undefined, backContent: supportsFaces ? item.backContent ?? "" : "", facesEnabled: supportsFaces && (item.facesEnabled ?? Boolean(item.backContent)), labelColor: item.labelColor ?? "", canvasPlacements: item.canvasPlacements ?? [], parentItemId: item.parentItemId ?? null, childItemIds: item.childItemIds ?? [] }];
+      const rawLink = item.webLink;
+      const webLink = repairedType === "link" && rawLink?.url ? { url: rawLink.url, siteName: rawLink.siteName ?? "", description: rawLink.description ?? "", thumbnailUrl: rawLink.thumbnailUrl ?? "", width: rawLink.width ?? 280, height: rawLink.height ?? 180, color: rawLink.color, capturedAt: rawLink.capturedAt ?? item.createdAt ?? migratedAt } : undefined;
+      return [id, { ...item, group, type: repairedType, webLink, sourceDeletedAt: repairedType === "markdown" ? item.sourceDeletedAt : undefined, backContent: supportsFaces ? item.backContent ?? "" : "", facesEnabled: supportsFaces && (item.facesEnabled ?? Boolean(item.backContent)), labelColor: item.labelColor ?? "", canvasPlacements: item.canvasPlacements ?? [], parentItemId: item.parentItemId ?? null, childItemIds: item.childItemIds ?? [] }];
     })),
     workspaces,
     collections: raw.collections ?? {},

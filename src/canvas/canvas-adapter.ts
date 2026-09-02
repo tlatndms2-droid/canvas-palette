@@ -1,4 +1,4 @@
-import { App, Notice, TFile } from "obsidian";
+import { App, Notice, TFile, requestUrl } from "obsidian";
 import { createId } from "../core/ids";
 import { findMarkdownNodeReplacement } from "../core/canvas-node-replacement";
 import { SerialTaskQueue } from "../core/serial-task-queue";
@@ -186,7 +186,8 @@ export class CanvasAdapter {
     }
     for (const node of selectedNodes) {
       if (node.type === "group" || capturedByGroup.has(node.id)) continue;
-      items.push(await this.itemFromNode(node, canvasPath));
+      const item = await this.itemFromNode(node, canvasPath);
+      if (item) items.push(item);
     }
     return items;
   }
@@ -495,7 +496,7 @@ export class CanvasAdapter {
     });
   }
 
-  private async itemFromNode(node: CanvasNodeSnapshot, canvasPath: string): Promise<PaletteItem> {
+  private async itemFromNode(node: CanvasNodeSnapshot, canvasPath: string): Promise<PaletteItem | null> {
     const now = Date.now();
     const metadata = this.getMetadata(canvasPath, node.id);
     const common = { tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", backContent: metadata?.backContent ?? "", facesEnabled: metadata?.facesEnabled ?? false, modifiedAt: metadata?.modifiedAt ?? now };
@@ -505,7 +506,36 @@ export class CanvasAdapter {
       const type: PaletteItemType = isImage ? "image" : "markdown";
       return { id: createId(type), type, displayTitle: file instanceof TFile ? file.basename : node.file, ...common, createdAt: now, origin: { canvasPath, canvasNodeId: node.id, filePath: node.file }, canvasPlacements: [], content: type === "markdown" && file instanceof TFile ? await this.app.vault.cachedRead(file) : undefined };
     }
+    if (node.type === "link") {
+      const url = typeof node.url === "string" ? node.url.trim() : "";
+      if (!url) { new Notice("Canvas link without an address was skipped."); return null; }
+      const fallback = this.linkFallback(url);
+      const preview = await this.captureLinkPreview(url, fallback);
+      return { id: createId("link"), type: "link", displayTitle: preview.title, ...common, facesEnabled: false, backContent: "", createdAt: now, origin: { canvasPath, canvasNodeId: node.id }, canvasPlacements: [], webLink: { url, siteName: preview.siteName, description: preview.description, thumbnailUrl: preview.thumbnailUrl, width: node.width || 280, height: node.height || 180, color: node.color, capturedAt: now } };
+    }
     return { id: createId("card"), type: "card", displayTitle: (node.text ?? "Canvas card").split(/\r?\n/, 1)[0].slice(0, 80), ...common, facesEnabled: metadata?.facesEnabled ?? false, createdAt: now, origin: { canvasPath, canvasNodeId: node.id }, canvasPlacements: [], content: node.text ?? "" };
+  }
+
+  private linkFallback(url: string): { title: string; siteName: string; description: string; thumbnailUrl: string } {
+    try { const parsed = new URL(url); return { title: parsed.hostname, siteName: parsed.hostname, description: url, thumbnailUrl: "" }; }
+    catch { return { title: url, siteName: "", description: url, thumbnailUrl: "" }; }
+  }
+
+  /** Captures safe Open Graph text once; later renders never re-fetch it. */
+  private async captureLinkPreview(url: string, fallback: { title: string; siteName: string; description: string; thumbnailUrl: string }): Promise<{ title: string; siteName: string; description: string; thumbnailUrl: string }> {
+    if (!/^https?:\/\//i.test(url)) return fallback;
+    try {
+      const response = await requestUrl({ url, method: "GET", headers: { "User-Agent": "Canvas-Palette/0.3" }, throw: false });
+      const html = response.text.slice(0, 512_000);
+      const meta = (name: string): string => {
+        const match = new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']*)["']|<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${name}["']`, "i").exec(html);
+        return (match?.[1] ?? match?.[2] ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
+      };
+      const title = meta("og:title") || /<title[^>]*>([^<]*)<\/title>/i.exec(html)?.[1]?.replace(/\s+/g, " ").trim().slice(0, 500) || fallback.title;
+      const image = meta("og:image");
+      let thumbnailUrl = ""; try { thumbnailUrl = image ? new URL(image, url).href : ""; } catch { /* URL fallback remains empty. */ }
+      return { title, siteName: meta("og:site_name") || fallback.siteName, description: meta("og:description") || meta("description") || fallback.description, thumbnailUrl };
+    } catch { return fallback; }
   }
 
   private groupItem(nodes: CanvasNodeSnapshot[], edges: CanvasEdgeSnapshot[], canvasPath: string, nodeId: string): PaletteItem | null {
@@ -556,6 +586,11 @@ export class CanvasAdapter {
       const file = item.origin.filePath ? this.app.vault.getAbstractFileByPath(item.origin.filePath) : null;
       if (!(file instanceof TFile)) return { node: null, warning: `${item.displayTitle}: image source was unavailable and was skipped.` };
       return { node: { id: nextId(), type: "file", file: file.path, x, y, width: size.width, height: size.height } };
+    }
+    if (item.type === "link") {
+      const link = item.webLink;
+      if (!link?.url) return { node: null, warning: `${item.displayTitle}: link address was unavailable and was skipped.` };
+      return { node: { id: nextId(), type: "link", url: link.url, x, y, width: link.width || size.width, height: link.height || size.height, ...(link.color ? { color: link.color } : {}) } };
     }
     const text = this.exportCardText(item, headingLevel);
     return { node: { id: nextId(), type: "text", text, x, y, width: size.width, height: size.height } };

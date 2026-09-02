@@ -202,7 +202,7 @@ export class FloatingMiniPalette {
     parent.createEl("label", { text: "Sort" }); const sort = parent.createEl("select", { cls: "dropdown" }); for (const [value, label] of [["modified-desc", "Modified (newest)"], ["modified-asc", "Modified (oldest)"], ["title-asc", "Title (A-Z)"], ["title-desc", "Title (Z-A)"]] as const) sort.createEl("option", { value, text: label }); sort.value = this.plugin.store.data.uiState.miniPalette.sort; sort.addEventListener("change", () => { this.plugin.store.data.uiState.miniPalette.sort = sort.value as typeof this.plugin.store.data.uiState.miniPalette.sort; this.plugin.store.changed(); });
     this.renderDensityControl(parent, "Mini Palette item size");
     parent.createEl("label", { text: "Date" }); const date = parent.createEl("select", { cls: "dropdown" }); for (const [value, text] of [["all", "All dates"], ["today", "Today"], ["week", "Last 7 days"], ["month", "Last 30 days"]] as const) date.createEl("option", { value, text }); date.value = this.dateFilter; date.addEventListener("change", () => { this.dateFilter = date.value as typeof this.dateFilter; this.refreshStorageItems(); });
-    parent.createEl("label", { text: "Filter type" }); const types = parent.createDiv({ cls: "cp-filter-chips" }); for (const type of ["all", "card", "markdown", "image", "group"] as const) { const button = types.createEl("button", { text: type === "all" ? "All" : type === "markdown" ? "MD" : type, cls: this.typeFilter === type ? "is-active" : "" }); button.addEventListener("click", () => { this.typeFilter = type; for (const chip of Array.from(types.querySelectorAll("button"))) chip.toggleClass("is-active", chip === button); this.refreshStorageItems(); }); }
+    parent.createEl("label", { text: "Filter type" }); const types = parent.createDiv({ cls: "cp-filter-chips" }); for (const type of ["all", "card", "markdown", "image", "link", "group"] as const) { const button = types.createEl("button", { text: type === "all" ? "All" : type === "markdown" ? "MD" : type === "link" ? "Link" : type, cls: this.typeFilter === type ? "is-active" : "" }); button.addEventListener("click", () => { this.typeFilter = type; for (const chip of Array.from(types.querySelectorAll("button"))) chip.toggleClass("is-active", chip === button); this.refreshStorageItems(); }); }
     parent.createEl("label", { text: "Tag filter" }); const tag = parent.createEl("input", { attr: { placeholder: "#tag" }, value: this.tagFilter }); tag.addEventListener("input", () => { this.tagFilter = tag.value.replace(/^#/, ""); this.refreshStorageItems(); });
     parent.createEl("label", { text: "Label filter" }); const label = parent.createEl("input", { attr: { placeholder: "Label" }, value: this.labelFilter }); label.addEventListener("input", () => { this.labelFilter = label.value; this.refreshStorageItems(); });
   }
@@ -220,7 +220,7 @@ export class FloatingMiniPalette {
       const quick = parent.createDiv({ cls: "cp-mini-quick-controls" });
       const search = quick.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search assets", "data-cp-focus": "mini-quick-search" }, value: this.search }); search.addEventListener("input", () => { this.search = search.value; this.refreshStorageItems(); });
       const type = quick.createEl("select", { cls: "dropdown", attr: { "aria-label": "Type filter" } });
-      for (const value of ["all", "card", "markdown", "image", "group"] as const) type.createEl("option", { value, text: value === "all" ? "All types" : value === "markdown" ? "MD" : value });
+      for (const value of ["all", "card", "markdown", "image", "link", "group"] as const) type.createEl("option", { value, text: value === "all" ? "All types" : value === "markdown" ? "MD" : value === "link" ? "Link" : value });
       type.value = this.typeFilter; type.addEventListener("change", () => { this.typeFilter = type.value as TypeFilter; this.refreshStorageItems(); });
       this.renderDensityControl(quick, "Item size", true);
     }
@@ -264,6 +264,7 @@ export class FloatingMiniPalette {
     for (const [label, value] of details) { const row = parent.createDiv({ cls: "cp-detail" }); row.createSpan({ text: label }); row.createEl("strong", { text: value }); }
     const actions = parent.createDiv({ cls: "cp-preview-actions" }); const copy = actions.createEl("button", { text: "Copy" }); copy.addEventListener("click", () => void navigator.clipboard?.writeText(item.content ?? item.origin.filePath ?? item.displayTitle));
     if (this.plugin.store.numberedCanvasLinks(item).length > 0) actions.createEl("button", { text: "Locate on Canvas" }).addEventListener("click", () => void this.plugin.locateItemOnCanvas(item));
+    if (item.type === "link" && /^https?:\/\//i.test(item.webLink?.url ?? "")) actions.createEl("button", { text: "Open web link" }).addEventListener("click", () => this.plugin.openWebLink(item));
     else if (item.origin.filePath) actions.createEl("button", { text: "Open source file" }).addEventListener("click", () => void this.plugin.openOriginal(item));
   }
 
@@ -436,6 +437,7 @@ export class FloatingMiniPalette {
     }
     if (targetIds.length === 1) {
       if (this.plugin.store.numberedCanvasLinks(item).length > 0) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => void this.plugin.locateItemOnCanvas(item)));
+      if (item.type === "link" && /^https?:\/\//i.test(item.webLink?.url ?? "")) menu.addItem((entry) => entry.setTitle("Open web link").setIcon("external-link").onClick(() => this.plugin.openWebLink(item)));
       else if (item.origin.filePath) menu.addItem((entry) => entry.setTitle("Open source file").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
     }
     menu.addSeparator();

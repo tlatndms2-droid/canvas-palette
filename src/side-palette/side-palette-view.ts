@@ -376,7 +376,7 @@ export class SidePaletteView extends ItemView {
       remove.addClass("mod-warning", "cp-selection-delete");
     }
     const filters = parent.createDiv({ cls: "cp-viewport-filters" });
-    const typeFilters = [["All", null], ["Image", "image"], ["MD", "markdown"], ["Card", "card"], ["Group", "group"]] as const;
+    const typeFilters = [["All", null], ["Image", "image"], ["MD", "markdown"], ["Card", "card"], ["Link", "link"], ["Group", "group"]] as const;
     for (const [label, type] of typeFilters) {
       const token = type ? `type:${type}` : null;
       const active = token ? this.plugin.search.hasToken(this.query, token) : !/\btype:/i.test(this.query);
@@ -835,6 +835,7 @@ export class SidePaletteView extends ItemView {
     if (workspace) menu.addItem((entry) => entry.setTitle("Move to…").setIcon("folder-input").onClick(() => new MoveItemsModal(this.app, workspace.name, Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id), targetIds.length, (collectionId) => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collectionId)).open()));
     const linkedLocations = this.plugin.store.linkedCanvasLocations(item);
     if (linkedLocations.length > 0) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => this.plugin.findLinkedCanvas(item)));
+    if (item.type === "link" && /^https?:\/\//i.test(item.webLink?.url ?? "")) menu.addItem((entry) => entry.setTitle("Open web link").setIcon("external-link").onClick(() => this.plugin.openWebLink(item)));
     else if (item.origin.filePath) menu.addItem((entry) => entry.setTitle("Open source file").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
     menu.addSeparator(); menu.addItem((entry) => entry.setTitle(`Delete${targetIds.length > 1 ? ` ${targetIds.length} items` : ""}`).setIcon("trash").onClick(() => this.confirmDelete(targetIds)));
     menu.showAtMouseEvent(event);

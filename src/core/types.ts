@@ -1,4 +1,4 @@
-export type PaletteItemType = "card" | "markdown" | "image" | "group";
+export type PaletteItemType = "card" | "markdown" | "image" | "link" | "group";
 export type PaletteTheme = "obsidian" | "light" | "dark";
 export type AccentMode = "obsidian" | "custom";
 export type AssetViewMode = "grid" | "list";
@@ -23,6 +23,8 @@ export interface CanvasNodeSnapshot {
   height: number;
   text?: string;
   file?: string;
+  /** JSON Canvas external-link node URL. */
+  url?: string;
   label?: string;
   color?: string;
   parentId?: string;
@@ -64,6 +66,8 @@ export interface PaletteItem {
   sourceDeletedAt?: number;
   canvasPlacements: CanvasPlacement[];
   content?: string;
+  /** A one-time, display-only snapshot of a native Canvas link. */
+  webLink?: { url: string; siteName: string; description: string; thumbnailUrl: string; width: number; height: number; color?: string; capturedAt: number; };
   backContent: string;
   facesEnabled: boolean;
   group?: GroupSnapshot;

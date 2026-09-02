@@ -50,7 +50,10 @@ The user distinguishes these modes precisely:
 
 ## Current state
 
-- Version: `0.3.50`.
+- Version: `0.3.51` (local implementation, automated and Sandbox-validated; not yet published).
+- Latest runtime change: native Canvas external links are canonical `link` Palette Items rather than blank Cards. Capture stores the exact URL plus one-time title/site/description/thumbnail metadata; Link filtering, explicit `Open web link`, type-safe Front/Back exclusion, and native link-node restoration apply across Side, Mini, direct placement, Collection/Workspace export, and MindMap. A `Link` inside a Group preview is rendered as a link label and the Group serializer retains its original URL/edges. Sandbox validation used the separate `canvas-palette-link-0351-Sandbox` process on port `9241`: a selected native YouTube link collected through the registered Canvas Palette collect command into a visible Mini Link card, restored to a second Canvas as `{ type: "link" }` with its exact URL, `360×220` size and color `6`, and persisted after plugin reload at version `0.3.51`. The disposable Sandbox fixtures must be restored after the pass.
+
+- Previous release: `0.3.50`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
 - Latest published release: [`0.3.50`](https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.50), commit `8b1f45135bdc792206eaa396e49bb5921124f842`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.

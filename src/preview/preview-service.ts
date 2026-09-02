@@ -29,6 +29,19 @@ export class PreviewService {
       await this.renderCanvasGroup(parent, item.group, item.origin.canvasPath ?? "", compact);
       return;
     }
+    if (item.type === "link" && item.webLink) {
+      const link = item.webLink;
+      const wrap = parent.createDiv({ cls: "cp-link-preview" });
+      if (link.thumbnailUrl) {
+        const image = wrap.createEl("img", { cls: "cp-link-preview__image", attr: { src: link.thumbnailUrl, alt: "", draggable: "false" } });
+        image.addEventListener("error", () => image.remove());
+      }
+      const text = wrap.createDiv({ cls: "cp-link-preview__text" });
+      text.createEl("strong", { text: item.displayTitle });
+      if (link.siteName) text.createSpan({ cls: "cp-link-preview__site", text: link.siteName });
+      text.createSpan({ cls: "cp-link-preview__url", text: link.description || link.url });
+      return;
+    }
     const source = item.content ?? item.origin.filePath ?? "No preview available.";
     if (item.type === "markdown" || item.type === "card") {
       await MarkdownRenderer.render(this.app, compact ? source.slice(0, compactLimit) : source, parent, item.origin.filePath ?? "", this.component);
@@ -78,11 +91,15 @@ export class PreviewService {
         content.createEl("img", { attr: { src: this.app.vault.getResourcePath(file), alt: file.basename, draggable: "false" } });
       } else if (node.type === "text") {
         await MarkdownRenderer.render(this.app, node.text ?? "", content, sourcePath, this.component);
+      } else if (node.type === "link") {
+        content.setText(this.linkLabel(node.url));
       } else if (file instanceof TFile && file.extension.toLowerCase() === "md") {
         await MarkdownRenderer.render(this.app, await this.app.vault.cachedRead(file), content, file.path, this.component);
       } else content.setText(node.label ?? node.file?.split("/").pop() ?? "File");
     }
   }
+
+  private linkLabel(url: string | undefined): string { try { return new URL(url ?? "").hostname || url || "Link"; } catch { return url || "Link"; } }
 
   private positionSnapshotNode(element: HTMLElement, node: CanvasNodeSnapshot, width: number, height: number): void {
     element.style.left = `${node.x / width * 100}%`;

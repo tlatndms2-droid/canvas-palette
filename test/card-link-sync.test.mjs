@@ -69,7 +69,7 @@ test("Group snapshot migration preserves legacy Front Back metadata and new per-
   raw.workspaces.workspace.looseItemIds.push("group");
   const store = new PaletteStore({ loadData: async () => raw, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
   await store.load();
-  assert.equal(store.data.schemaVersion, 22);
+  assert.equal(store.data.schemaVersion, 23);
   assert.equal(store.data.items.group.group.nodeMetadata.inside.backContent, "Legacy back");
   assert.deepEqual(store.data.items.group.group.nodeMetadata.inside.tags, []);
   await cleanup();

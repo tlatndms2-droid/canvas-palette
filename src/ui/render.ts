@@ -7,6 +7,7 @@ export const TYPE_ICON: Record<PaletteItemType, string> = {
   card: "sticky-note",
   markdown: "file-text",
   image: "image",
+  link: "link",
   group: "boxes"
 };
 
@@ -20,7 +21,7 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
 export type MarkdownSourceStatus = "deleted";
 export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; dragItemIds?: string[]; miniCollect?: boolean; currentFace?: CardFace; unlinked?: boolean; markdownSourceStatus?: MarkdownSourceStatus | null; onMarkdownSourceStatus?: (event: MouseEvent) => void; onToggleFace?: (face: CardFace) => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
 
-export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group"; }
+export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group" && item.type !== "link"; }
 
 export function renderItem(parent: HTMLElement, item: PaletteItem, options: ItemRenderOptions): HTMLElement {
   const canvasLinks = new Map<string, string[]>();
