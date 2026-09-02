@@ -24,15 +24,38 @@ Current development proceeds through **Plan mode → Goal/Implementation mode �
 - Never operate the user's real Vault for validation; restore Sandbox fixtures after verification.
 - Create a release only after implementation and verification are complete and the user requests it.
 
+### Portable isolated Sandbox and background validation
+
+Use this exact procedure on another PC when a real Obsidian runtime check is required. It opens a visible Sandbox window for the user while all inspection and interaction continue through a background CDP process; do not use the real working Vault or Computer Use unless the user explicitly requests direct pointer control.
+
+1. Build the plugin, then copy `main.js`, `manifest.json`, and `styles.css` into the isolated Sandbox plugin folder.
+2. Create a dedicated temporary Obsidian profile, for example `C:\Users\<user>\AppData\Local\Temp\canvas-palette-sandbox-registered-profile`.
+3. Before starting Obsidian, create `<profile>\obsidian.json` and register the exact Sandbox Vault with `open: true`:
+
+   ```json
+   {"vaults":{"canvas-palette-sandbox":{"path":"C:\\absolute\\path\\to\\Obsidian Mini Palette Sandbox","ts":0,"open":true}}}
+   ```
+
+4. Start only that separate profile, adding `--remote-debugging-port=9237`. Do not pass only a Vault folder path; a fresh profile otherwise opens the Vault picker. The resulting title must contain both the active Canvas/document and Sandbox Vault name, for example `Mini Test - Obsidian Mini Palette Sandbox - Obsidian`.
+5. Confirm both the listening port and the newly discovered CDP page target at `http://127.0.0.1:9237/json/list`. Select the target by its exact Sandbox title; never reuse a previous target ID. A process or port alone is insufficient—there must be a `page` target with the Sandbox title.
+6. Use CDP for DOM inspection, keyboard events, and interaction only after fixture backups. Background automation must not activate or move the user's real Obsidian window. Keep the Sandbox window open and visible unless the user explicitly asks to hide it.
+7. Back up `data.json`, relevant `.canvas` files, and `.obsidian/workspace.json` before mutations; restore and hash-check them afterward. If a prior failed attempt altered a fixture before a backup exists, report that fact rather than silently restoring an older, nonmatching fixture.
+8. For a release, run tests, TypeScript, production build, `git diff --check`, the affected Sandbox flows, then commit, push `main`, create an annotated tag, publish the GitHub Release with `main.js`, `manifest.json`, and `styles.css`, and re-download the three assets to compare SHA-256 hashes.
+
+The user distinguishes these modes precisely:
+
+- **Sandbox open**: a separate Obsidian window has the registered Sandbox Vault open; this must be visibly confirmable by title.
+- **Background validation**: CDP connects to that already-open Sandbox window and does not require pointer/mouse control.
+- **Computer Use**: direct Windows mouse/keyboard control with a blue target border. Do not use it while background validation is requested or until the user explicitly permits it.
+
 ## Current state
 
 - Version: `0.3.50`.
 - Repository: `https://github.com/tlatndms2-droid/canvas-palette` (public).
 - Build stack: TypeScript + esbuild using the official Obsidian API package.
-- Latest release candidate: `0.3.50`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
-- Latest release URL: pending `0.3.50` publication.
+- Latest published release: [`0.3.50`](https://github.com/tlatndms2-droid/canvas-palette/releases/tag/0.3.50), commit `8b1f45135bdc792206eaa396e49bb5921124f842`, with BRAT assets `main.js`, `manifest.json`, and `styles.css`.
 - Latest runtime change: `0.3.50`; Canvas links now have per-Canvas sequential addresses. Every linked Card, Markdown, Image, and Group node displays its existing top-left chain control with a small accent number badge. Numbers derive from the saved origin/placement order, start at one in every Canvas, compact after single-node Unlink or Canvas reconciliation, and retain their slot through linked-node replacement. Side cards summarize Canvas link counts. `Locate on Canvas` now shares the same one-link direct route and Canvas-then-number picker across Side, Mini, and Item detail; the numbered picker uses full-row keyboard targets and internal scrolling.
-- `0.3.50` verification: 98 automated tests, TypeScript no-emit, production build, and `git diff --check` passed. The existing isolated Sandbox received the `0.3.50` assets after a backup; background-only verification could not attach because its running Obsidian instance does not expose CDP `9237`, and no pointer or keyboard UI input was used. A live visual/interaction pass remains required before publishing a release.
+- `0.3.50` verification: 98 automated tests, TypeScript no-emit, production build, and `git diff --check` passed. In the isolated `Obsidian Mini Palette Sandbox`, `0.3.50` rendered `링크 1/1 · Side Palette에서 보기`; the one-link route selected the exact Canvas node without a modal; a one-Canvas three-link probe rendered `링크 1–3` and selected link 2's exact node; a two-Canvas probe rendered Canvas selection, number selection, `이전`, and `Escape` return; and a 20-link probe kept the header outside the scrollable list (`overflow-y: auto`). The release assets were downloaded from GitHub and SHA-256 matched the local build.
 - Latest runtime change: `0.3.49`; Outliner Ctrl/Shift selection now permits Collections and files to be selected together. The MindMap command exports only the visible selected rows as one connected hierarchy bundle, preventing hidden/out-of-scope rows from being materialized. Repeated Canvas synchronization no longer accumulates Markdown heading prefixes, and Card body, link, and footer regions remain non-overlapping.
 - `0.3.49` validation: 96 automated tests passed. The isolated Obsidian Sandbox verified mixed Shift selection, the MindMap menu, hierarchy bundle creation, repeated heading synchronization, Canvas heading rendering, and selected Card layout.
 - Latest runtime change: `0.3.48`; selected Outliner Items can be exported through `Export from MindMap to Canvas`. Parent-child structure becomes real Canvas Edges with depth-aware Card headings; ordinary Item and Collection export flows remain available. This resolves the previous hierarchy-Edge follow-up for the selected Outliner MindMap route.
