@@ -75,6 +75,7 @@ test("reviewed pending import to another Canvas representative removes every Can
   store.data.items.foreign.canvasPlacements.push({ canvasPath: "folder/EP01.canvas", nodeIds: ["node"], placedAt: 1 });
   assert.equal(store.itemLinkedToWorkspace(store.data.items.foreign, dedicated.id), true);
   store.renameCanvasPath("folder/EP01.canvas", "story/EP01.canvas");
+  assert.equal(dedicated.name, "EP01");
   assert.equal(dedicated.ownerCanvasPath, "story/EP01.canvas");
   assert.equal(dedicated.representativeCanvasPath, "story/EP01.canvas");
   await cleanup();
@@ -84,7 +85,8 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
   const side = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
   const mini = await readFile(new URL("../src/mini-palette/floating-mini-palette.ts", import.meta.url), "utf8");
-  assert.match(main, /ensureCurrentCanvasWorkspace/);
+  assert.match(main, /openCanvasWorkspaceCreator/);
+  assert.match(main, /CanvasWorkspaceModal/);
   assert.match(main, /Create Workspace for current Canvas/);
   assert.match(main, /Set as representative/);
   assert.match(main, /representativePath === currentPath \? "★ " : "☆ "/);
@@ -99,6 +101,8 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   assert.match(mini, /result\.alreadySaved\.length > 0/);
   assert.match(main, /const changedCanvas = context\.file\.path !== this\.lastCanvasPath/);
   assert.match(main, /if \(changedCanvas\) this\.selectRepresentativeWorkspace\(context\.file\.path\)/);
+  assert.match(main, /representativeWorkspaceForCanvas\(canvasPath\)/);
+  assert.doesNotMatch(main, /ensureCanvasWorkspace\(canvasPath/);
   assert.match(main, /activeContext\(\)\?\.file\.path \?\? this\.lastCanvasPath/);
   assert.match(main, /this\.lastCanvasPath = this\.store\.data\.uiState\.lastCanvasPath/);
   assert.match(main, /this\.store\.data\.uiState\.lastCanvasPath = context\.file\.path/);
@@ -106,6 +110,9 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   assert.match(side, /Open current Canvas Workspace/);
   assert.match(side, /Open Workspace Explorer/);
   assert.match(side, /openWorkspaceExplorer/);
+  assert.match(side, /이 Canvas용 Workspace가 없습니다/);
+  assert.match(side, /Canvas를 열어도 자동 생성되지 않습니다/);
+  assert.match(side, /Workspace 만들기/);
   assert.doesNotMatch(mini, /option\.disabled = Boolean\(workspace/);
   assert.doesNotMatch(mini, /only accepts items that exist in its own Canvas/);
 });
@@ -117,12 +124,15 @@ test("Workspace Explorer prioritizes the current Canvas and offers search, dates
   assert.match(explorer, /Search Canvas or Workspace/);
   assert.match(explorer, /Current Canvas ·/);
   assert.match(explorer, /workspace\.ownerCanvasPath === currentCanvas/);
+  assert.match(explorer, /소속 Canvas · \$\{this\.baseName/);
   assert.match(explorer, /type: "date"/);
   assert.match(explorer, /"icons"[\s\S]*"list"[\s\S]*"details"/);
   assert.match(explorer, /Created: newest/);
   assert.match(render, /Number\(bCurrent\) - Number\(aCurrent\)/);
   assert.match(styles, /\.cp-workspace-explorer__body\.is-icons/);
   assert.match(styles, /\.cp-workspace-explorer__columns/);
+  assert.match(styles, /\.cp-current-canvas-empty/);
+  assert.match(styles, /\.cp-canvas-workspace-modal/);
 });
 
 test("deleting a Workspace preserves its Palette items in Mini Palette storage", async () => {

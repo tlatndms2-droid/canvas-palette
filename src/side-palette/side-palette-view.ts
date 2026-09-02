@@ -125,6 +125,15 @@ export class SidePaletteView extends ItemView {
       const manageWorkspace = iconButton(selectorRow, "folder-cog", "Open Workspace Explorer", () => this.plugin.openWorkspaceExplorer());
       manageWorkspace.addClass("cp-workspace-manage");
     }
+    const canvasPath = this.plugin.currentCanvasPath();
+    const missingCanvasWorkspace = Boolean(canvasPath && !this.plugin.store.representativeWorkspaceForCanvas(canvasPath));
+    root.toggleClass("has-canvas-workspace-empty", missingCanvasWorkspace);
+    if (canvasPath && missingCanvasWorkspace) {
+      const empty = root.createDiv({ cls: "cp-current-canvas-empty" });
+      empty.createDiv({ cls: "cp-current-canvas-empty__title", text: "이 Canvas용 Workspace가 없습니다" });
+      empty.createDiv({ cls: "cp-current-canvas-empty__hint", text: "Canvas를 열어도 자동 생성되지 않습니다." });
+      empty.createEl("button", { text: "Workspace 만들기" }).addEventListener("click", () => this.plugin.openCanvasWorkspaceCreator(canvasPath));
+    }
   }
 
   private openHeaderMenu(trigger: HTMLElement, workspaceId: string): void {

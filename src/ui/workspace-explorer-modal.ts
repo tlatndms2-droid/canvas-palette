@@ -75,10 +75,7 @@ export class WorkspaceExplorerModal extends Modal {
     const canvas = footer.createEl("button", { text: "+ Current Canvas Workspace" }); canvas.disabled = !currentCanvas;
     canvas.addEventListener("click", () => {
       if (!currentCanvas) return;
-      const count = this.plugin.store.canvasWorkspaces(currentCanvas).length;
-      new TextPromptModal(this.app, "New Canvas Workspace", `${this.baseName(currentCanvas)} ${count + 1}`, (name) => {
-        const workspace = this.plugin.store.createWorkspace(name, "canvas", currentCanvas, count === 0); this.plugin.store.data.uiState.activeWorkspaceId = workspace.id; this.plugin.store.changed();
-      }, "Workspace name").open();
+      this.plugin.openCanvasWorkspaceCreator(currentCanvas);
     });
   }
 
@@ -105,7 +102,7 @@ export class WorkspaceExplorerModal extends Modal {
     if (this.viewState().viewMode === "icons") name.createSpan({ cls: "cp-workspace-file__date", text: this.formatDate(workspace.modifiedAt) });
     const meta = row.createDiv({ cls: "cp-workspace-file__meta" });
     meta.createSpan({ cls: "cp-workspace-file__badge", text: workspace.kind === "canvas" ? (representative ? "Representative" : "Canvas") : "General" });
-    meta.createSpan({ text: workspace.kind === "canvas" ? this.baseName(workspace.ownerCanvasPath ?? "") : "All Canvases" });
+    meta.createSpan({ text: workspace.kind === "canvas" ? `소속 Canvas · ${this.baseName(workspace.ownerCanvasPath ?? "")}` : "All Canvases" });
     row.createSpan({ cls: "cp-workspace-file__modified", text: this.formatDate(workspace.modifiedAt) });
     const more = row.createEl("button", { cls: "cp-icon-button cp-workspace-file__more", attr: { title: "Workspace actions", "aria-label": "Workspace actions" } }); setIcon(more, "more-vertical");
     const open = (): void => { this.plugin.store.data.uiState.activeWorkspaceId = workspace.id; this.plugin.store.changed(); };

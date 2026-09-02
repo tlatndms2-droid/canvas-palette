@@ -15,7 +15,7 @@ import { PreviewService } from "./preview/preview-service";
 import { SearchService } from "./search/search-service";
 import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
-import { AlreadySavedToWorkspaceModal, CanvasTargetModal, ConfirmDeleteModal, ConfirmExportDuplicateModal, ConfirmForeignCanvasWorkspaceModal, ItemEditorModal, MetadataEditorModal, TextPromptModal } from "./ui/modal";
+import { AlreadySavedToWorkspaceModal, CanvasTargetModal, CanvasWorkspaceModal, ConfirmDeleteModal, ConfirmExportDuplicateModal, ConfirmForeignCanvasWorkspaceModal, ItemEditorModal, MetadataEditorModal, TextPromptModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 import { FindLinkModal } from "./ui/find-link-modal";
 import { WorkspaceExplorerModal } from "./ui/workspace-explorer-modal";
@@ -138,7 +138,8 @@ export default class CanvasPalettePlugin extends Plugin {
     const currentPath = this.currentCanvasPath();
     const representativePath = workspace.kind === "canvas" ? workspace.representativeCanvasPath : null;
     const representativeMark = representativePath ? representativePath === currentPath ? "★ " : "☆ " : "";
-    return `${representativeMark}${workspace.name}${workspace.kind === "canvas" ? " · Canvas" : ""}`;
+    const ownerCanvas = workspace.kind === "canvas" ? this.canvasBaseName(workspace.ownerCanvasPath ?? "") : "";
+    return workspace.kind === "canvas" ? `${representativeMark}${workspace.name} · ${ownerCanvas}` : `${representativeMark}${workspace.name}`;
   }
 
   workspaceAcceptsCanvas(workspace: PaletteWorkspace, canvasPath: string): boolean {
@@ -166,10 +167,21 @@ export default class CanvasPalettePlugin extends Plugin {
   }
 
   openCurrentCanvasWorkspace(): void {
-    const workspace = this.ensureCurrentCanvasWorkspace();
-    if (!workspace) { new Notice("Open a Canvas first."); return; }
+    const canvasPath = this.currentCanvasPath();
+    if (!canvasPath) { new Notice("Open a Canvas first."); return; }
+    const workspace = this.store.representativeWorkspaceForCanvas(canvasPath);
+    if (!workspace) { this.openCanvasWorkspaceCreator(canvasPath); return; }
     this.store.data.uiState.activeWorkspaceId = workspace.id;
     this.store.changed();
+  }
+
+  openCanvasWorkspaceCreator(canvasPath = this.currentCanvasPath()): void {
+    if (!canvasPath) { new Notice("Open a Canvas first."); return; }
+    new CanvasWorkspaceModal(this.app, this.canvasBaseName(canvasPath), (name) => {
+      const workspace = this.store.createWorkspace(name, "canvas", canvasPath, this.store.canvasWorkspaces(canvasPath).length === 0);
+      this.store.data.uiState.activeWorkspaceId = workspace.id;
+      this.store.changed();
+    }).open();
   }
 
   showWorkspaceMenu(anchor: HTMLElement): void {
@@ -179,14 +191,7 @@ export default class CanvasPalettePlugin extends Plugin {
       const workspace = this.store.createWorkspace(name, "general");
       this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed();
     }, "Workspace name").open()));
-    menu.addItem((entry) => entry.setTitle("Create Workspace for current Canvas…").setIcon("layout-dashboard").setDisabled(!canvasPath).onClick(() => {
-      if (!canvasPath) return;
-      const count = this.store.canvasWorkspaces(canvasPath).length;
-      new TextPromptModal(this.app, "New Canvas Workspace", `${this.canvasBaseName(canvasPath)} ${count + 1}`, (name) => {
-        const workspace = this.store.createWorkspace(name, "canvas", canvasPath, count === 0);
-        this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed();
-      }, "Workspace name").open();
-    }));
+    menu.addItem((entry) => entry.setTitle("Create Workspace for current Canvas…").setIcon("layout-dashboard").setDisabled(!canvasPath).onClick(() => this.openCanvasWorkspaceCreator(canvasPath)));
     const active = this.activeWorkspace();
     if (active) {
       menu.addSeparator();
@@ -712,14 +717,8 @@ export default class CanvasPalettePlugin extends Plugin {
 
   private selectRepresentativeWorkspace(canvasPath = this.currentCanvasPath()): void {
     if (!canvasPath) return;
-    const workspace = this.store.ensureCanvasWorkspace(canvasPath, this.canvasBaseName(canvasPath));
+    const workspace = this.store.representativeWorkspaceForCanvas(canvasPath);
     if (workspace && workspace.id !== this.store.data.uiState.activeWorkspaceId) { this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed(); }
-  }
-
-  private ensureCurrentCanvasWorkspace(): PaletteWorkspace | undefined {
-    const canvasPath = this.currentCanvasPath();
-    if (!canvasPath) return undefined;
-    return this.store.ensureCanvasWorkspace(canvasPath, this.canvasBaseName(canvasPath));
   }
 
   private canvasBaseName(path: string): string { return path.split("/").pop()?.replace(/\.canvas$/i, "") || "Canvas"; }

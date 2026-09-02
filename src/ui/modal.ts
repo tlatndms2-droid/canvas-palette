@@ -44,6 +44,30 @@ export class TextPromptModal extends Modal {
   onClose(): void { this.contentEl.empty(); }
 }
 
+export class CanvasWorkspaceModal extends Modal {
+  private value = "";
+  constructor(app: App, private readonly canvasName: string, private readonly onSubmit: (value: string) => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-canvas-workspace-modal");
+    this.contentEl.createEl("h2", { text: "New Canvas Workspace" });
+    this.contentEl.createEl("label", { text: "Workspace name" });
+    const input = this.contentEl.createEl("input", { attr: { type: "text", placeholder: "예: 튜토리얼 링크", "aria-label": "Workspace name" } });
+    input.addEventListener("input", () => { this.value = input.value; });
+    const owner = this.contentEl.createDiv({ cls: "cp-canvas-workspace-modal__owner" });
+    owner.createSpan({ text: "소속 Canvas" });
+    owner.createSpan({ text: `· ${this.canvasName}` });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
+    actions.createEl("button", { text: "Save", cls: "mod-cta" }).addEventListener("click", () => {
+      const value = this.value.trim();
+      if (!value) { input.focus(); return; }
+      this.onSubmit(value); this.close();
+    });
+    window.setTimeout(() => input.focus(), 0);
+  }
+  onClose(): void { this.contentEl.empty(); }
+}
+
 export class ConfirmDeleteModal extends Modal {
   constructor(app: App, private readonly count: number, private readonly onConfirm: () => void) { super(app); }
   onOpen(): void {
