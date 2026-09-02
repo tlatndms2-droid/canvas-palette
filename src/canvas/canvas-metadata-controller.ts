@@ -51,15 +51,18 @@ export class CanvasMetadataController {
     this.remove(node);
     const state = metadata ?? { tags: [], label: "", labelColor: "", caption: "", backContent: "", currentFace: "front" as const, facesEnabled: false, modifiedAt: Date.now() };
     const supportsFaces = this.adapter.supportsFrontBack(node);
-    const linked = Boolean(this.plugin.store.linkedItemForNode(canvasPath, nodeId));
+    const numberedLink = this.plugin.store.numberedCanvasLinkForNode(canvasPath, nodeId);
+    const linked = Boolean(numberedLink);
     const data = node.getData?.();
     const type = data?.type ?? "unknown";
     nodeEl.addClass("cp-canvas-has-metadata", `cp-canvas-has-metadata--${type}`);
     if (linked) nodeEl.addClass("cp-canvas-linked");
     const layer = nodeEl.createDiv({ cls: `cp-canvas-metadata cp-canvas-metadata--${type}`, attr: { "aria-label": "Canvas Palette metadata" } });
     if (linked) {
-      const linkBadge = layer.createEl("button", { cls: "clickable-icon cp-canvas-link-badge", attr: { type: "button", "aria-label": "Show linked item in Side Palette", title: "Show linked item in Side Palette" } });
+      const linkLabel = `링크 ${numberedLink?.link.number}/${numberedLink?.link.total} · Side Palette에서 보기`;
+      const linkBadge = layer.createEl("button", { cls: "clickable-icon cp-canvas-link-badge", attr: { type: "button", "aria-label": linkLabel, title: linkLabel } });
       setIcon(linkBadge, "link-2");
+      linkBadge.createSpan({ cls: "cp-canvas-link-badge__number", text: String(numberedLink?.link.number ?? "") });
       linkBadge.addEventListener("pointerdown", (event) => event.stopPropagation());
       linkBadge.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); void this.plugin.revealPaletteItemForCanvasNode(canvasPath, nodeId); });
       linkBadge.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); });

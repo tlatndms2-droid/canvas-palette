@@ -1,7 +1,7 @@
 import type CanvasPalettePlugin from "../main";
 import { DEFAULT_SIDE_LAYOUT, migrateData } from "./defaults";
 import { createId } from "./ids";
-import type { CardFace, Collection, PaletteData, PaletteItem, PaletteMetadata, PaletteWorkspace } from "./types";
+import type { CardFace, Collection, NumberedCanvasLink, PaletteData, PaletteItem, PaletteMetadata, PaletteWorkspace } from "./types";
 
 type Listener = () => void;
 
@@ -481,9 +481,24 @@ export class PaletteStore {
   }
 
   linkedCanvasLocations(item: PaletteItem): Array<{ canvasPath: string; nodeId: string }> {
-    const locations = new Map<string, { canvasPath: string; nodeId: string }>();
-    for (const location of this.linkedCanvasNodes(item)) if (!locations.has(location.canvasPath)) locations.set(location.canvasPath, location);
-    return [...locations.values()];
+    return this.linkedCanvasNodes(item);
+  }
+
+  numberedCanvasLinks(item: PaletteItem): NumberedCanvasLink[] {
+    const byCanvas = new Map<string, Array<{ canvasPath: string; nodeId: string }>>();
+    for (const location of this.linkedCanvasNodes(item)) {
+      const entries = byCanvas.get(location.canvasPath) ?? [];
+      entries.push(location);
+      byCanvas.set(location.canvasPath, entries);
+    }
+    return [...byCanvas.values()].flatMap((entries) => entries.map((location, index) => ({ ...location, number: index + 1, total: entries.length })));
+  }
+
+  numberedCanvasLinkForNode(canvasPath: string, nodeId: string): { item: PaletteItem; link: NumberedCanvasLink } | undefined {
+    const item = this.linkedItemForNode(canvasPath, nodeId);
+    if (!item) return undefined;
+    const link = this.numberedCanvasLinks(item).find((candidate) => candidate.canvasPath === canvasPath && candidate.nodeId === nodeId);
+    return link ? { item, link } : undefined;
   }
 
   reconcileCanvasLinks(canvasPath: string, existingNodeIds: Set<string>): boolean {
@@ -648,22 +663,32 @@ export class PaletteStore {
     const item = this.data.items[itemId];
     if (!item) return;
     const removed = new Set(removedNodeIds);
+    const replacements = [...newNodeIds];
     const replacedOrigin = item.origin.canvasPath === canvasPath && Boolean(item.origin.canvasNodeId && removed.has(item.origin.canvasNodeId));
     if (replacedOrigin) {
-      item.origin.canvasPath = canvasPath;
-      item.origin.canvasNodeId = newNodeIds[0];
+      const replacement = replacements.shift();
+      if (replacement) item.origin.canvasNodeId = replacement;
+      else { delete item.origin.canvasPath; delete item.origin.canvasNodeId; }
     }
     for (const placement of item.canvasPlacements) {
-      if (placement.canvasPath === canvasPath) placement.nodeIds = placement.nodeIds.filter((nodeId) => !removed.has(nodeId));
+      if (placement.canvasPath !== canvasPath) continue;
+      const nextNodeIds: string[] = [];
+      for (const nodeId of placement.nodeIds) {
+        if (!removed.has(nodeId)) nextNodeIds.push(nodeId);
+        else {
+          const replacement = replacements.shift();
+          if (replacement && !nextNodeIds.includes(replacement)) nextNodeIds.push(replacement);
+        }
+      }
+      placement.nodeIds = nextNodeIds;
     }
     item.canvasPlacements = item.canvasPlacements.filter((placement) => placement.nodeIds.length > 0);
-    const placementIds = replacedOrigin ? newNodeIds.slice(1) : newNodeIds;
-    if (placementIds.length > 0) {
+    if (replacements.length > 0) {
       const placement = item.canvasPlacements.find((candidate) => candidate.canvasPath === canvasPath);
       if (placement) {
-        placement.nodeIds = [...new Set([...placement.nodeIds, ...placementIds])];
+        placement.nodeIds = [...new Set([...placement.nodeIds, ...replacements])];
         placement.placedAt = Date.now();
-      } else item.canvasPlacements.push({ canvasPath, nodeIds: [...new Set(placementIds)], placedAt: Date.now() });
+      } else item.canvasPlacements.push({ canvasPath, nodeIds: [...new Set(replacements)], placedAt: Date.now() });
     }
     this.reconcileCanvasLinks(canvasPath, existingNodeIds);
     this.applyItemMetadataToLinkedNodes(item);

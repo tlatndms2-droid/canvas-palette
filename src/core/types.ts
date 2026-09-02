@@ -10,6 +10,8 @@ export type WorkspaceExplorerSort = "modified-desc" | "modified-asc" | "created-
 export interface TextSourceRange { from: { line: number; ch: number }; to: { line: number; ch: number }; }
 export interface ItemOrigin { canvasPath?: string; canvasNodeId?: string; workspaceId?: string; filePath?: string; textRange?: TextSourceRange; }
 export interface CanvasPlacement { canvasPath: string; nodeIds: string[]; placedAt: number; }
+/** A display-only Canvas link address. Its number is derived from the saved link order. */
+export interface NumberedCanvasLink { canvasPath: string; nodeId: string; number: number; total: number; }
 export interface PaletteMetadata { tags: string[]; label: string; labelColor?: string; caption: string; backContent: string; currentFace: CardFace; facesEnabled: boolean; modifiedAt: number; }
 
 export interface CanvasNodeSnapshot {

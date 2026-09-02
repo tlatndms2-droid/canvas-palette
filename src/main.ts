@@ -8,7 +8,7 @@ import { PaletteDropController } from "./canvas/palette-drop-controller";
 import { TextScrapHighlights } from "./canvas/text-scrap-highlights";
 import { createId } from "./core/ids";
 import { PaletteStore } from "./core/store";
-import type { OutlineSelectionTarget, PaletteItem, PaletteWorkspace } from "./core/types";
+import type { NumberedCanvasLink, OutlineSelectionTarget, PaletteItem, PaletteWorkspace } from "./core/types";
 import { PaletteEditorManager } from "./editor/editor-manager";
 import { FloatingMiniPalette } from "./mini-palette/floating-mini-palette";
 import { PreviewService } from "./preview/preview-service";
@@ -548,15 +548,13 @@ export default class CanvasPalettePlugin extends Plugin {
   }
 
   async locateItemOnCanvas(item: PaletteItem): Promise<void> {
-    const canvasPath = item.origin.canvasPath;
-    const nodeId = item.origin.canvasNodeId;
-    if (!canvasPath || !nodeId || !(await this.canvas.revealNode(canvasPath, nodeId))) new Notice("The original Canvas item is unavailable.");
+    this.findLinkedCanvas(item);
   }
 
   findLinkedCanvas(item: PaletteItem): void {
-    const locations = this.store.linkedCanvasLocations(item);
+    const locations = this.store.numberedCanvasLinks(item);
     if (locations.length === 0) { new Notice("This Palette item has no linked Canvas location."); return; }
-    const reveal = async (location: { canvasPath: string; nodeId: string }): Promise<void> => {
+    const reveal = async (location: NumberedCanvasLink): Promise<void> => {
       if (!(await this.canvas.revealNode(location.canvasPath, location.nodeId))) new Notice("The linked Canvas location is unavailable.");
     };
     if (locations.length === 1) { void reveal(locations[0]); return; }

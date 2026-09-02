@@ -23,10 +23,16 @@ export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: bo
 export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group"; }
 
 export function renderItem(parent: HTMLElement, item: PaletteItem, options: ItemRenderOptions): HTMLElement {
-  const canvasPaths = [...new Set([
-    item.origin.canvasPath && item.origin.canvasNodeId ? item.origin.canvasPath : undefined,
-    ...item.canvasPlacements.filter((placement) => placement.nodeIds.length > 0).map((placement) => placement.canvasPath)
-  ].filter((path): path is string => Boolean(path)))];
+  const canvasLinks = new Map<string, string[]>();
+  const addCanvasLink = (canvasPath: string | undefined, nodeId: string | undefined): void => {
+    if (!canvasPath || !nodeId) return;
+    const ids = canvasLinks.get(canvasPath) ?? [];
+    if (!ids.includes(nodeId)) ids.push(nodeId);
+    canvasLinks.set(canvasPath, ids);
+  };
+  addCanvasLink(item.origin.canvasPath, item.origin.canvasNodeId);
+  for (const placement of item.canvasPlacements) for (const nodeId of placement.nodeIds) addCanvasLink(placement.canvasPath, nodeId);
+  const canvasPaths = [...canvasLinks.keys()];
   const unlinked = options.unlinked ?? canvasPaths.length === 0;
   const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${options.selected ? " is-selected" : ""}${options.compact ? " is-compact" : ""}` });
   card.dataset.itemId = item.id;
@@ -76,12 +82,14 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   if (canvasPaths.length > 0) {
     const links = card.createDiv({ cls: "cp-item__canvas-links", attr: { title: canvasPaths.join("\n") } });
     const linkIcon = links.createSpan(); setIcon(linkIcon, "workflow");
-    links.createSpan({ text: canvasPaths.map(canvasName).slice(0, 2).join(", ") + (canvasPaths.length > 2 ? ` +${canvasPaths.length - 2}` : "") });
-    if (item.origin.canvasPath && item.origin.canvasNodeId && options.onLocate) {
+    const summaries = canvasPaths.map((path) => `${canvasName(path)} · ${canvasLinks.get(path)?.length ?? 0}개`);
+    links.createSpan({ text: summaries.slice(0, 2).join(" | ") + (summaries.length > 2 ? ` +${summaries.length - 2}` : "") });
+    links.setAttribute("title", canvasPaths.map((path) => `${canvasName(path)} · 링크 ${(canvasLinks.get(path) ?? []).map((_, index) => index + 1).join(", ")}`).join("\n"));
+    if (options.onLocate) {
       links.addClass("is-clickable");
       links.tabIndex = 0;
       links.setAttribute("role", "button");
-      links.setAttribute("aria-label", "Locate original item on Canvas");
+      links.setAttribute("aria-label", "Locate linked item on Canvas");
       const locate = (event: Event): void => { event.preventDefault(); event.stopPropagation(); options.onLocate?.(); };
       links.addEventListener("click", locate);
       links.addEventListener("dblclick", locate);

@@ -490,7 +490,7 @@ export class ItemEditorModal extends Modal {
     this.renderCanvasLinks(item);
     const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
     actions.createEl("button", { text: "Delete", cls: "mod-warning" }).addEventListener("click", () => new ConfirmDeleteModal(this.app, 1, () => { this.plugin.store.removeItems([item.id]); this.close(); }).open());
-    if (item.origin.canvasPath && item.origin.canvasNodeId) actions.createEl("button", { text: "Locate on Canvas" }).addEventListener("click", () => void this.plugin.locateItemOnCanvas(item));
+    if (this.plugin.store.numberedCanvasLinks(item).length > 0) actions.createEl("button", { text: "Locate on Canvas" }).addEventListener("click", () => void this.plugin.locateItemOnCanvas(item));
     else if (item.origin.filePath) actions.createEl("button", { text: "Open source file" }).addEventListener("click", () => void this.plugin.openOriginal(item));
     actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
     actions.createEl("button", { text: "Save", cls: "mod-cta" }).addEventListener("click", () => {
@@ -510,10 +510,12 @@ export class ItemEditorModal extends Modal {
   }
   private parseTags(value: string): string[] { return [...new Set(value.split(",").map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean))]; }
   private renderCanvasLinks(item: PaletteItem): void {
-    const paths = [...new Set([item.origin.canvasPath, ...item.canvasPlacements.map((placement) => placement.canvasPath)].filter((path): path is string => Boolean(path)))];
+    const grouped = new Map<string, number[]>();
+    for (const link of this.plugin.store.numberedCanvasLinks(item)) grouped.set(link.canvasPath, [...(grouped.get(link.canvasPath) ?? []), link.number]);
+    const paths = [...grouped.keys()];
     this.contentEl.createEl("h3", { text: "Linked canvases" });
     if (paths.length === 0) { this.contentEl.createDiv({ cls: "cp-empty cp-item-editor__empty", text: "Not linked to a Canvas yet." }); return; }
     const list = this.contentEl.createDiv({ cls: "cp-canvas-link-list" });
-    for (const path of paths) list.createDiv({ cls: "cp-canvas-link", text: path });
+    for (const path of paths) list.createDiv({ cls: "cp-canvas-link", text: `${path} · 링크 ${(grouped.get(path) ?? []).join(", ")}` });
   }
 }

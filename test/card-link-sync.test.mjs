@@ -374,16 +374,42 @@ test("Palette reveal resolves the item's preferred containing Workspace", async 
   await cleanup();
 });
 
-test("Find link exposes one representative node per linked Canvas", async () => {
+test("numbered Canvas links retain every node and restart numbering in every Canvas", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
   const store = new PaletteStore(plugin);
   store.data = fixture();
+  store.recordCanvasPlacement("card", "A.canvas", ["second", "third"]);
   store.recordCanvasPlacement("card", "B.canvas", ["drop", "legacy-extra"]);
 
-  assert.deepEqual(store.linkedCanvasLocations(store.data.items.card), [
-    { canvasPath: "A.canvas", nodeId: "origin" },
-    { canvasPath: "B.canvas", nodeId: "drop" }
+  assert.deepEqual(store.numberedCanvasLinks(store.data.items.card), [
+    { canvasPath: "A.canvas", nodeId: "origin", number: 1, total: 3 },
+    { canvasPath: "A.canvas", nodeId: "second", number: 2, total: 3 },
+    { canvasPath: "A.canvas", nodeId: "third", number: 3, total: 3 },
+    { canvasPath: "B.canvas", nodeId: "drop", number: 1, total: 2 },
+    { canvasPath: "B.canvas", nodeId: "legacy-extra", number: 2, total: 2 }
+  ]);
+  assert.deepEqual(store.numberedCanvasLinkForNode("A.canvas", "second")?.link, { canvasPath: "A.canvas", nodeId: "second", number: 2, total: 3 });
+
+  store.unlinkCanvasNode("A.canvas", "second");
+  assert.deepEqual(store.numberedCanvasLinks(store.data.items.card).filter((link) => link.canvasPath === "A.canvas"), [
+    { canvasPath: "A.canvas", nodeId: "origin", number: 1, total: 2 },
+    { canvasPath: "A.canvas", nodeId: "third", number: 2, total: 2 }
+  ]);
+  await cleanup();
+});
+
+test("replacing a linked node keeps its numbered slot", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  store.data = fixture();
+  store.recordCanvasPlacement("card", "A.canvas", ["second", "third"]);
+
+  store.replaceCanvasPlacement("card", "A.canvas", ["second"], ["replacement"], new Set(["origin", "replacement", "third"]));
+  assert.deepEqual(store.numberedCanvasLinks(store.data.items.card).filter((link) => link.canvasPath === "A.canvas"), [
+    { canvasPath: "A.canvas", nodeId: "origin", number: 1, total: 3 },
+    { canvasPath: "A.canvas", nodeId: "replacement", number: 2, total: 3 },
+    { canvasPath: "A.canvas", nodeId: "third", number: 3, total: 3 }
   ]);
   await cleanup();
 });
