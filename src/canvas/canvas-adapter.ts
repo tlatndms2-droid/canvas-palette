@@ -501,7 +501,7 @@ export class CanvasAdapter {
   private async itemFromNode(node: CanvasNodeSnapshot, canvasPath: string): Promise<PaletteItem | null> {
     const now = Date.now();
     const metadata = this.getMetadata(canvasPath, node.id);
-    const common = { tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", backContent: metadata?.backContent ?? "", facesEnabled: metadata?.facesEnabled ?? false, modifiedAt: metadata?.modifiedAt ?? now };
+    const common = { tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", captionFontSize: metadata?.captionFontSize ?? 11, backContent: metadata?.backContent ?? "", facesEnabled: metadata?.facesEnabled ?? false, modifiedAt: metadata?.modifiedAt ?? now };
     if (node.type === "file" && node.file) {
       const file = this.app.vault.getAbstractFileByPath(node.file);
       const isImage = file instanceof TFile && IMAGE_EXTENSIONS.has(file.extension.toLowerCase());
@@ -558,7 +558,7 @@ export class CanvasAdapter {
     snapshot.nodeBacks = Object.fromEntries(nodes.map((node) => [node.id, this.getMetadata(canvasPath, node.id)?.backContent ?? ""]).filter(([, back]) => Boolean(back)));
     snapshot.nodeMetadata = Object.fromEntries(nodes.map((node) => [node.id, this.getMetadata(canvasPath, node.id)]).filter((entry): entry is [string, PaletteMetadata] => Boolean(entry[1])).map(([id, value]) => [id, { ...value, tags: [...value.tags] }]));
     const title = nodes.find((node) => node.type === "group")?.label ?? nodes.find((node) => node.text)?.text?.split(/\r?\n/, 1)[0] ?? "Canvas group";
-    return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", backContent: "", facesEnabled: false, createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
+    return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", captionFontSize: metadata?.captionFontSize ?? 11, backContent: "", facesEnabled: false, createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
   }
 
   private materializeItem(item: PaletteItem, x: number, y: number, usedNodeIds: Set<string>, usedEdgeIds: Set<string>, headingLevel?: number): RestoredMaterial | null {
@@ -582,7 +582,7 @@ export class CanvasAdapter {
     }
     const restored = this.restoreNodeForItem(item, x, y, () => this.uniqueId("node", usedNodeIds), headingLevel);
     if (!restored.node) return { nodes: [], edges: [], anchorNodeId: null, placementNodeIds: [], metadata: [], warnings: restored.warning ? [restored.warning] : [] };
-    const metadata: PaletteMetadata = { tags: [...item.tags], label: item.label, labelColor: item.labelColor, caption: item.caption, backContent: item.backContent, currentFace: "front", facesEnabled: item.facesEnabled, modifiedAt: item.modifiedAt };
+    const metadata: PaletteMetadata = { tags: [...item.tags], label: item.label, labelColor: item.labelColor, caption: item.caption, captionFontSize: item.captionFontSize ?? 11, backContent: item.backContent, currentFace: "front", facesEnabled: item.facesEnabled, modifiedAt: item.modifiedAt };
     return { nodes: [restored.node], edges: [], anchorNodeId: restored.node.id, placementNodeIds: [restored.node.id], metadata: [{ nodeId: restored.node.id, metadata }], warnings: restored.warning ? [restored.warning] : [] };
   }
 

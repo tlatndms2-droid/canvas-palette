@@ -106,13 +106,7 @@ export class SidePaletteView extends ItemView {
   private renderHeader(root: HTMLElement, workspaceId: string): void {
     const header = root.createDiv({ cls: "cp-side__header" });
     header.createDiv({ cls: "cp-brand", text: "Canvas Palette" });
-    const send = this.layoutMode === "wide"
-      ? header.createEl("button", { text: "Export to Mini Palette" })
-      : iconButton(header, "send", "Export selected items to Mini Palette", () => this.plugin.sendItemsToMini(this.sideSelectedIds()));
-    if (this.layoutMode === "wide") send.addEventListener("click", () => this.plugin.sendItemsToMini(this.sideSelectedIds()));
     if (this.layoutMode === "wide") {
-      const exportButton = header.createEl("button", { text: "Export Workspace to Canvas" });
-      exportButton.addEventListener("click", () => void this.plugin.exportActiveWorkspace());
       const archive = header.createEl("button", { text: "Archive" });
       archive.addEventListener("click", () => this.plugin.openArchive());
     } else {
@@ -140,7 +134,6 @@ export class SidePaletteView extends ItemView {
 
   private openHeaderMenu(trigger: HTMLElement, workspaceId: string): void {
     const menu = new Menu();
-    menu.addItem((entry) => entry.setTitle("Export Workspace to Canvas").setIcon("download").onClick(() => void this.plugin.exportActiveWorkspace()));
     menu.addItem((entry) => entry.setTitle("Open Workspace Explorer").setIcon("folder-cog").onClick(() => this.plugin.openWorkspaceExplorer()));
     menu.addItem((entry) => entry.setTitle("Open Archive").setIcon("archive").onClick(() => this.plugin.openArchive()));
     menu.addItem((entry) => entry.setTitle("Open linked spaces").setIcon("network").onClick(() => this.openLinkedSpaces(workspaceId)));
@@ -843,6 +836,7 @@ export class SidePaletteView extends ItemView {
       .setChecked(allInMini)
       .onClick(() => allInMini ? this.plugin.store.removeMiniStorageItems(targetIds) : this.plugin.sendItemsToMini(targetIds)));
     menu.addItem((entry) => entry.setTitle(`Export ${targetIds.length} item${targetIds.length === 1 ? "" : "s"} to Canvas`).setIcon("share-2").onClick(() => void this.plugin.exportItemsToActiveCanvas(targetIds)));
+    if (workspace) menu.addItem((entry) => entry.setTitle("Export Workspace to Canvas").setIcon("download").onClick(() => void this.plugin.exportActiveWorkspace()));
     menu.addItem((entry) => entry.setTitle(fromOutliner ? "Export selection as MindMap to Canvas" : "Export from MindMap to Canvas").setIcon("git-branch").onClick(() => fromOutliner ? void this.plugin.exportOutlineSelectionAsMindMap(this.outlineSelection) : void this.plugin.exportItemsAsMindMap(targetIds)));
     if (workspace) menu.addItem((entry) => entry.setTitle("Move to…").setIcon("folder-input").onClick(() => new MoveItemsModal(this.app, workspace.name, Object.values(this.plugin.store.data.collections).filter((candidate) => candidate.workspaceId === workspace.id), targetIds.length, (collectionId) => this.plugin.store.assignItemsToCollection(workspace.id, targetIds, collectionId)).open()));
     menu.addItem((entry) => entry.setTitle("Archive에 독립 사본 보관").setIcon("archive").onClick(() => void this.plugin.archiveItems(targetIds)));

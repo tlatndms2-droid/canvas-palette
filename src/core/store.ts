@@ -293,7 +293,7 @@ export class PaletteStore {
     return { imported, rejected, alreadySaved };
   }
 
-  updateItem(id: string, changes: Pick<PaletteItem, "displayTitle" | "tags" | "label" | "caption"> & Partial<Pick<PaletteItem, "content" | "backContent" | "labelColor">>): void {
+  updateItem(id: string, changes: Pick<PaletteItem, "displayTitle" | "tags" | "label" | "caption"> & Partial<Pick<PaletteItem, "content" | "backContent" | "labelColor" | "captionFontSize">>): void {
     const item = this.data.items[id];
     if (!item) return;
     Object.assign(item, changes, { modifiedAt: Date.now() });
@@ -367,13 +367,14 @@ export class PaletteStore {
     return this.data.items[item.id];
   }
 
-  setCanvasNodeMetadata(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">): void {
+  setCanvasNodeMetadata(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption"> & Partial<Pick<PaletteMetadata, "captionFontSize">>): void {
     const modifiedAt = Date.now();
     const normalized = {
       tags: [...new Set(metadata.tags)],
       label: metadata.label,
       labelColor: metadata.label ? metadata.labelColor ?? "" : "",
-      caption: metadata.caption
+      caption: metadata.caption,
+      captionFontSize: this.captionFontSize(metadata.captionFontSize)
     };
     this.setMetadataRecord(canvasPath, nodeId, normalized, modifiedAt);
     const linkedItems = Object.values(this.data.items).filter((item) => this.itemHasLinkedNode(item, canvasPath, nodeId));
@@ -440,7 +441,7 @@ export class PaletteStore {
     const item = this.allItems().find((candidate) => this.itemHasLinkedNode(candidate, canvasPath, nodeId));
     if (!item) return false;
     const current = this.canvasNodeState(canvasPath, nodeId);
-    this.setMetadataRecord(canvasPath, nodeId, { ...current, tags: [...item.tags], label: item.label, labelColor: item.labelColor ?? "", caption: item.caption, backContent: item.backContent, facesEnabled: item.facesEnabled }, item.modifiedAt);
+    this.setMetadataRecord(canvasPath, nodeId, { ...current, tags: [...item.tags], label: item.label, labelColor: item.labelColor ?? "", caption: item.caption, captionFontSize: this.captionFontSize(item.captionFontSize), backContent: item.backContent, facesEnabled: item.facesEnabled }, item.modifiedAt);
     if (item.origin.canvasPath === canvasPath && item.origin.canvasNodeId === nodeId) { delete item.origin.canvasPath; delete item.origin.canvasNodeId; }
     for (const placement of item.canvasPlacements) if (placement.canvasPath === canvasPath) placement.nodeIds = placement.nodeIds.filter((id) => id !== nodeId);
     item.canvasPlacements = item.canvasPlacements.filter((placement) => placement.nodeIds.length > 0);
@@ -748,7 +749,7 @@ export class PaletteStore {
   }
 
   private applyItemMetadataToLinkedNodes(item: PaletteItem): void {
-    const normalized = { tags: [...new Set(item.tags)], label: item.label, labelColor: item.label ? item.labelColor ?? "" : "", caption: item.caption, backContent: item.backContent, facesEnabled: item.facesEnabled };
+    const normalized = { tags: [...new Set(item.tags)], label: item.label, labelColor: item.label ? item.labelColor ?? "" : "", caption: item.caption, captionFontSize: this.captionFontSize(item.captionFontSize), backContent: item.backContent, facesEnabled: item.facesEnabled };
     for (const location of this.linkedCanvasNodes(item)) {
       const currentFace = this.data.canvasNodeMetadata[location.canvasPath]?.[location.nodeId]?.currentFace ?? "front";
       this.setMetadataRecord(location.canvasPath, location.nodeId, { ...normalized, currentFace }, item.modifiedAt);
@@ -794,12 +795,12 @@ export class PaletteStore {
   }
 
   private canvasNodeState(canvasPath: string, nodeId: string): PaletteMetadata {
-    return this.data.canvasNodeMetadata[canvasPath]?.[nodeId] ?? { tags: [], label: "", labelColor: "", caption: "", backContent: "", currentFace: "front", facesEnabled: false, modifiedAt: Date.now() };
+    return this.data.canvasNodeMetadata[canvasPath]?.[nodeId] ?? { tags: [], label: "", labelColor: "", caption: "", captionFontSize: 11, backContent: "", currentFace: "front", facesEnabled: false, modifiedAt: Date.now() };
   }
 
-  private setMetadataRecord(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption"> & Partial<Pick<PaletteMetadata, "backContent" | "currentFace" | "facesEnabled">>, modifiedAt: number): void {
+  private setMetadataRecord(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption"> & Partial<Pick<PaletteMetadata, "captionFontSize" | "backContent" | "currentFace" | "facesEnabled">>, modifiedAt: number): void {
     const previous = this.data.canvasNodeMetadata[canvasPath]?.[nodeId];
-    const record: PaletteMetadata = { tags: metadata.tags, label: metadata.label, labelColor: metadata.labelColor, caption: metadata.caption, backContent: metadata.backContent ?? previous?.backContent ?? "", currentFace: metadata.currentFace ?? previous?.currentFace ?? "front", facesEnabled: metadata.facesEnabled ?? previous?.facesEnabled ?? false, modifiedAt };
+    const record: PaletteMetadata = { tags: metadata.tags, label: metadata.label, labelColor: metadata.labelColor, caption: metadata.caption, captionFontSize: this.captionFontSize(metadata.captionFontSize ?? previous?.captionFontSize), backContent: metadata.backContent ?? previous?.backContent ?? "", currentFace: metadata.currentFace ?? previous?.currentFace ?? "front", facesEnabled: metadata.facesEnabled ?? previous?.facesEnabled ?? false, modifiedAt };
     const isEmpty = record.tags.length === 0 && !record.label && !record.caption && !record.backContent && record.currentFace === "front" && !record.facesEnabled;
     if (isEmpty) {
       const canvas = this.data.canvasNodeMetadata[canvasPath];
@@ -811,6 +812,8 @@ export class PaletteStore {
     const canvas = this.data.canvasNodeMetadata[canvasPath] ??= {};
     canvas[nodeId] = record;
   }
+
+  private captionFontSize(value: number | undefined): number { return Math.max(8, Math.min(32, Number.isFinite(value) ? Math.round(value as number) : 11)); }
 
   itemsForWorkspace(workspaceId: string | null, includeCollections = true): PaletteItem[] {
     if (!workspaceId) return [];

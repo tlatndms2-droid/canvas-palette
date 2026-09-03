@@ -20,7 +20,10 @@ test("Side item menu uses focused metadata, move, and Find link actions", async 
   assert.match(source, /setTitle\("Locate on Canvas"\)/);
   assert.match(source, /allInMini \? "Remove from Mini Palette" : "Export to Mini Palette"/);
   assert.match(source, /allInMini \? this\.plugin\.store\.removeMiniStorageItems\(targetIds\) : this\.plugin\.sendItemsToMini\(targetIds\)/);
-  assert.match(source, /Export to Mini Palette[\s\S]{0,180}sendItemsToMini\(this\.sideSelectedIds\(\)\)/);
+  assert.match(source, /setTitle\("Export Workspace to Canvas"\)[\s\S]{0,120}exportActiveWorkspace\(\)/);
+  assert.doesNotMatch(source, /header\.createEl\("button", \{ text: "Export to Mini Palette" \}\)/);
+  assert.doesNotMatch(source, /header\.createEl\("button", \{ text: "Export Workspace to Canvas" \}\)/);
+  assert.doesNotMatch(source, /Export selected items to Mini Palette/);
   assert.match(main, /collectCanvasItems\(items\)[\s\S]{0,160}miniPalette\.tab = "collect"/);
   assert.match(main, /sendItemsToMini\(itemIds: string\[\]\)/);
   assert.doesNotMatch(source, /setTitle\("Open original"\)/);

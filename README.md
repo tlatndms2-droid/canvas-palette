@@ -2,14 +2,16 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, web links, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.57**
+Current version: **0.3.58**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
 - Workspace Explorer is a movable, resizable, collapsible non-blocking popup. It shows the current Canvas at the top, Canvas folders on the left, and General Workspaces on the right. Dragging a Workspace into a Canvas folder makes it Canvas-owned; dragging it to the General area removes that ownership without changing its Items, Collections, layout, files, or existing Canvas placements. Ctrl/Cmd, Shift, and checkboxes support multiple Workspace selection and batch move/delete actions.
+- Workspace Explorer shows only Canvas folders that currently own a Canvas Workspace; empty Canvases remain available as `Canvas로 이동…` targets. Its Workspace menu opens at the triggering button or pointer location. Side header export buttons have moved into the Item context menu, which offers Mini Palette transfer, individual Canvas export, and current-Workspace Canvas export.
 - Canvas Workspaces may share one Canvas and exactly one can be its representative. Moving a representative Workspace clears that role; no other Workspace is promoted automatically. Changing Canvas no longer changes the selected Workspace. `Current Canvas` opens the Explorer for an explicit representative selection or new Canvas Workspace.
+- `Edit Palette Metadata` now controls each Canvas Item caption at `8–32px` and, for a single file node, its Vault file name. Caption size synchronizes with linked placements; Palette captions render inside their cards instead of being clipped below them.
 - Canvas deletion asks how to handle every Canvas Workspace that belonged to that Canvas. With one Workspace it shows two large choices; with several it offers an all-at-once setting and an individual choice per row. Converting makes a General Workspace; deleting moves only Items that lose every Workspace membership to the fixed Archive. Vault files and other Canvas links remain.
 - `Archive에 독립 사본 보관` creates a new Item ID without Canvas links, copies direct Markdown/Image and Group file references into `Canvas Palette Archive`, and leaves the source Item unchanged.
 

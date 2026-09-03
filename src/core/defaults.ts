@@ -1,6 +1,8 @@
 import type { PaletteData, SideLayoutState } from "./types";
 import { ASSET_DENSITY_DEFAULT, legacyDensity } from "../ui/asset-density";
 
+const captionFontSize = (value: unknown): number => Math.max(8, Math.min(32, typeof value === "number" && Number.isFinite(value) ? Math.round(value) : 11));
+
 export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
   viewportRatio: 0.52, topRatio: 0.69, indexRatio: 0.5, viewMode: "grid", densityLevel: ASSET_DENSITY_DEFAULT,
   responsiveTab: "viewport",
@@ -9,7 +11,7 @@ export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
 };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 25,
+  schemaVersion: 26,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
@@ -44,7 +46,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 25,
+    schemaVersion: 26,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
       const repairedType = item.type === "markdown" && !item.origin?.filePath ? "card" : item.type;
       const supportsFaces = repairedType !== "group" && repairedType !== "link";
@@ -55,7 +57,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
       } : item.group;
       const rawLink = item.webLink;
       const webLink = repairedType === "link" && rawLink?.url ? { url: rawLink.url, siteName: rawLink.siteName ?? "", description: rawLink.description ?? "", thumbnailUrl: rawLink.thumbnailUrl ?? "", width: rawLink.width ?? 280, height: rawLink.height ?? 180, color: rawLink.color, capturedAt: rawLink.capturedAt ?? item.createdAt ?? migratedAt } : undefined;
-      return [id, { ...item, group, type: repairedType, webLink, sourceDeletedAt: repairedType === "markdown" ? item.sourceDeletedAt : undefined, backContent: supportsFaces ? item.backContent ?? "" : "", facesEnabled: supportsFaces && (item.facesEnabled ?? Boolean(item.backContent)), labelColor: item.labelColor ?? "", canvasPlacements: item.canvasPlacements ?? [], parentItemId: item.parentItemId ?? null, childItemIds: item.childItemIds ?? [] }];
+      return [id, { ...item, group, type: repairedType, webLink, sourceDeletedAt: repairedType === "markdown" ? item.sourceDeletedAt : undefined, backContent: supportsFaces ? item.backContent ?? "" : "", facesEnabled: supportsFaces && (item.facesEnabled ?? Boolean(item.backContent)), labelColor: item.labelColor ?? "", captionFontSize: captionFontSize(item.captionFontSize), canvasPlacements: item.canvasPlacements ?? [], parentItemId: item.parentItemId ?? null, childItemIds: item.childItemIds ?? [] }];
     })),
     workspaces,
     collections: raw.collections ?? {},
@@ -66,7 +68,8 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
         backContent: metadata.backContent ?? "",
         currentFace: metadata.currentFace ?? "front",
         facesEnabled: metadata.facesEnabled ?? Boolean(metadata.backContent || metadata.currentFace === "back"),
-        labelColor: metadata.labelColor ?? ""
+        labelColor: metadata.labelColor ?? "",
+        captionFontSize: captionFontSize(metadata.captionFontSize)
       }]))
     ])),
     uiState: {

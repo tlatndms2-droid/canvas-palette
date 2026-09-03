@@ -388,11 +388,17 @@ export default class CanvasPalettePlugin extends Plugin {
     const targets = nodes.map((node) => this.canvas.nodeContext(node)).filter((target): target is { canvasPath: string; nodeId: string } => Boolean(target));
     if (targets.length === 0) { new Notice("Unable to identify the selected Canvas items."); return; }
     const first = targets[0];
-    const current = this.store.getCanvasNodeMetadata(first.canvasPath, first.nodeId) ?? { tags: [], label: "", caption: "", modifiedAt: Date.now() };
+    const current = this.store.getCanvasNodeMetadata(first.canvasPath, first.nodeId) ?? { tags: [], label: "", caption: "", captionFontSize: 11, modifiedAt: Date.now() };
+    const linkedItem = targets.length === 1 ? this.store.linkedItemForNode(first.canvasPath, first.nodeId) : undefined;
+    const sourcePath = targets.length === 1 ? (nodes[0] as { getData?: () => { file?: string } }).getData?.().file : undefined;
+    const source = sourcePath ? this.app.vault.getAbstractFileByPath(sourcePath) : null;
+    const fileRename = linkedItem && (linkedItem.type === "markdown" || linkedItem.type === "image")
+      ? { name: linkedItem.displayTitle, rename: (name: string) => this.renameLinkedItem(linkedItem.id, name) }
+      : source instanceof TFile ? { name: source.basename, rename: (name: string) => this.renameCanvasSourceFile(source.path, name) } : undefined;
     new MetadataEditorModal(this.app, this, current, (metadata) => {
       for (const target of targets) this.store.setCanvasNodeMetadata(target.canvasPath, target.nodeId, metadata);
       new Notice(`Palette metadata applied to ${targets.length} Canvas item${targets.length === 1 ? "" : "s"}.`);
-    }).open();
+    }, fileRename).open();
   }
 
   private saveCanvasSelectionFromToolbar(anchor: HTMLElement): void {
@@ -615,6 +621,24 @@ export default class CanvasPalettePlugin extends Plugin {
       console.error("Canvas Palette failed to rename a linked item", error);
       new Notice("Could not rename every linked item.");
       this.store.changed();
+      return false;
+    }
+  }
+
+  private async renameCanvasSourceFile(filePath: string, requestedTitle: string): Promise<boolean> {
+    const source = this.app.vault.getAbstractFileByPath(filePath);
+    const baseName = requestedTitle.trim().replace(new RegExp(`\\.${source instanceof TFile ? source.extension : ""}$`, "i"), "");
+    if (!(source instanceof TFile) || !baseName || /[\\/:*?"<>|]/.test(baseName)) { new Notice("Enter a valid file name."); return false; }
+    const parentPath = source.parent?.path && source.parent.path !== "/" ? `${source.parent.path}/` : "";
+    const nextPath = normalizePath(`${parentPath}${baseName}.${source.extension}`);
+    if (nextPath !== source.path && this.app.vault.getAbstractFileByPath(nextPath)) { new Notice(`A file already exists at ${nextPath}.`); return false; }
+    try {
+      if (nextPath !== source.path) await this.app.fileManager.renameFile(source, nextPath);
+      new Notice(`Renamed file to ${baseName}.`);
+      return true;
+    } catch (error) {
+      console.error("Canvas Palette failed to rename a Canvas source file", error);
+      new Notice("Could not rename the file.");
       return false;
     }
   }

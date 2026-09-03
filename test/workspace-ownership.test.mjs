@@ -124,6 +124,9 @@ test("Workspace Explorer is a persistent popup with Canvas folders, selection, a
   assert.match(explorer, /cp-workspace-canvas-folder/);
   assert.match(explorer, /application\/x-canvas-palette-workspaces/);
   assert.match(explorer, /moveWorkspaces/);
+  assert.match(explorer, /workspace\.kind === "canvas" && workspace\.ownerCanvasPath/);
+  assert.match(explorer, /const rect = more\.getBoundingClientRect\(\).*this\.render\(\); this\.actions\(\[\.\.\.this\.selected\], \{ x: rect\.right, y: rect\.bottom \+ 2 \}\)/);
+  assert.match(explorer, /this\.actions\(\[\.\.\.this\.selected\], \{ x: event\.clientX, y: event\.clientY \}\)/);
   assert.match(explorer, /선택 \$\{this\.selected\.size\}개/);
   assert.match(explorer, /type: "date"/);
   assert.match(styles, /\.cp-workspace-explorer-popup/);

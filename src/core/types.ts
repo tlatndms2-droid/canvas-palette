@@ -12,7 +12,7 @@ export interface ItemOrigin { canvasPath?: string; canvasNodeId?: string; worksp
 export interface CanvasPlacement { canvasPath: string; nodeIds: string[]; placedAt: number; }
 /** A display-only Canvas link address. Its number is derived from the saved link order. */
 export interface NumberedCanvasLink { canvasPath: string; nodeId: string; number: number; total: number; }
-export interface PaletteMetadata { tags: string[]; label: string; labelColor?: string; caption: string; backContent: string; currentFace: CardFace; facesEnabled: boolean; modifiedAt: number; }
+export interface PaletteMetadata { tags: string[]; label: string; labelColor?: string; caption: string; /** Per-item Canvas caption size in px. */ captionFontSize?: number; backContent: string; currentFace: CardFace; facesEnabled: boolean; modifiedAt: number; }
 
 export interface CanvasNodeSnapshot {
   id: string;
@@ -60,6 +60,8 @@ export interface PaletteItem {
   label: string;
   labelColor?: string;
   caption: string;
+  /** Per-item Canvas caption size in px. */
+  captionFontSize?: number;
   createdAt: number;
   modifiedAt: number;
   origin: ItemOrigin;
