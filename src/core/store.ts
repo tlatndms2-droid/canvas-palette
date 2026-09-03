@@ -16,8 +16,8 @@ export class PaletteStore {
     this.data = migrateData(await this.plugin.loadData() as Partial<PaletteData> | null);
     this.ensureArchiveWorkspace(false);
     const repairedDuplicates = this.repairDuplicateCanvasItems();
-    if (!Object.values(this.data.workspaces).some((workspace) => workspace.kind !== "archive")) this.createWorkspace("My Workspace");
-    else if (repairedDuplicates) await this.flush();
+    if (!this.data.uiState.activeWorkspaceId || !this.data.workspaces[this.data.uiState.activeWorkspaceId]) this.data.uiState.activeWorkspaceId = this.archiveWorkspace().id;
+    if (repairedDuplicates) await this.flush();
   }
 
   subscribe(listener: Listener): () => void {
@@ -99,6 +99,65 @@ export class PaletteStore {
     return true;
   }
 
+  /** Changes only the Workspace's organizing Canvas. Item identity and Canvas placements stay intact. */
+  moveWorkspaces(ids: string[], ownerCanvasPath: string | null): string[] {
+    const moved: string[] = [];
+    const now = Date.now();
+    for (const id of new Set(ids)) {
+      const workspace = this.data.workspaces[id];
+      if (!workspace || workspace.kind === "archive") continue;
+      if (ownerCanvasPath && workspace.kind === "canvas" && workspace.ownerCanvasPath === ownerCanvasPath) continue;
+      if (!ownerCanvasPath && workspace.kind === "general") continue;
+      workspace.kind = ownerCanvasPath ? "canvas" : "general";
+      workspace.ownerCanvasPath = ownerCanvasPath;
+      workspace.canvasPaths = ownerCanvasPath ? [ownerCanvasPath] : [];
+      workspace.representativeCanvasPath = null;
+      workspace.modifiedAt = now;
+      moved.push(id);
+    }
+    if (moved.length) this.changed();
+    return moved;
+  }
+
+  removeWorkspaces(ids: string[]): string[] {
+    const removed = [...new Set(ids)].filter((id) => {
+      const workspace = this.data.workspaces[id];
+      return Boolean(workspace && workspace.kind !== "archive");
+    });
+    if (!removed.length) return [];
+    const removedSet = new Set(removed);
+    const archive = this.archiveWorkspace();
+    const itemIds = new Set<string>();
+    for (const id of removed) for (const item of this.itemsForWorkspace(id)) itemIds.add(item.id);
+    const survivingWorkspaceForItem = (itemId: string): PaletteWorkspace | undefined => Object.values(this.data.workspaces).find((workspace) => !removedSet.has(workspace.id) && workspace.kind !== "archive" && this.itemsForWorkspace(workspace.id).some((item) => item.id === itemId));
+    const removeCollection = (collectionId: string): void => {
+      const collection = this.data.collections[collectionId];
+      if (!collection) return;
+      for (const childId of collection.childCollectionIds) removeCollection(childId);
+      delete this.data.collections[collectionId];
+    };
+    for (const id of removed) {
+      const workspace = this.data.workspaces[id];
+      if (!workspace) continue;
+      for (const collectionId of workspace.rootCollectionIds) removeCollection(collectionId);
+      delete this.data.workspaces[id];
+    }
+    for (const itemId of itemIds) {
+      const item = this.data.items[itemId];
+      if (!item) continue;
+      const survivor = survivingWorkspaceForItem(itemId);
+      if (survivor) {
+        if (removedSet.has(item.origin.workspaceId ?? "")) item.origin.workspaceId = survivor.id;
+        continue;
+      }
+      item.origin.workspaceId = archive.id;
+      if (!archive.looseItemIds.includes(itemId)) archive.looseItemIds.push(itemId);
+    }
+    if (this.data.uiState.activeWorkspaceId && removedSet.has(this.data.uiState.activeWorkspaceId)) this.data.uiState.activeWorkspaceId = archive.id;
+    this.changed();
+    return removed;
+  }
+
   canStoreItem(workspaceId: string, item: PaletteItem): boolean {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace) return false;
@@ -129,27 +188,7 @@ export class PaletteStore {
   }
 
   removeWorkspace(id: string): boolean {
-    const workspace = this.data.workspaces[id];
-    if (!workspace || workspace.kind === "archive") return false;
-    const itemIds = this.itemsForWorkspace(id).map((item) => item.id);
-    const archive = this.archiveWorkspace();
-    for (const itemId of itemIds) {
-      const item = this.data.items[itemId];
-      if (!item) continue;
-      if (item.origin.workspaceId === id) item.origin.workspaceId = archive.id;
-      if (!archive.looseItemIds.includes(itemId)) archive.looseItemIds.push(itemId);
-    }
-    const removeCollection = (collectionId: string): void => {
-      const collection = this.data.collections[collectionId];
-      if (!collection) return;
-      for (const childId of collection.childCollectionIds) removeCollection(childId);
-      delete this.data.collections[collectionId];
-    };
-    for (const collectionId of workspace.rootCollectionIds) removeCollection(collectionId);
-    delete this.data.workspaces[id];
-    if (this.data.uiState.activeWorkspaceId === id) this.data.uiState.activeWorkspaceId = archive.id;
-    this.changed();
-    return true;
+    return this.removeWorkspaces([id]).length > 0;
   }
 
   queueDeletedCanvasWorkspaceCleanup(canvasPath: string): void {

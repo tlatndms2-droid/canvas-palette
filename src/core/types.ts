@@ -143,6 +143,7 @@ export interface MiniPaletteState {
 }
 
 export interface QuickEditorGeometry { x: number | null; y: number | null; width: number | null; height: number | null; }
+export interface WorkspaceExplorerGeometry extends QuickEditorGeometry { collapsed: boolean; expandedCanvasPaths: string[]; }
 
 export interface UIState {
   activeWorkspaceId: string | null;
@@ -153,7 +154,7 @@ export interface UIState {
   miniItemFaces: Record<string, CardFace>;
   quickEditor: QuickEditorGeometry;
   miniPalette: MiniPaletteState;
-  workspaceExplorer: { viewMode: WorkspaceExplorerViewMode; sort: WorkspaceExplorerSort };
+  workspaceExplorer: { viewMode: WorkspaceExplorerViewMode; sort: WorkspaceExplorerSort; geometry: WorkspaceExplorerGeometry };
   pendingCanvasWorkspaceCleanup: string[];
 }
 

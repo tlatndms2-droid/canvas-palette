@@ -1,166 +1,113 @@
-import { App, Menu, Modal, Notice, setIcon } from "obsidian";
+import { App, Menu, Modal, setIcon } from "obsidian";
 import type CanvasPalettePlugin from "../main";
-import type { PaletteWorkspace, WorkspaceExplorerSort, WorkspaceExplorerViewMode } from "../core/types";
+import type { PaletteWorkspace, WorkspaceExplorerSort } from "../core/types";
 import { TextPromptModal } from "./modal";
 
-type WorkspaceFilter = "all" | "canvas" | "general" | "archive";
+type Filter = "all" | "canvas" | "general";
 
-export class WorkspaceExplorerModal extends Modal {
-  private query = "";
-  private filter: WorkspaceFilter = "all";
-  private date = "";
-  private unsubscribe?: () => void;
+/** Persistent non-modal Explorer. The backdrop deliberately accepts no pointer events. */
+export class WorkspaceExplorerModal {
+  private query = ""; private filter: Filter = "all"; private date = "";
+  private selected = new Set<string>(); private anchor: string | null = null;
+  private root: HTMLElement | null = null; private panel: HTMLElement | null = null; private unsubscribe?: () => void;
+  constructor(private readonly app: App, private readonly plugin: CanvasPalettePlugin) {}
 
-  constructor(app: App, private readonly plugin: CanvasPalettePlugin) { super(app); }
-
-  onOpen(): void {
-    this.modalEl.addClass("cp-workspace-explorer-shell");
-    this.unsubscribe = this.plugin.store.subscribe(() => this.render());
-    this.render();
+  open(): void {
+    if (this.panel) { this.expand(); this.panel.style.zIndex = "var(--layer-modal,1000)"; return; }
+    const doc = this.app.workspace.containerEl.ownerDocument;
+    this.root = doc.body.createDiv({ cls: "cp-workspace-explorer-overlay" });
+    this.panel = this.root.createDiv({ cls: "canvas-palette cp-workspace-explorer-popup" });
+    this.applyGeometry(); this.unsubscribe = this.plugin.store.subscribe(() => this.render()); this.render();
   }
-
-  onClose(): void { this.unsubscribe?.(); this.contentEl.empty(); }
+  close(): void { this.saveGeometry(); this.unsubscribe?.(); this.root?.remove(); this.root = null; this.panel = null; this.selected.clear(); this.anchor = null; }
+  private state() { return this.plugin.store.data.uiState.workspaceExplorer; }
+  private geo() { return this.state().geometry; }
 
   private render(): void {
-    const activeElement = document.activeElement;
-    const restoreSearch = activeElement instanceof HTMLInputElement && activeElement.hasClass("cp-workspace-explorer__search");
-    const cursor = restoreSearch ? activeElement.selectionStart : null;
-    this.contentEl.empty();
-    this.contentEl.addClass("canvas-palette", "cp-workspace-explorer");
-    const title = this.contentEl.createDiv({ cls: "cp-workspace-explorer__title" });
-    title.createEl("h2", { text: "Workspace Explorer" });
-    title.createSpan({ text: "Find and manage Workspaces like files." });
+    const panel = this.panel; if (!panel) return;
+    panel.empty();
+    const header = panel.createDiv({ cls: "cp-workspace-explorer-popup__header" });
+    const handle = header.createDiv({ cls: "cp-workspace-explorer-popup__drag" });
+    handle.createEl("strong", { text: "Workspace Explorer" }); handle.createSpan({ text: "Canvas별 Workspace 관리" }); this.drag(handle);
+    const actions = header.createDiv({ cls: "cp-workspace-explorer-popup__actions" });
+    this.icon(actions, "archive", "Archive", () => this.plugin.openArchive());
+    this.icon(actions, this.geo().collapsed ? "chevrons-up-down" : "minus", this.geo().collapsed ? "펼치기" : "접기", () => { this.geo().collapsed = !this.geo().collapsed; this.plugin.store.changed(); });
+    this.icon(actions, "x", "닫기", () => this.close());
+    if (this.geo().collapsed) { panel.addClass("is-collapsed"); return; } panel.removeClass("is-collapsed");
 
-    const toolbar = this.contentEl.createDiv({ cls: "cp-workspace-explorer__toolbar" });
-    const search = toolbar.createEl("input", { cls: "cp-workspace-explorer__search", value: this.query, attr: { type: "search", placeholder: "Search Canvas or Workspace…", autocomplete: "off" } });
-    search.addEventListener("input", () => { this.query = search.value.normalize("NFC"); this.render(); });
-    if (restoreSearch) window.requestAnimationFrame(() => { search.focus(); search.setSelectionRange(cursor, cursor); });
+    const toolbar = panel.createDiv({ cls: "cp-workspace-explorer-popup__toolbar" });
+    const search = toolbar.createEl("input", { value: this.query, attr: { type: "search", placeholder: "Canvas 또는 Workspace 검색" } });
+    search.addEventListener("input", () => { this.query = search.value.normalize("NFC"); this.clear(); this.render(); });
+    for (const [value, text] of [["all", "전체"], ["canvas", "Canvas"], ["general", "일반"]] as const) { const button = toolbar.createEl("button", { text, cls: this.filter === value ? "is-active" : "" }); button.addEventListener("click", () => { this.filter = value; this.clear(); this.render(); }); }
+    const sort = toolbar.createEl("select", { attr: { "aria-label": "정렬" } });
+    for (const [value, text] of [["modified-desc", "최근 수정"], ["modified-asc", "오래된 수정"], ["created-desc", "최근 생성"], ["created-asc", "오래된 생성"], ["name-asc", "이름순"], ["name-desc", "이름 역순"]] as const) { const option = sort.createEl("option", { value, text }); option.selected = this.state().sort === value; }
+    sort.addEventListener("change", () => { this.state().sort = sort.value as WorkspaceExplorerSort; this.plugin.store.changed(); });
+    const date = toolbar.createEl("input", { value: this.date, attr: { type: "date", "aria-label": "수정일 필터" } }); date.addEventListener("change", () => { this.date = date.value; this.clear(); this.render(); });
 
-    const controls = toolbar.createDiv({ cls: "cp-workspace-explorer__controls" });
-    for (const [value, label] of [["all", "All"], ["canvas", "Canvas"], ["general", "General"], ["archive", "Archive"]] as const) {
-      const button = controls.createEl("button", { text: label, cls: this.filter === value ? "is-active" : "" });
-      button.addEventListener("click", () => { this.filter = value; this.render(); });
-    }
-    const sort = controls.createEl("select", { attr: { "aria-label": "Sort Workspaces" } });
-    for (const [value, label] of [["modified-desc", "Modified: newest"], ["modified-asc", "Modified: oldest"], ["created-desc", "Created: newest"], ["created-asc", "Created: oldest"], ["name-asc", "Name: A–Z"], ["name-desc", "Name: Z–A"]] as const) {
-      const option = sort.createEl("option", { value, text: label }); option.selected = this.viewState().sort === value;
-    }
-    sort.addEventListener("change", () => { this.viewState().sort = sort.value as WorkspaceExplorerSort; this.plugin.store.changed(); });
-    const date = controls.createEl("input", { cls: "cp-workspace-explorer__date", value: this.date, attr: { type: "date", title: "Filter by modified date", "aria-label": "Filter by modified date" } });
-    date.addEventListener("change", () => { this.date = date.value; this.render(); });
-    if (this.date) {
-      const clearDate = controls.createEl("button", { cls: "cp-icon-button", attr: { title: "Clear date", "aria-label": "Clear date" } }); setIcon(clearDate, "x");
-      clearDate.addEventListener("click", () => { this.date = ""; this.render(); });
-    }
-    const views = controls.createDiv({ cls: "cp-workspace-explorer__views" });
-    for (const [value, icon, label] of [["icons", "grid-2x2", "Icons"], ["list", "list", "List"], ["details", "list-tree", "Details"]] as const) {
-      const button = views.createEl("button", { cls: `cp-icon-button${this.viewState().viewMode === value ? " is-active" : ""}`, attr: { title: `${label} view`, "aria-label": `${label} view` } }); setIcon(button, icon);
-      button.addEventListener("click", () => { this.viewState().viewMode = value; this.plugin.store.changed(); });
-    }
-
-    const results = this.filteredWorkspaces();
-    const currentCanvas = this.plugin.currentCanvasPath();
-    const current = currentCanvas ? results.filter((workspace) => workspace.kind === "canvas" && workspace.ownerCanvasPath === currentCanvas) : [];
-    const archive = results.filter((workspace) => workspace.kind === "archive");
-    const other = results.filter((workspace) => !current.includes(workspace) && !archive.includes(workspace));
-    const body = this.contentEl.createDiv({ cls: `cp-workspace-explorer__body is-${this.viewState().viewMode}` });
-    if (currentCanvas) this.renderSection(body, `Current Canvas · ${this.baseName(currentCanvas)}`, current, true);
-    this.renderSection(body, "Archive", archive, true);
-    this.renderSection(body, currentCanvas ? "Other Workspaces" : "Workspaces", other, false);
-    if (results.length === 0) body.createDiv({ cls: "cp-empty", text: "No matching Workspaces." });
-
-    const footer = this.contentEl.createDiv({ cls: "cp-workspace-explorer__footer" });
-    const general = footer.createEl("button", { text: "+ New Workspace" });
-    general.addEventListener("click", () => new TextPromptModal(this.app, "New general Workspace", "", (name) => {
-      const workspace = this.plugin.store.createWorkspace(name, "general"); this.plugin.store.data.uiState.activeWorkspaceId = workspace.id; this.plugin.store.changed();
-    }, "Workspace name").open());
-    const canvas = footer.createEl("button", { text: "+ Current Canvas Workspace" }); canvas.disabled = !currentCanvas;
-    canvas.addEventListener("click", () => {
-      if (!currentCanvas) return;
-      this.plugin.openCanvasWorkspaceCreator(currentCanvas);
-    });
+    const current = this.plugin.currentCanvasPath(); if (current) this.currentSection(panel, current);
+    const body = panel.createDiv({ cls: "cp-workspace-explorer-popup__body" });
+    const canvases = body.createDiv({ cls: "cp-workspace-explorer-popup__area" }); const general = body.createDiv({ cls: "cp-workspace-explorer-popup__area" });
+    this.canvasArea(canvases); this.generalArea(general);
+    const footer = panel.createDiv({ cls: "cp-workspace-explorer-popup__footer" }); footer.createSpan({ text: `선택 ${this.selected.size}개` });
+    const clear = footer.createEl("button", { text: "선택 해제" }); clear.disabled = !this.selected.size; clear.addEventListener("click", () => { this.clear(); this.render(); });
+    const pending = this.plugin.store.data.uiState.pendingCanvasWorkspaceCleanup.length; if (pending) footer.createEl("button", { text: `처리 대기 ${pending}건` }).addEventListener("click", () => this.plugin.openPendingCanvasWorkspaceCleanup());
+    footer.createEl("button", { text: "+ 일반 Workspace" }).addEventListener("click", () => new TextPromptModal(this.app, "새 일반 Workspace", "", (name) => this.plugin.store.createWorkspace(name), "Workspace 이름").open());
+    const create = footer.createEl("button", { text: "+ 현재 Canvas Workspace" }); create.disabled = !current; create.addEventListener("click", () => current && this.plugin.openCanvasWorkspaceCreator(current));
   }
 
-  private renderSection(parent: HTMLElement, title: string, workspaces: PaletteWorkspace[], pinned: boolean): void {
-    if (workspaces.length === 0) return;
-    const section = parent.createDiv({ cls: "cp-workspace-explorer__section" });
-    const heading = section.createDiv({ cls: "cp-workspace-explorer__section-title" });
-    if (pinned) setIcon(heading.createSpan(), "pin"); heading.createSpan({ text: title });
-    if (this.viewState().viewMode === "details") {
-      const columns = section.createDiv({ cls: "cp-workspace-explorer__columns" });
-      columns.createSpan({ text: "Name" }); columns.createSpan({ text: "Type / Canvas" }); columns.createSpan({ text: "Modified" }); columns.createSpan();
+  private currentSection(parent: HTMLElement, path: string): void {
+    const section = parent.createDiv({ cls: "cp-workspace-explorer-popup__current" }); section.createEl("strong", { text: `현재 열린 Canvas · ${this.canvasName(path)}` });
+    const list = section.createDiv({ cls: "cp-workspace-explorer-popup__rows" }); const workspaces = this.plugin.store.canvasWorkspaces(path);
+    if (!workspaces.length) list.createDiv({ cls: "cp-empty", text: "연결된 Workspace가 없습니다. 아래 일반 Workspace를 이 Canvas 폴더로 옮길 수 있습니다." });
+    for (const workspace of workspaces) this.workspaceRow(list, workspace); this.dropTarget(section, path);
+  }
+  private canvasArea(parent: HTMLElement): void {
+    this.areaTitle(parent, "Canvas Workspace", "folder-kanban");
+    if (this.filter === "general") return;
+    const paths = new Set<string>(); for (const file of this.app.vault.getFiles()) if (file.extension.toLowerCase() === "canvas") paths.add(file.path); for (const workspace of Object.values(this.plugin.store.data.workspaces)) if (workspace.ownerCanvasPath) paths.add(workspace.ownerCanvasPath);
+    for (const path of [...paths].sort((a, b) => this.canvasName(a).localeCompare(this.canvasName(b)))) {
+      const workspaces = this.sorted(this.plugin.store.canvasWorkspaces(path)); const matches = !this.query || `${path} ${workspaces.map((workspace) => workspace.name).join(" ")}`.toLocaleLowerCase().includes(this.query.trim().toLocaleLowerCase()); if (!matches) continue;
+      const expanded = this.geo().expandedCanvasPaths.includes(path); const folder = parent.createDiv({ cls: `cp-workspace-canvas-folder${expanded ? " is-expanded" : ""}` });
+      const heading = folder.createDiv({ cls: "cp-workspace-canvas-folder__heading", attr: { tabindex: "0", role: "button" } }); const arrow = heading.createSpan(); setIcon(arrow, expanded ? "chevron-down" : "chevron-right"); const icon = heading.createSpan(); setIcon(icon, "folder"); heading.createSpan({ text: this.canvasName(path) }); heading.createEl("small", { text: ` · ${workspaces.length}` });
+      const toggle = () => { const paths = new Set(this.geo().expandedCanvasPaths); paths.has(path) ? paths.delete(path) : paths.add(path); this.geo().expandedCanvasPaths = [...paths]; this.plugin.store.changed(); }; heading.addEventListener("click", toggle); heading.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(); } }); this.dropTarget(heading, path);
+      if (expanded) { const list = folder.createDiv({ cls: "cp-workspace-explorer-popup__rows" }); if (!workspaces.length) list.createDiv({ cls: "cp-workspace-canvas-folder__empty", text: "여기에 Workspace를 놓아 소속시킵니다." }); for (const workspace of workspaces) this.workspaceRow(list, workspace); }
     }
-    const list = section.createDiv({ cls: "cp-workspace-explorer__list" });
-    for (const workspace of workspaces) this.renderWorkspace(list, workspace);
   }
-
-  private renderWorkspace(parent: HTMLElement, workspace: PaletteWorkspace): void {
-    const active = this.plugin.store.data.uiState.activeWorkspaceId === workspace.id;
-    const representative = workspace.kind === "canvas" && workspace.ownerCanvasPath === workspace.representativeCanvasPath;
-    const row = parent.createDiv({ cls: `cp-workspace-file${active ? " is-selected" : ""}`, attr: { tabindex: "0", role: "button" } });
-    const icon = row.createSpan({ cls: "cp-workspace-file__icon" }); setIcon(icon, workspace.kind === "canvas" ? "folder-kanban" : workspace.kind === "archive" ? "archive" : "folder");
-    const name = row.createDiv({ cls: "cp-workspace-file__name" });
-    const label = name.createDiv(); if (representative) { const star = label.createSpan({ cls: "cp-workspace-file__star" }); setIcon(star, "star"); } label.createSpan({ text: workspace.name });
-    if (this.viewState().viewMode === "icons") name.createSpan({ cls: "cp-workspace-file__date", text: this.formatDate(workspace.modifiedAt) });
-    const meta = row.createDiv({ cls: "cp-workspace-file__meta" });
-    meta.createSpan({ cls: "cp-workspace-file__badge", text: workspace.kind === "canvas" ? (representative ? "Representative" : "Canvas") : workspace.kind === "archive" ? "Archive" : "General" });
-    meta.createSpan({ text: workspace.kind === "canvas" ? `소속 Canvas · ${this.baseName(workspace.ownerCanvasPath ?? "")}` : workspace.kind === "archive" ? "Independent snapshots" : "All Canvases" });
-    row.createSpan({ cls: "cp-workspace-file__modified", text: this.formatDate(workspace.modifiedAt) });
-    const more = row.createEl("button", { cls: "cp-icon-button cp-workspace-file__more", attr: { title: "Workspace actions", "aria-label": "Workspace actions" } }); setIcon(more, "more-vertical");
-    const open = (): void => { this.plugin.store.data.uiState.activeWorkspaceId = workspace.id; this.plugin.store.changed(); };
-    row.addEventListener("dblclick", open);
-    row.addEventListener("keydown", (event) => { if (event.key === "Enter") open(); });
-    more.addEventListener("click", (event) => { event.stopPropagation(); this.showActions(workspace, more); });
+  private generalArea(parent: HTMLElement): void {
+    this.areaTitle(parent, "일반 Workspace", "folder"); this.dropTarget(parent, null); if (this.filter === "canvas") return;
+    const list = parent.createDiv({ cls: "cp-workspace-explorer-popup__rows" }); const workspaces = this.sorted(Object.values(this.plugin.store.data.workspaces).filter((workspace) => workspace.kind === "general"));
+    for (const workspace of workspaces) if (this.matches(workspace)) this.workspaceRow(list, workspace);
+    if (!list.children.length) list.createDiv({ cls: "cp-empty", text: "Canvas Workspace를 여기로 끌어오면 일반 Workspace가 됩니다." });
   }
+  private areaTitle(parent: HTMLElement, text: string, iconName: string): void { const title = parent.createDiv({ cls: "cp-workspace-explorer-popup__area-title" }); const icon = title.createSpan(); setIcon(icon, iconName); title.createSpan({ text }); }
 
-  private showActions(workspace: PaletteWorkspace, anchor: HTMLElement): void {
-    const menu = new Menu();
-    menu.addItem((item) => item.setTitle("Open").setIcon("folder-open").onClick(() => { this.plugin.store.data.uiState.activeWorkspaceId = workspace.id; this.plugin.store.changed(); }));
-    const canvasPath = this.plugin.currentCanvasPath();
-    const canRepresent = Boolean(canvasPath && workspace.kind === "canvas" && workspace.ownerCanvasPath === canvasPath);
-    menu.addItem((item) => item.setTitle("Set as representative").setIcon("star").setDisabled(!canRepresent).setChecked(Boolean(canRepresent && workspace.representativeCanvasPath === canvasPath)).onClick(() => {
-      if (canvasPath) this.plugin.store.setRepresentativeWorkspace(workspace.id, canvasPath);
-    }));
-    menu.addItem((item) => item.setTitle("Rename").setIcon("pencil").onClick(() => new TextPromptModal(this.app, "Rename Workspace", workspace.name, (name) => this.plugin.store.renameWorkspace(workspace.id, name), "Workspace name").open()));
-    menu.addSeparator();
-    menu.addItem((item) => item.setTitle("Delete").setIcon("trash-2").setDisabled(workspace.kind === "archive").onClick(() => new ConfirmDeleteWorkspaceModal(this.app, workspace.name, this.plugin.store.itemsForWorkspace(workspace.id).length, () => {
-      if (this.plugin.store.removeWorkspace(workspace.id)) new Notice(`${workspace.name} deleted. Its Palette items moved to Archive.`);
-    }).open()));
-    const rect = anchor.getBoundingClientRect(); menu.showAtPosition({ x: rect.right, y: rect.bottom + 2 });
+  private workspaceRow(parent: HTMLElement, workspace: PaletteWorkspace): void {
+    const representative = workspace.kind === "canvas" && workspace.ownerCanvasPath === workspace.representativeCanvasPath; const selected = this.selected.has(workspace.id); const active = this.plugin.store.data.uiState.activeWorkspaceId === workspace.id;
+    const row = parent.createDiv({ cls: `cp-workspace-explorer-row${selected ? " is-selected" : ""}${active ? " is-active" : ""}`, attr: { tabindex: "0", draggable: "true", "data-workspace-id": workspace.id } });
+    const check = row.createEl("input", { attr: { type: "checkbox", "aria-label": `${workspace.name} 선택` } }); check.checked = selected; check.addEventListener("click", (event) => { event.stopPropagation(); this.toggle(workspace.id); this.render(); });
+    const icon = row.createSpan(); setIcon(icon, "folder-kanban"); const label = row.createSpan({ cls: "cp-workspace-explorer-row__title", text: workspace.name }); if (representative) { const star = label.createSpan({ cls: "cp-workspace-explorer-row__star" }); setIcon(star, "star"); } row.createEl("small", { text: `${this.plugin.store.itemsForWorkspace(workspace.id).length} Items` });
+    const more = row.createEl("button", { cls: "cp-icon-button", attr: { title: "Workspace 작업", "aria-label": "Workspace 작업" } }); setIcon(more, "more-vertical"); more.addEventListener("click", (event) => { event.stopPropagation(); if (!this.selected.has(workspace.id)) this.only(workspace.id); this.render(); this.actions([...this.selected], more); });
+    row.addEventListener("click", (event) => this.click(workspace.id, event)); row.addEventListener("dblclick", () => this.openWorkspace(workspace.id)); row.addEventListener("keydown", (event) => { if (event.key === "Enter") this.openWorkspace(workspace.id); if (event.key === " ") { event.preventDefault(); this.toggle(workspace.id); this.render(); } }); row.addEventListener("contextmenu", (event) => { event.preventDefault(); if (!this.selected.has(workspace.id)) this.only(workspace.id); this.render(); this.actions([...this.selected], row); });
+    row.addEventListener("dragstart", (event) => { const ids = this.selected.has(workspace.id) ? [...this.selected] : [workspace.id]; if (!this.selected.has(workspace.id)) this.only(workspace.id); event.dataTransfer?.setData("application/x-canvas-palette-workspaces", JSON.stringify(ids)); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; });
   }
+  private dropTarget(target: HTMLElement, path: string | null): void { target.addEventListener("dragover", (event) => { if (!event.dataTransfer?.types.includes("application/x-canvas-palette-workspaces")) return; event.preventDefault(); target.addClass("is-drop-target"); }); target.addEventListener("dragleave", () => target.removeClass("is-drop-target")); target.addEventListener("drop", (event) => { event.preventDefault(); target.removeClass("is-drop-target"); try { const ids = JSON.parse(event.dataTransfer?.getData("application/x-canvas-palette-workspaces") ?? "[]") as string[]; this.plugin.store.moveWorkspaces(ids, path); } catch { /* external drag */ } }); }
+  private actions(ids: string[], anchor: HTMLElement): void { const workspaces = ids.map((id) => this.plugin.store.data.workspaces[id]).filter((workspace): workspace is PaletteWorkspace => Boolean(workspace && workspace.kind !== "archive")); if (!workspaces.length) return; const menu = new Menu(); if (workspaces.length === 1) { const workspace = workspaces[0]; menu.addItem((item) => item.setTitle("열기").setIcon("folder-open").onClick(() => this.openWorkspace(workspace.id))); menu.addItem((item) => item.setTitle("이름 변경").setIcon("pencil").onClick(() => new TextPromptModal(this.app, "Workspace 이름 변경", workspace.name, (name) => this.plugin.store.renameWorkspace(workspace.id, name), "Workspace 이름").open())); menu.addItem((item) => item.setTitle(workspace.representativeCanvasPath ? "대표 Workspace 해제" : "대표 Workspace 지정").setIcon("star").setDisabled(workspace.kind !== "canvas").onClick(() => { if (!workspace.ownerCanvasPath) return; if (workspace.representativeCanvasPath) { workspace.representativeCanvasPath = null; this.plugin.store.changed(); } else this.plugin.store.setRepresentativeWorkspace(workspace.id, workspace.ownerCanvasPath); })); menu.addSeparator(); }
+    menu.addItem((item) => item.setTitle("Canvas로 이동…").setIcon("folder-input").onClick(() => new WorkspaceCanvasTargetModal(this.app, this.canvasPaths(), (path) => this.plugin.store.moveWorkspaces(workspaces.map((workspace) => workspace.id), path)).open())); menu.addItem((item) => item.setTitle("일반 Workspace로 이동").setIcon("folder-output").onClick(() => this.plugin.store.moveWorkspaces(workspaces.map((workspace) => workspace.id), null))); menu.addSeparator(); menu.addItem((item) => item.setTitle(workspaces.length === 1 ? "Workspace 삭제" : `${workspaces.length}개 Workspace 삭제`).setIcon("trash-2").onClick(() => new ConfirmDeleteWorkspacesModal(this.app, workspaces, (id) => this.plugin.store.itemsForWorkspace(id).length, () => this.plugin.store.removeWorkspaces(workspaces.map((workspace) => workspace.id))).open())); const rect = anchor.getBoundingClientRect(); menu.showAtPosition({ x: rect.right, y: rect.bottom + 2 }); }
 
-  private filteredWorkspaces(): PaletteWorkspace[] {
-    const query = this.query.trim().toLocaleLowerCase();
-    const workspaces = Object.values(this.plugin.store.data.workspaces).filter((workspace) => {
-      if (this.filter !== "all" && workspace.kind !== this.filter) return false;
-      const owner = workspace.ownerCanvasPath ?? "";
-      if (query && !`${workspace.name} ${owner} ${this.baseName(owner)}`.toLocaleLowerCase().includes(query)) return false;
-      if (this.date && this.localDate(workspace.modifiedAt) !== this.date) return false;
-      return true;
-    });
-    const sort = this.viewState().sort;
-    return workspaces.sort((a, b) => {
-      if (sort === "name-asc" || sort === "name-desc") return a.name.localeCompare(b.name, undefined, { numeric: true }) * (sort === "name-asc" ? 1 : -1);
-      const key = sort.startsWith("created") ? "createdAt" : "modifiedAt";
-      return (a[key] - b[key]) * (sort.endsWith("asc") ? 1 : -1);
-    });
-  }
-
-  private viewState(): { viewMode: WorkspaceExplorerViewMode; sort: WorkspaceExplorerSort } { return this.plugin.store.data.uiState.workspaceExplorer; }
-  private baseName(path: string): string { return path.split("/").pop()?.replace(/\.canvas$/i, "") ?? path; }
-  private formatDate(value: number): string { return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" }).format(value); }
-  private localDate(value: number): string { const date = new Date(value); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
+  private canvasPaths(): string[] { const paths = new Set(this.app.vault.getFiles().filter((file) => file.extension.toLowerCase() === "canvas").map((file) => file.path)); for (const workspace of Object.values(this.plugin.store.data.workspaces)) if (workspace.ownerCanvasPath) paths.add(workspace.ownerCanvasPath); return [...paths].sort(); }
+  private matches(workspace: PaletteWorkspace): boolean { return !this.query || `${workspace.name} ${workspace.ownerCanvasPath ?? ""}`.toLocaleLowerCase().includes(this.query.trim().toLocaleLowerCase()); }
+  private sorted(workspaces: PaletteWorkspace[]): PaletteWorkspace[] { const sort = this.state().sort; return workspaces.filter((workspace) => !this.date || this.localDate(workspace.modifiedAt) === this.date).sort((a, b) => { if (sort.startsWith("name")) return a.name.localeCompare(b.name) * (sort.endsWith("asc") ? 1 : -1); const key = sort.startsWith("created") ? "createdAt" : "modifiedAt"; return (a[key] - b[key]) * (sort.endsWith("asc") ? 1 : -1); }); }
+  private canvasName(path: string): string { return path.replace(/\.canvas$/i, ""); } private localDate(value: number): string { const date = new Date(value); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
+  private visible(): string[] { return Array.from(this.panel?.querySelectorAll<HTMLElement>(".cp-workspace-explorer-row") ?? []).map((row) => row.dataset.workspaceId).filter((id): id is string => Boolean(id)); }
+  private click(id: string, event: MouseEvent): void { if (event.shiftKey && this.anchor) { const all = this.visible(); const from = all.indexOf(this.anchor); const to = all.indexOf(id); if (from >= 0 && to >= 0) for (const item of all.slice(Math.min(from, to), Math.max(from, to) + 1)) this.selected.add(item); } else if (event.ctrlKey || event.metaKey) this.toggle(id); else this.only(id); this.anchor = id; this.render(); }
+  private only(id: string): void { this.selected = new Set([id]); this.anchor = id; } private toggle(id: string): void { this.selected.has(id) ? this.selected.delete(id) : this.selected.add(id); this.anchor = id; } private clear(): void { this.selected.clear(); this.anchor = null; }
+  private openWorkspace(id: string): void { if (!this.plugin.store.data.workspaces[id]) return; this.plugin.store.data.uiState.activeWorkspaceId = id; this.plugin.store.changed(); void this.plugin.openSidePalette(); }
+  private icon(parent: HTMLElement, iconName: string, label: string, action: () => void): void { const button = parent.createEl("button", { cls: "cp-icon-button", attr: { title: label, "aria-label": label } }); setIcon(button, iconName); button.addEventListener("click", action); }
+  private applyGeometry(): void { const panel = this.panel; if (!panel) return; const win = panel.ownerDocument.defaultView ?? window; const width = Math.max(620, Math.min(this.geo().width ?? 1000, win.innerWidth - 24)); const height = Math.max(360, Math.min(this.geo().height ?? 700, win.innerHeight - 24)); panel.style.width = `${width}px`; panel.style.height = `${height}px`; panel.style.left = `${Math.max(12, Math.min(this.geo().x ?? (win.innerWidth - width) / 2, win.innerWidth - width - 12))}px`; panel.style.top = `${Math.max(12, Math.min(this.geo().y ?? (win.innerHeight - height) / 2, win.innerHeight - height - 12))}px`; }
+  private drag(handle: HTMLElement): void { const panel = this.panel; if (!panel) return; const win = panel.ownerDocument.defaultView ?? window; handle.addEventListener("pointerdown", (event) => { if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return; const left = panel.offsetLeft; const top = panel.offsetTop; handle.setPointerCapture(event.pointerId); const move = (next: PointerEvent) => { panel.style.left = `${Math.max(0, Math.min(left + next.clientX - event.clientX, win.innerWidth - panel.offsetWidth))}px`; panel.style.top = `${Math.max(0, Math.min(top + next.clientY - event.clientY, win.innerHeight - panel.offsetHeight))}px`; }; const done = () => { handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", done); handle.removeEventListener("pointercancel", done); this.saveGeometry(); }; handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", done); handle.addEventListener("pointercancel", done); }); }
+  private saveGeometry(): void { const panel = this.panel; if (!panel) return; this.geo().x = panel.offsetLeft; this.geo().y = panel.offsetTop; this.geo().width = panel.offsetWidth; this.geo().height = panel.offsetHeight; this.plugin.store.changed(); }
+  private expand(): void { if (this.geo().collapsed) { this.geo().collapsed = false; this.plugin.store.changed(); } }
 }
 
-class ConfirmDeleteWorkspaceModal extends Modal {
-  constructor(app: App, private readonly name: string, private readonly count: number, private readonly onConfirm: () => void) { super(app); }
-  onOpen(): void {
-    this.contentEl.addClass("canvas-palette", "cp-confirm-modal");
-    this.contentEl.createEl("h2", { text: "Delete Workspace?" });
-    this.contentEl.createEl("p", { text: `“${this.name}” will be removed. Its ${this.count} Palette item${this.count === 1 ? "" : "s"} will remain in Mini Palette storage. Original Vault files and Canvas nodes will not be deleted.` });
-    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
-    actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
-    actions.createEl("button", { text: "Delete Workspace", cls: "mod-warning" }).addEventListener("click", () => { this.onConfirm(); this.close(); });
-  }
-  onClose(): void { this.contentEl.empty(); }
-}
+class WorkspaceCanvasTargetModal extends Modal { constructor(app: App, private readonly paths: string[], private readonly choose: (path: string) => void) { super(app); } onOpen(): void { this.contentEl.addClass("canvas-palette", "cp-confirm-modal"); this.contentEl.createEl("h2", { text: "Canvas로 Workspace 이동" }); const select = this.contentEl.createEl("select"); for (const path of this.paths) select.createEl("option", { value: path, text: path.replace(/\.canvas$/i, "") }); const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" }); actions.createEl("button", { text: "취소" }).addEventListener("click", () => this.close()); actions.createEl("button", { text: "이동", cls: "mod-cta" }).addEventListener("click", () => { if (select.value) this.choose(select.value); this.close(); }); } onClose(): void { this.contentEl.empty(); } }
+class ConfirmDeleteWorkspacesModal extends Modal { constructor(app: App, private readonly workspaces: PaletteWorkspace[], private readonly count: (id: string) => number, private readonly confirm: () => void) { super(app); } onOpen(): void { this.contentEl.addClass("canvas-palette", "cp-confirm-modal"); this.contentEl.createEl("h2", { text: this.workspaces.length === 1 ? "Workspace를 삭제할까요?" : `${this.workspaces.length}개 Workspace를 삭제할까요?` }); for (const workspace of this.workspaces) this.contentEl.createDiv({ text: `${workspace.name} · Item ${this.count(workspace.id)}개` }); this.contentEl.createEl("p", { text: "Workspace와 Collections는 제거됩니다. 소속을 잃는 Item만 Archive로 이동하며, 원본 파일과 Canvas 연결은 유지됩니다." }); const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" }); actions.createEl("button", { text: "취소" }).addEventListener("click", () => this.close()); actions.createEl("button", { text: "Workspace 삭제", cls: "mod-warning" }).addEventListener("click", () => { this.confirm(); this.close(); }); } onClose(): void { this.contentEl.empty(); } }

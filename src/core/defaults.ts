@@ -9,14 +9,14 @@ export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
 };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 24,
+  schemaVersion: 25,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4 },
   items: {},
   workspaces: {},
   collections: {},
   pendingItemIds: [],
   canvasNodeMetadata: {},
-  uiState: { activeWorkspaceId: null, lastCanvasPath: null, selectedItemId: null, sideSelectedItemIds: [], sideItemFaces: {}, miniItemFaces: {}, quickEditor: { x: null, y: null, width: null, height: null }, workspaceExplorer: { viewMode: "details", sort: "modified-desc" }, pendingCanvasWorkspaceCleanup: [], miniPalette: {
+  uiState: { activeWorkspaceId: null, lastCanvasPath: null, selectedItemId: null, sideSelectedItemIds: [], sideItemFaces: {}, miniItemFaces: {}, quickEditor: { x: null, y: null, width: null, height: null }, workspaceExplorer: { viewMode: "details", sort: "modified-desc", geometry: { x: null, y: null, width: 1000, height: 700, collapsed: false, expandedCanvasPaths: [] } }, pendingCanvasWorkspaceCleanup: [], miniPalette: {
     tab: "collect", storageItemIds: [], isOpen: false, position: { x: 24, y: 62 }, size: { width: 1120, height: 720 },
     leftPaneOpen: true, rightPaneOpen: true, leftPaneWidth: 248, rightPaneWidth: 310,
     viewMode: "grid", densityLevel: ASSET_DENSITY_DEFAULT, cardHeight: 220, sort: "modified-desc",
@@ -44,7 +44,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 24,
+    schemaVersion: 25,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
       const repairedType = item.type === "markdown" && !item.origin?.filePath ? "card" : item.type;
       const supportsFaces = repairedType !== "group" && repairedType !== "link";
@@ -76,7 +76,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
       sideItemFaces: legacyUi.sideItemFaces ?? {},
       miniItemFaces: legacyUi.miniItemFaces ?? {},
       quickEditor: { ...DEFAULT_DATA.uiState.quickEditor, ...legacyUi.quickEditor },
-      workspaceExplorer: { ...DEFAULT_DATA.uiState.workspaceExplorer, ...legacyUi.workspaceExplorer },
+      workspaceExplorer: { ...DEFAULT_DATA.uiState.workspaceExplorer, ...legacyUi.workspaceExplorer, geometry: { ...DEFAULT_DATA.uiState.workspaceExplorer.geometry, ...legacyUi.workspaceExplorer?.geometry, expandedCanvasPaths: legacyUi.workspaceExplorer?.geometry?.expandedCanvasPaths ?? [] } },
       pendingCanvasWorkspaceCleanup: legacyUi.pendingCanvasWorkspaceCleanup ?? [],
       miniPalette: {
       ...DEFAULT_DATA.uiState.miniPalette, ...legacyMiniPalette,

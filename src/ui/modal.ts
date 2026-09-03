@@ -70,35 +70,41 @@ export class CanvasWorkspaceModal extends Modal {
 
 export class DeletedCanvasWorkspacesModal extends Modal {
   private choices = new Map<string, "general" | "delete">();
+  private applied = false;
   constructor(app: App, private readonly canvasName: string, private readonly workspaces: PaletteWorkspace[], private readonly itemCount: (id: string) => number, private readonly onApply: (choices: Map<string, "general" | "delete">) => void, private readonly onLater: () => void) { super(app); }
   onOpen(): void {
     this.contentEl.addClass("canvas-palette", "cp-confirm-modal");
     this.contentEl.createEl("h2", { text: "Canvas가 삭제되었습니다" });
     this.contentEl.createEl("p", { text: `“${this.canvasName}”에 연결되어 있던 Workspace를 처리하세요.` });
-    const all = this.contentEl.createEl("button", { text: "모두 일반 Workspace로 전환" });
+    const single = this.workspaces.length === 1;
+    const all = single ? null : this.contentEl.createEl("button", { text: "모두 일반 Workspace로 남기기" });
+    const allDelete = single ? null : this.contentEl.createEl("button", { text: "모두 삭제", cls: "mod-warning" });
     const rows = this.contentEl.createDiv({ cls: "cp-deleted-canvas-workspaces" });
     const renderRows = (): void => {
       rows.empty();
       for (const workspace of this.workspaces) {
         const row = rows.createDiv();
         const representative = workspace.representativeCanvasPath === workspace.ownerCanvasPath;
-        row.createDiv({ text: `${workspace.name}${representative ? " · 대표 Workspace" : ""} · ${this.itemCount(workspace.id)} items` });
-        const choice = row.createEl("select", { attr: { "aria-label": `${workspace.name} 처리` } });
-        choice.createEl("option", { value: "general", text: "일반 Workspace로 전환" });
-        choice.createEl("option", { value: "delete", text: "Workspace 삭제" });
-        choice.value = this.choices.get(workspace.id) ?? "general";
-        choice.addEventListener("change", () => this.choices.set(workspace.id, choice.value as "general" | "delete"));
+        row.addClass(single ? "cp-deleted-canvas-workspace--single" : "cp-deleted-canvas-workspace--multiple");
+        row.createDiv({ text: `${workspace.name}${representative ? " · 대표 Workspace" : ""} · Item ${this.itemCount(workspace.id)}개` });
+        const options = row.createDiv({ cls: "cp-deleted-canvas-workspace__choices" });
+        for (const [value, label] of [["general", single ? "일반 Workspace로 남기기" : "일반 전환"], ["delete", "삭제"]] as const) {
+          const button = options.createEl("button", { text: label, cls: this.choices.get(workspace.id) === value ? "is-active" : value === "delete" ? "mod-warning" : "" });
+          button.addEventListener("click", () => { this.choices.set(workspace.id, value); renderRows(); });
+        }
       }
+      if (!single) rows.createDiv({ cls: "cp-deleted-canvas-workspaces__summary", text: `일반 전환 ${[...this.choices.values()].filter((choice) => choice === "general").length}개 · 삭제 ${[...this.choices.values()].filter((choice) => choice === "delete").length}개` });
     };
     for (const workspace of this.workspaces) this.choices.set(workspace.id, "general");
-    all.addEventListener("click", () => { for (const workspace of this.workspaces) this.choices.set(workspace.id, "general"); renderRows(); });
+    all?.addEventListener("click", () => { for (const workspace of this.workspaces) this.choices.set(workspace.id, "general"); renderRows(); });
+    allDelete?.addEventListener("click", () => { for (const workspace of this.workspaces) this.choices.set(workspace.id, "delete"); renderRows(); });
     renderRows();
-    this.contentEl.createEl("p", { text: "Workspace를 삭제해도 Palette Item과 원본 파일은 Archive에 보관됩니다." });
+    this.contentEl.createEl("p", { text: "일반 전환은 내용과 레이아웃을 유지하고 Canvas 소속만 해제합니다. 삭제 시 소속을 잃는 Item만 Archive로 이동하며 원본 파일과 다른 Canvas 연결은 유지됩니다." });
     const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
-    actions.createEl("button", { text: "나중에 처리" }).addEventListener("click", () => { this.onLater(); this.close(); });
-    actions.createEl("button", { text: "적용", cls: "mod-cta" }).addEventListener("click", () => { this.onApply(this.choices); this.close(); });
+    actions.createEl("button", { text: "나중에 처리" }).addEventListener("click", () => this.close());
+    actions.createEl("button", { text: "적용", cls: "mod-cta" }).addEventListener("click", () => { this.applied = true; this.onApply(this.choices); this.close(); });
   }
-  onClose(): void { this.contentEl.empty(); }
+  onClose(): void { if (!this.applied) this.onLater(); this.contentEl.empty(); }
 }
 
 export class ConfirmDeleteModal extends Modal {

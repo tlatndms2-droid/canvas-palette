@@ -116,22 +116,37 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   assert.doesNotMatch(mini, /only accepts items that exist in its own Canvas/);
 });
 
-test("Workspace Explorer prioritizes the current Canvas and offers search, dates, and Explorer views", async () => {
+test("Workspace Explorer is a persistent popup with Canvas folders, selection, and drop targets", async () => {
   const explorer = await readFile(new URL("../src/ui/workspace-explorer-modal.ts", import.meta.url), "utf8");
-  const render = await readFile(new URL("../src/ui/render.ts", import.meta.url), "utf8");
   const styles = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(explorer, /Search Canvas or Workspace/);
-  assert.match(explorer, /Current Canvas ·/);
-  assert.match(explorer, /workspace\.ownerCanvasPath === currentCanvas/);
-  assert.match(explorer, /소속 Canvas · \$\{this\.baseName/);
+  assert.match(explorer, /cp-workspace-explorer-overlay/);
+  assert.match(explorer, /현재 열린 Canvas/);
+  assert.match(explorer, /cp-workspace-canvas-folder/);
+  assert.match(explorer, /application\/x-canvas-palette-workspaces/);
+  assert.match(explorer, /moveWorkspaces/);
+  assert.match(explorer, /선택 \$\{this\.selected\.size\}개/);
   assert.match(explorer, /type: "date"/);
-  assert.match(explorer, /"icons"[\s\S]*"list"[\s\S]*"details"/);
-  assert.match(explorer, /Created: newest/);
-  assert.match(render, /현재 Canvas Workspace/);
-  assert.match(styles, /\.cp-workspace-explorer__body\.is-icons/);
-  assert.match(styles, /\.cp-workspace-explorer__columns/);
-  assert.match(styles, /\.cp-current-canvas-empty/);
-  assert.match(styles, /\.cp-canvas-workspace-modal/);
+  assert.match(styles, /\.cp-workspace-explorer-popup/);
+  assert.match(styles, /\.cp-workspace-canvas-folder/);
+});
+
+test("Workspace ownership moves do not modify Items and batch deletion uses one Archive path", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  const first = store.createWorkspace("First", "general");
+  const second = store.createWorkspace("Second", "canvas", "B.canvas", true);
+  store.addToWorkspace(first.id, item("kept", "A.canvas"));
+  const originalItem = store.data.items.kept;
+  assert.deepEqual(store.moveWorkspaces([first.id, second.id], "C.canvas"), [first.id, second.id]);
+  assert.equal(first.kind, "canvas");
+  assert.equal(first.ownerCanvasPath, "C.canvas");
+  assert.equal(second.representativeCanvasPath, null);
+  assert.equal(store.data.items.kept, originalItem);
+  assert.deepEqual(store.moveWorkspaces([first.id], null), [first.id]);
+  assert.equal(first.kind, "general");
+  assert.deepEqual(store.removeWorkspaces([first.id, second.id]).sort(), [first.id, second.id].sort());
+  assert.equal(store.data.items.kept.origin.workspaceId, "canvas-palette-archive");
+  await cleanup();
 });
 
 test("deleting a Workspace moves its Palette items to Archive", async () => {

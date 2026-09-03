@@ -23,6 +23,7 @@ import { WorkspaceExplorerModal } from "./ui/workspace-explorer-modal";
 export default class CanvasPalettePlugin extends Plugin {
   private readonly canvasSyncTimers = new Map<string, number>();
   private readonly cleanupDialogs = new Set<string>();
+  private workspaceExplorer?: WorkspaceExplorerModal;
   private lastCanvasPath: string | null = null;
   store = new PaletteStore(this);
   search = new SearchService();
@@ -133,7 +134,7 @@ export default class CanvasPalettePlugin extends Plugin {
     }, 0);
   }
 
-  async onunload(): Promise<void> { for (const timer of this.canvasSyncTimers.values()) window.clearTimeout(timer); this.canvasSyncTimers.clear(); this.exportPlacement.cancel(); this.canvasToolbar.destroy(); this.canvasMetadata.destroy(); this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
+  async onunload(): Promise<void> { this.workspaceExplorer?.close(); for (const timer of this.canvasSyncTimers.values()) window.clearTimeout(timer); this.canvasSyncTimers.clear(); this.exportPlacement.cancel(); this.canvasToolbar.destroy(); this.canvasMetadata.destroy(); this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
 
   activeWorkspace(): PaletteWorkspace | undefined {
     const id = this.store.data.uiState.activeWorkspaceId;
@@ -180,7 +181,7 @@ export default class CanvasPalettePlugin extends Plugin {
     const workspace = this.store.representativeWorkspaceForCanvas(canvasPath);
     if (!workspace) {
       const candidates = this.store.canvasWorkspaces(canvasPath);
-      if (candidates.length) { this.store.setRepresentativeWorkspace(candidates[0].id, canvasPath); this.store.data.uiState.activeWorkspaceId = candidates[0].id; this.store.changed(); return; }
+      if (candidates.length) { this.openWorkspaceExplorer(); new Notice("대표 Workspace를 선택하거나 새로 만들어 주세요."); return; }
       this.openCanvasWorkspaceCreator(canvasPath); return;
     }
     this.store.data.uiState.activeWorkspaceId = workspace.id;
@@ -217,7 +218,12 @@ export default class CanvasPalettePlugin extends Plugin {
     const rect = anchor.getBoundingClientRect(); menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
   }
 
-  openWorkspaceExplorer(): void { new WorkspaceExplorerModal(this.app, this).open(); }
+  openWorkspaceExplorer(): void { (this.workspaceExplorer ??= new WorkspaceExplorerModal(this.app, this)).open(); }
+
+  openPendingCanvasWorkspaceCleanup(): void {
+    const pending = this.store.data.uiState.pendingCanvasWorkspaceCleanup.find((path) => !this.app.vault.getAbstractFileByPath(path));
+    if (pending) this.handleDeletedCanvas(pending);
+  }
 
   openArchive(): void { this.store.data.uiState.activeWorkspaceId = this.store.archiveWorkspace().id; this.store.changed(); }
 
@@ -272,14 +278,12 @@ export default class CanvasPalettePlugin extends Plugin {
     this.store.queueDeletedCanvasWorkspaceCleanup(canvasPath);
     new DeletedCanvasWorkspacesModal(this.app, this.canvasBaseName(canvasPath), workspaces, (id) => this.store.itemsForWorkspace(id).length, (choices) => {
       if (this.app.vault.getAbstractFileByPath(canvasPath)) { this.store.clearDeletedCanvasWorkspaceCleanup(canvasPath); this.cleanupDialogs.delete(canvasPath); return; }
-      for (const workspace of workspaces) {
-        if (!this.store.data.workspaces[workspace.id]) continue;
-        if ((choices.get(workspace.id) ?? "general") === "general") this.store.makeWorkspaceGeneral(workspace.id);
-        else this.store.removeWorkspace(workspace.id);
-      }
+      const eligible = workspaces.filter((workspace) => this.store.data.workspaces[workspace.id]?.ownerCanvasPath === canvasPath);
+      this.store.moveWorkspaces(eligible.filter((workspace) => (choices.get(workspace.id) ?? "general") === "general").map((workspace) => workspace.id), null);
+      this.store.removeWorkspaces(eligible.filter((workspace) => choices.get(workspace.id) === "delete").map((workspace) => workspace.id));
       this.store.clearDeletedCanvasWorkspaceCleanup(canvasPath);
       this.cleanupDialogs.delete(canvasPath);
-    }, () => undefined).open();
+    }, () => this.cleanupDialogs.delete(canvasPath)).open();
   }
 
   selectedItem(): PaletteItem | undefined {
