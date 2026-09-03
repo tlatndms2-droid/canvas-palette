@@ -3,6 +3,7 @@ import { CanvasAdapter } from "./canvas/canvas-adapter";
 import { ExportPlacementController } from "./canvas/export-placement-controller";
 import { mergeCanvasNodeIds } from "./core/canvas-node-presence";
 import { CanvasMetadataController } from "./canvas/canvas-metadata-controller";
+import { CanvasCaptionControl } from "./canvas/canvas-caption-control";
 import { CanvasNodeToolbarController } from "./canvas/canvas-node-toolbar-controller";
 import { PaletteDropController } from "./canvas/palette-drop-controller";
 import { TextScrapHighlights } from "./canvas/text-scrap-highlights";
@@ -37,6 +38,7 @@ export default class CanvasPalettePlugin extends Plugin {
   );
   exportPlacement = new ExportPlacementController(this.canvas);
   canvasMetadata = new CanvasMetadataController(this, this.canvas);
+  canvasCaptionControl = new CanvasCaptionControl(this, this.canvas);
   canvasToolbar = new CanvasNodeToolbarController(this.canvas, {
     editMetadata: (nodes) => this.editCanvasNodesMetadata(nodes),
     collectToMini: () => void this.collectCanvasSelection(),
@@ -69,7 +71,7 @@ export default class CanvasPalettePlugin extends Plugin {
     this.register(this.dropController.mount(this.app.workspace.containerEl.ownerDocument));
     this.register(this.canvasToolbar.mount(this.app.workspace.containerEl.ownerDocument));
     this.registerEditorExtension(this.textScrapHighlights.extension());
-    this.register(this.store.subscribe(() => { this.textScrapHighlights.refreshVisibleEditors(); this.canvasMetadata.refreshSoon(); this.canvasToolbar.refreshSoon(); }));
+    this.register(this.store.subscribe(() => { this.textScrapHighlights.refreshVisibleEditors(); this.canvasMetadata.refreshSoon(); this.canvasCaptionControl.refresh(); this.canvasToolbar.refreshSoon(); }));
     this.registerView(SIDE_PALETTE_VIEW, (leaf) => new SidePaletteView(leaf, this));
     this.addRibbonIcon("library-big", "Open Canvas Palette", () => void this.activateSidePalette());
     this.addRibbonIcon("panels-top-left", "Toggle Canvas Mini Palette", () => this.miniPalette.toggle());
@@ -112,20 +114,20 @@ export default class CanvasPalettePlugin extends Plugin {
           this.store.data.uiState.lastCanvasPath = context.file.path;
           this.store.changed();
         }
-        this.miniPalette.mount();
+        this.miniPalette.mount(); this.canvasCaptionControl.mount();
         this.scheduleCanvasSync(context.file);
       }
-      else this.miniPalette.destroy();
+      else { this.miniPalette.destroy(); this.canvasCaptionControl.destroy(); }
       this.canvasMetadata.refreshSoon();
       this.canvasToolbar.refreshSoon();
     }));
-    this.registerEvent(workspaceEvents.on("layout-change", () => { this.canvasMetadata.refreshSoon(); this.canvasToolbar.refreshSoon(); }));
+    this.registerEvent(workspaceEvents.on("layout-change", () => { this.canvasMetadata.refreshSoon(); this.canvasCaptionControl.mount(); this.canvasToolbar.refreshSoon(); }));
     this.addSettingTab(new CanvasPaletteSettingTab(this));
     const initialCanvas = this.canvas.activeContext();
     if (initialCanvas) {
       this.lastCanvasPath = initialCanvas.file.path;
       this.store.data.uiState.lastCanvasPath = initialCanvas.file.path;
-      this.miniPalette.mount();
+      this.miniPalette.mount(); this.canvasCaptionControl.mount();
       this.scheduleCanvasSync(initialCanvas.file);
     }
     this.canvasMetadata.refreshSoon();
@@ -134,7 +136,7 @@ export default class CanvasPalettePlugin extends Plugin {
     }, 0);
   }
 
-  async onunload(): Promise<void> { this.workspaceExplorer?.close(); for (const timer of this.canvasSyncTimers.values()) window.clearTimeout(timer); this.canvasSyncTimers.clear(); this.exportPlacement.cancel(); this.canvasToolbar.destroy(); this.canvasMetadata.destroy(); this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
+  async onunload(): Promise<void> { this.workspaceExplorer?.close(); for (const timer of this.canvasSyncTimers.values()) window.clearTimeout(timer); this.canvasSyncTimers.clear(); this.exportPlacement.cancel(); this.canvasToolbar.destroy(); this.canvasMetadata.destroy(); this.canvasCaptionControl.destroy(); this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
 
   activeWorkspace(): PaletteWorkspace | undefined {
     const id = this.store.data.uiState.activeWorkspaceId;
@@ -388,7 +390,7 @@ export default class CanvasPalettePlugin extends Plugin {
     const targets = nodes.map((node) => this.canvas.nodeContext(node)).filter((target): target is { canvasPath: string; nodeId: string } => Boolean(target));
     if (targets.length === 0) { new Notice("Unable to identify the selected Canvas items."); return; }
     const first = targets[0];
-    const current = this.store.getCanvasNodeMetadata(first.canvasPath, first.nodeId) ?? { tags: [], label: "", caption: "", captionFontSize: 11, modifiedAt: Date.now() };
+    const current = this.store.getCanvasNodeMetadata(first.canvasPath, first.nodeId) ?? { tags: [], label: "", caption: "", modifiedAt: Date.now() };
     const linkedItem = targets.length === 1 ? this.store.linkedItemForNode(first.canvasPath, first.nodeId) : undefined;
     const sourcePath = targets.length === 1 ? (nodes[0] as { getData?: () => { file?: string } }).getData?.().file : undefined;
     const source = sourcePath ? this.app.vault.getAbstractFileByPath(sourcePath) : null;

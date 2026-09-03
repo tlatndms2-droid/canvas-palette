@@ -50,13 +50,16 @@ test("a dropped Card becomes a linked placement with shared metadata", async () 
   assert.deepEqual(store.getCanvasNodeMetadata("B.canvas", "drop")?.tags, ["one"]);
   assert.equal(store.getCanvasNodeMetadata("B.canvas", "drop")?.caption, "Caption");
 
-  store.setCanvasNodeMetadata("B.canvas", "drop", { tags: ["two"], label: "Changed", labelColor: "#ef4444", caption: "Changed caption", captionFontSize: 19 });
+  store.setCanvasNodeMetadata("B.canvas", "drop", { tags: ["two"], label: "Changed", labelColor: "#ef4444", caption: "Changed caption" });
   assert.deepEqual(store.data.items.card.tags, ["two"]);
   assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.label, "Changed");
   assert.equal(store.getCanvasNodeMetadata("B.canvas", "drop")?.caption, "Changed caption");
-  assert.equal(store.data.items.card.captionFontSize, 19);
-  assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.captionFontSize, 19);
+  assert.equal(store.data.items.card.captionFontSize, undefined);
+  assert.equal(store.getCanvasNodeMetadata("A.canvas", "origin")?.captionFontSize, 11);
   assert.deepEqual(synchronized, ["card"]);
+
+  store.setCanvasCaptionFontSize(19);
+  assert.equal(store.data.settings.canvasCaptionFontSize, 19);
 
   await cleanup();
 });
@@ -71,7 +74,7 @@ test("Group snapshot migration preserves legacy Front Back metadata and new per-
   raw.workspaces.workspace.looseItemIds.push("group");
   const store = new PaletteStore({ loadData: async () => raw, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
   await store.load();
-  assert.equal(store.data.schemaVersion, 26);
+  assert.equal(store.data.schemaVersion, 27);
   assert.equal(store.data.items.group.group.nodeMetadata.inside.backContent, "Legacy back");
   assert.deepEqual(store.data.items.group.group.nodeMetadata.inside.tags, []);
   await cleanup();

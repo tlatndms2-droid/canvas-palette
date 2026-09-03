@@ -113,7 +113,7 @@ export class CanvasMetadataController {
     }
     if (state.caption) {
       const caption = layer.createDiv({ cls: "cp-canvas-metadata__caption", text: state.caption });
-      caption.style.setProperty("--cp-caption-font-size", `${state.captionFontSize ?? 11}px`);
+      caption.style.setProperty("--cp-caption-font-size", `${this.plugin.store.data.settings.canvasCaptionFontSize}px`);
       this.makeInlineEditable(caption, "Edit caption", state.caption, (value) => {
         this.saveMetadata(canvasPath, nodeId, { caption: value });
       });
@@ -209,15 +209,14 @@ export class CanvasMetadataController {
     });
   }
 
-  private saveMetadata(canvasPath: string, nodeId: string, changes: Partial<Pick<PaletteMetadata, "tags" | "label" | "caption" | "captionFontSize">>): void {
+  private saveMetadata(canvasPath: string, nodeId: string, changes: Partial<Pick<PaletteMetadata, "tags" | "label" | "caption">>): void {
     const current = this.plugin.store.getCanvasNodeMetadata(canvasPath, nodeId);
     if (!current) { this.refreshSoon(); return; }
     this.plugin.store.setCanvasNodeMetadata(canvasPath, nodeId, {
       tags: changes.tags ?? current.tags,
       label: changes.label ?? current.label,
       labelColor: (changes.label ?? current.label) ? current.labelColor : "",
-      caption: changes.caption ?? current.caption,
-      captionFontSize: changes.captionFontSize ?? current.captionFontSize
+      caption: changes.caption ?? current.caption
     });
   }
 

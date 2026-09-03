@@ -12,7 +12,7 @@ export interface ItemOrigin { canvasPath?: string; canvasNodeId?: string; worksp
 export interface CanvasPlacement { canvasPath: string; nodeIds: string[]; placedAt: number; }
 /** A display-only Canvas link address. Its number is derived from the saved link order. */
 export interface NumberedCanvasLink { canvasPath: string; nodeId: string; number: number; total: number; }
-export interface PaletteMetadata { tags: string[]; label: string; labelColor?: string; caption: string; /** Per-item Canvas caption size in px. */ captionFontSize?: number; backContent: string; currentFace: CardFace; facesEnabled: boolean; modifiedAt: number; }
+export interface PaletteMetadata { tags: string[]; label: string; labelColor?: string; caption: string; /** Legacy stored value retained for compatibility; Canvas now uses PaletteSettings.canvasCaptionFontSize. */ captionFontSize?: number; backContent: string; currentFace: CardFace; facesEnabled: boolean; modifiedAt: number; }
 
 export interface CanvasNodeSnapshot {
   id: string;
@@ -60,7 +60,7 @@ export interface PaletteItem {
   label: string;
   labelColor?: string;
   caption: string;
-  /** Per-item Canvas caption size in px. */
+  /** Legacy stored value retained for compatibility; Palette captions use their fixed display size. */
   captionFontSize?: number;
   createdAt: number;
   modifiedAt: number;
@@ -118,6 +118,8 @@ export interface PaletteSettings {
   cardHeight: number;
   fontSize: number;
   columns: number;
+  /** One shared display size for captions rendered on every Canvas. */
+  canvasCaptionFontSize: number;
 }
 
 export interface MiniPaletteState {

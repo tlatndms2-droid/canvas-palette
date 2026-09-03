@@ -4,10 +4,12 @@ import type { Collection, PaletteItem, PaletteMetadata, PaletteWorkspace } from 
 import { createLabelColorPicker } from "./label-color-picker";
 
 export class MetadataEditorModal extends Modal {
-  constructor(app: App, private readonly plugin: CanvasPalettePlugin, private readonly initial: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption"> & Partial<Pick<PaletteMetadata, "captionFontSize">>, private readonly onSave: (metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption"> & Pick<PaletteMetadata, "captionFontSize">) => void, private readonly fileRename?: { name: string; rename: (name: string) => Promise<boolean> }) { super(app); }
+  constructor(app: App, private readonly plugin: CanvasPalettePlugin, private readonly initial: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">, private readonly onSave: (metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">) => void, private readonly fileRename?: { name: string; rename: (name: string) => Promise<boolean> }) { super(app); }
   onOpen(): void {
     this.contentEl.addClass("canvas-palette", "cp-metadata-editor");
     this.contentEl.createEl("h2", { text: "Palette metadata" });
+    const fileName = this.fileRename ? this.contentEl.createEl("input", { value: this.fileRename.name, attr: { type: "text", placeholder: "File name", "aria-label": "File name" } }) : null;
+    if (fileName) fileName.insertAdjacentElement("beforebegin", this.contentEl.createEl("label", { text: "File name" }));
     this.contentEl.createEl("label", { text: "Tags" });
     const tags = this.contentEl.createEl("input", { value: this.initial.tags.join(", "), attr: { placeholder: "tag1, tag2" } });
     this.contentEl.createEl("label", { text: "Label" });
@@ -16,17 +18,12 @@ export class MetadataEditorModal extends Modal {
     const labelColor = createLabelColorPicker(this.contentEl, this.initial.labelColor, this.plugin.store.data.settings.labelColorPresets, (color) => this.plugin.store.addLabelColorPreset(color));
     this.contentEl.createEl("label", { text: "Caption" });
     const caption = this.contentEl.createEl("textarea", { text: this.initial.caption, attr: { placeholder: "Short description" } });
-    this.contentEl.createEl("label", { text: "Caption font size (Canvas)" });
-    const captionFontSize = this.contentEl.createEl("input", { value: String(this.initial.captionFontSize ?? 11), attr: { type: "number", min: "8", max: "32", step: "1", "aria-label": "Caption font size in pixels" } });
-    const fileName = this.fileRename ? this.contentEl.createEl("input", { value: this.fileRename.name, attr: { type: "text", placeholder: "File name", "aria-label": "File name" } }) : null;
-    if (fileName) fileName.insertAdjacentElement("beforebegin", this.contentEl.createEl("label", { text: "File name" }));
     const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
     actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
     actions.createEl("button", { text: "Save", cls: "mod-cta" }).addEventListener("click", async () => {
       const labelValue = label.value.trim();
       if (fileName && this.fileRename && fileName.value.trim() !== this.fileRename.name && !await this.fileRename.rename(fileName.value)) return;
-      const size = Math.max(8, Math.min(32, Math.round(Number(captionFontSize.value) || 11)));
-      this.onSave({ tags: [...new Set(tags.value.split(",").map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean))], label: labelValue, labelColor: labelValue ? labelColor.value : "", caption: caption.value.trim(), captionFontSize: size });
+      this.onSave({ tags: [...new Set(tags.value.split(",").map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean))], label: labelValue, labelColor: labelValue ? labelColor.value : "", caption: caption.value.trim() });
       this.close();
     });
   }

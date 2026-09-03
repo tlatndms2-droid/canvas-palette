@@ -37,7 +37,6 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   const unlinked = options.unlinked ?? canvasPaths.length === 0;
   const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${options.selected ? " is-selected" : ""}${options.compact ? " is-compact" : ""}` });
   card.dataset.itemId = item.id;
-  card.style.setProperty("--cp-caption-font-size", `${item.captionFontSize ?? 11}px`);
   card.tabIndex = 0;
   if (options.selected && options.showSelectionMarker !== false) { const marker = card.createSpan({ cls: "cp-item__selection", attr: { "aria-label": "Selected" } }); setIcon(marker, "check"); }
   const header = card.createDiv({ cls: "cp-item__header" });

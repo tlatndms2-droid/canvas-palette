@@ -367,14 +367,13 @@ export class PaletteStore {
     return this.data.items[item.id];
   }
 
-  setCanvasNodeMetadata(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption"> & Partial<Pick<PaletteMetadata, "captionFontSize">>): void {
+  setCanvasNodeMetadata(canvasPath: string, nodeId: string, metadata: Pick<PaletteMetadata, "tags" | "label" | "labelColor" | "caption">): void {
     const modifiedAt = Date.now();
     const normalized = {
       tags: [...new Set(metadata.tags)],
       label: metadata.label,
       labelColor: metadata.label ? metadata.labelColor ?? "" : "",
-      caption: metadata.caption,
-      captionFontSize: this.captionFontSize(metadata.captionFontSize)
+      caption: metadata.caption
     };
     this.setMetadataRecord(canvasPath, nodeId, normalized, modifiedAt);
     const linkedItems = Object.values(this.data.items).filter((item) => this.itemHasLinkedNode(item, canvasPath, nodeId));
@@ -384,6 +383,13 @@ export class PaletteStore {
     }
     this.changed();
     for (const item of linkedItems) void this.plugin.syncPaletteItemToCanvas(item);
+  }
+
+  setCanvasCaptionFontSize(value: number): void {
+    const next = this.captionFontSize(value);
+    if (this.data.settings.canvasCaptionFontSize === next) return;
+    this.data.settings.canvasCaptionFontSize = next;
+    this.changed();
   }
 
   setCanvasNodeBack(canvasPath: string, nodeId: string, backContent: string): void {
@@ -749,7 +755,7 @@ export class PaletteStore {
   }
 
   private applyItemMetadataToLinkedNodes(item: PaletteItem): void {
-    const normalized = { tags: [...new Set(item.tags)], label: item.label, labelColor: item.label ? item.labelColor ?? "" : "", caption: item.caption, captionFontSize: this.captionFontSize(item.captionFontSize), backContent: item.backContent, facesEnabled: item.facesEnabled };
+    const normalized = { tags: [...new Set(item.tags)], label: item.label, labelColor: item.label ? item.labelColor ?? "" : "", caption: item.caption, backContent: item.backContent, facesEnabled: item.facesEnabled };
     for (const location of this.linkedCanvasNodes(item)) {
       const currentFace = this.data.canvasNodeMetadata[location.canvasPath]?.[location.nodeId]?.currentFace ?? "front";
       this.setMetadataRecord(location.canvasPath, location.nodeId, { ...normalized, currentFace }, item.modifiedAt);
