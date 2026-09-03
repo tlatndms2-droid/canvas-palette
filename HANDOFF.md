@@ -48,6 +48,46 @@ The user distinguishes these modes precisely:
 - **Background validation**: CDP connects to that already-open Sandbox window and does not require pointer/mouse control.
 - **Computer Use**: direct Windows mouse/keyboard control with a blue target border. Do not use it while background validation is requested or until the user explicitly permits it.
 
+## Pending implementation plan — Side Palette inline editing and Explorer Canvas opening (2026-09-03)
+
+**Status:** User explicitly stopped implementation. This is an approved-for-future-work product contract, not implemented behavior and not a release. Resume from this section on another PC; inspect the listed source and current git state before editing because the worktree already contained unrelated changes.
+
+### Exact UI contract
+
+1. **New Memo title only.** Clicking either Side Palette `+ Memo` creates and imports a normal Card draft, reveals it in the Viewport, and immediately makes only its header title editable. Its default/current value is `New memo`.
+   - `Enter` or clicking outside the input saves the title.
+   - `Escape` restores the previous title; for a new draft this means `New memo` remains, and the draft is **not deleted**.
+   - Never automatically open the body editor after creating the Memo.
+2. **Existing Card and Markdown titles.** Both types show a header pencil button that opens the same in-card title input. Saving changes only `PaletteItem.displayTitle`; it must never rename a Vault Markdown file, change `origin.filePath`, alter Canvas node identity, or change Workspace/Collection membership.
+3. **In-card body editor.** Both Card and Markdown show a separate header pencil button for body editing. Clicking it replaces only the card body preview with the existing native Obsidian Markdown editor.
+   - Card saves the edited text through `PaletteStore.updateItem(...content)`.
+   - Markdown saves the linked original `.md` through the native editor's normal file-save path; fail gracefully with the existing unavailable-source Notice when its source is missing.
+   - While the body editor is open, disable card dragging and stop editor pointer/click/double-click propagation into the card. Keep the editor within the current card body/height and let its body scroll rather than opening a floating editor.
+   - Clicking outside the card or pressing `Escape` saves and closes the inline editor. `Ctrl/Cmd+S` saves without closing it. Starting another inline editor must first save/close the currently active one.
+4. **Existing double-click remains.** Outside title inputs, header buttons, and an active inline editor, a card double-click retains the existing full native Quick Editor route. The inline controls must not trigger that handler.
+5. **Workspace Explorer Canvas opening.** Keep the existing ownership tree scope: only Canvas paths with at least one Canvas Workspace appear. Add a visible right-side `Canvas 열기 ↗` button to each Canvas-folder row. It opens the real `.canvas` in an Obsidian tab. The left `› / ⌄` control continues to only collapse/expand that Canvas's Workspace rows. Do not turn folder-row clicks into Canvas opening; Workspace-row double-click continues to select/open its Workspace in Side Palette.
+
+### Existing implementation base and intended change points
+
+- `src/main.ts`: `createMemo()` currently creates/imports/selects a `New memo` Card only. Add a small UI-facing start-title-edit signal/state; do not make it open the body editor. Existing `openSideItemPreview()` preserves the double-click route.
+- `src/side-palette/side-palette-view.ts`: owns Side rerendering and already has `activeBackEditor` plus `openInlineBackEditor()`, which mounts `NativeMarkdownEditor` in a card body. Generalize or parallel this pattern for exactly one active front/body editor and local title-edit state; preserve scroll memory, selection, drag ordering, and the existing Back-face behavior.
+- `src/ui/render.ts`: card-wide click/double-click handlers currently live here. Add optional Side-only callbacks/controls for title editing and front/body editing, and stop propagation from every input/button/editor surface before those handlers run. Do not change Mini Palette behavior unless a shared API requires a no-op callback.
+- `src/editor/native-markdown-editor.ts` and `src/editor/editor-manager.ts`: reuse `NativeMarkdownEditor` targets. Card target text is stored content; Markdown target must resolve and save the actual `TFile`. Do not introduce a new document format or schema migration.
+- `src/ui/workspace-explorer-modal.ts`: Canvas-folder heading currently toggles expansion. Separate its arrow control from the new Canvas-open button and reuse the existing Obsidian `TFile` tab-opening path already used by Canvas services.
+- `styles.css`: add compact in-card title input, header control, editing body, and scroll/drag-disabled styles that follow existing `.cp-side`, `.cp-item`, and `.cp-side-back-editor` tokens. The visual requirement is the existing card surface, not a modal or a new oversized layout.
+
+### Required tests and safe verification
+
+- Add focused static tests for new Memo title focus/save/Escape-draft retention; existing Card/Markdown title edits changing only `displayTitle`; Card content save; linked Markdown source save routing; one-active-inline-editor save/close; `Ctrl/Cmd+S`; outside-click/Escape save; drag disabled while editing; and card double-click remaining intact outside inline controls.
+- Add Explorer tests proving arrow-only expansion, explicit Canvas-button tab opening, and unchanged Workspace-row double-click selection.
+- Before calling the work complete: focused tests, complete suite, TypeScript no-emit, production build, and `git diff --check`. Treat these as static verification only.
+- If live runtime validation is requested, follow the isolated Sandbox procedure above. Back up `data.json`, affected `.canvas`, Markdown fixture, and `.obsidian/workspace.json`; test Card save, Markdown file save, double-click Quick Editor, Canvas open button, reload persistence; then restore fixtures and verify hashes. Never use the user's real Vault.
+
+### Resume guardrails
+
+- Preserve existing unrelated worktree changes. At planning time `src/side-palette/side-palette-view.ts` was already modified and `AGENTS.md`, the Sandbox folder, and several `docs/` files were untracked; do not reset, checkout, delete, or absorb them without inspecting ownership.
+- This feature has **no** version bump, commit, push, or release authorization. Those require a separate explicit request after implementation and verification.
+
 ## Current state
 
 - Version: `0.3.59` (global Canvas caption control and metadata order release).
