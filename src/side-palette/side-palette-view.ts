@@ -458,7 +458,6 @@ export class SidePaletteView extends ItemView {
     parent.createDiv({ cls: "cp-viewport-scope", text: `${collection?.name ?? workspace.name} · ${visibleItems.length} items` });
     this.visibleItemIds = visibleItems.map((item) => item.id);
     const visibleSet = new Set(visibleItems.map((item) => item.id));
-    const importedChildren = workspace.outlineImport?.childItemIdsByParent;
     const renderCard = (host: HTMLElement, item: PaletteItem): void => {
       const facesEnabled = supportsFrontBack(item) && item.facesEnabled;
       const face = facesEnabled ? this.plugin.store.data.uiState.sideItemFaces[item.id] ?? "front" : "front";
@@ -478,8 +477,8 @@ export class SidePaletteView extends ItemView {
     const renderItemTree = (host: HTMLElement, itemId: string): void => {
       const item = this.plugin.store.data.items[itemId]; if (!item) return;
       const descendantIds: string[] = [];
-      const children = importedChildren?.[itemId] ?? item.childItemIds ?? [];
-      const collect = (id: string): void => { const current = this.plugin.store.data.items[id]; if (!current) return; if (visibleSet.has(id)) descendantIds.push(id); for (const child of importedChildren?.[id] ?? current.childItemIds ?? []) collect(child); };
+      const children = item.childItemIds ?? [];
+      const collect = (id: string): void => { const current = this.plugin.store.data.items[id]; if (!current) return; if (visibleSet.has(id)) descendantIds.push(id); for (const child of current.childItemIds ?? []) collect(child); };
       collect(itemId); if (descendantIds.length === 0) return;
       if (children.length === 0) { if (visibleSet.has(item.id)) renderCard(host, item); return; }
       const group = host.createDiv({ cls: "cp-viewport-group cp-viewport-file-group" });
@@ -503,7 +502,7 @@ export class SidePaletteView extends ItemView {
         head.createSpan({ cls: "cp-viewport-group__title", text: current.name }); head.createSpan({ cls: "cp-viewport-group__count", text: `${matches.length} items` }); head.addEventListener("dblclick", () => { workspace.sideLayout.focusedCollectionId = collectionId; workspace.sideLayout.selectedCollectionId = collectionId; this.plugin.store.changed(); });
         if (!collapsed) { const body = group.createDiv({ cls: "cp-viewport-group__body" }); for (const rootId of roots) renderItemTree(body, rootId); }
       }
-      for (const rootId of workspace.outlineImport?.rootItemIds ?? workspace.looseItemIds) renderItemTree(listEl, rootId);
+      for (const rootId of workspace.looseItemIds) renderItemTree(listEl, rootId);
     } else {
       for (const rootId of collection.itemIds) renderItemTree(listEl, rootId);
       if (workspace.sideLayout.outlinerIncludeDescendants) for (const childCollectionId of collection.childCollectionIds) for (const rootId of collectionItems(childCollectionId)) renderItemTree(listEl, rootId);
@@ -663,8 +662,6 @@ export class SidePaletteView extends ItemView {
     const allCollapsed = [...allCollectionIds, ...allItemIds].every((id) => workspace.sideLayout.collapsedCollectionIds.includes(id) || workspace.sideLayout.collapsedItemIds.includes(id));
     const toggleAll = iconButton(header, allCollapsed ? "chevrons-down-up" : "chevrons-up-down", allCollapsed ? "모든 폴더 펼치기" : "모든 폴더 접기", () => { workspace.sideLayout.collapsedCollectionIds = allCollapsed ? [] : allCollectionIds; workspace.sideLayout.collapsedItemIds = allCollapsed ? [] : allItemIds; this.plugin.store.changed(); });
     toggleAll.addClass("cp-outliner-toggle-all");
-    const importCanvas = iconButton(header, "git-branch", "현재 Canvas 구조를 Outliner로 가져오기", () => void this.plugin.importCurrentCanvasOutline());
-    importCanvas.addClass("cp-outliner-import-canvas"); importCanvas.disabled = !this.plugin.currentCanvasPath();
     const collection = header.createEl("button", { text: "+ Collection" }); collection.addEventListener("click", () => this.promptCollection(workspaceId, null));
     const memo = header.createEl("button", { text: "+ Memo" }); memo.addEventListener("click", () => void this.plugin.createMemo().then((id) => this.startTitleEdit(id)));
     parent.style.setProperty("--cp-outline-height", `${workspace.sideLayout.outlinerItemHeight}px`);
@@ -695,8 +692,7 @@ export class SidePaletteView extends ItemView {
     const focused = workspace.sideLayout.focusedCollectionId ? this.plugin.store.data.collections[workspace.sideLayout.focusedCollectionId] : null;
     const collectionIds = focused?.childCollectionIds ?? workspace.rootCollectionIds; const itemIds = focused?.itemIds ?? workspace.looseItemIds;
     for (const id of collectionIds) this.renderCollection(parent, this.plugin.store.data.collections[id], 0);
-    const importedRoots = workspace.outlineImport?.rootItemIds;
-    for (const item of (importedRoots ?? itemIds).map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item))) this.renderOutlineItem(parent, item, 0, focused?.id ?? null, workspace.outlineImport?.childItemIdsByParent);
+    for (const item of itemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item))) this.renderOutlineItem(parent, item, 0, focused?.id ?? null);
   }
 
   private openLinkedSpaces(workspaceId: string): void {
@@ -755,13 +751,13 @@ export class SidePaletteView extends ItemView {
     }
   }
 
-  private renderOutlineItem(parent: HTMLElement, item: PaletteItem, depth: number, collectionId: string | null, importedChildren?: Record<string, string[]>): void {
+  private renderOutlineItem(parent: HTMLElement, item: PaletteItem, depth: number, collectionId: string | null): void {
     const target: OutlineSelectionTarget = { kind: "item", id: item.id };
     this.outlineRows.push(target);
     const selected = this.outlineTargetSelected(target);
     const showMarker = selected && this.outlineSelection.length > 1;
     const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${selected ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.itemId = item.id; row.draggable = true;
-    const children = importedChildren?.[item.id] ?? item.childItemIds ?? [];
+    const children = item.childItemIds ?? [];
     const layout = this.plugin.activeWorkspace()?.sideLayout;
     const collapsed = layout?.collapsedItemIds.includes(item.id) ?? false;
     if (children.length > 0) {
@@ -781,7 +777,7 @@ export class SidePaletteView extends ItemView {
     row.addEventListener("dragstart", (event) => { const selectedIds = this.sideSelectedIds(); event.dataTransfer?.setData("application/x-canvas-palette-item", item.id); event.dataTransfer?.setData("application/x-canvas-palette-items", JSON.stringify(selectedIds.includes(item.id) ? selectedIds : [item.id])); if (event.dataTransfer) event.dataTransfer.effectAllowed = "copyMove"; row.addClass("is-dragging"); });
     row.addEventListener("dragend", () => row.removeClass("is-dragging"));
     this.mountOutlineItemDropTarget(row, item.id, collectionId, item.parentItemId ?? null);
-    if (!collapsed) for (const childId of children) { const child = this.plugin.store.data.items[childId]; if (child) this.renderOutlineItem(parent, child, depth + 1, collectionId, importedChildren); }
+    if (!collapsed) for (const childId of children) { const child = this.plugin.store.data.items[childId]; if (child) this.renderOutlineItem(parent, child, depth + 1, collectionId); }
   }
 
   private mountOutlineItemDropTarget(row: HTMLElement, targetId: string, collectionId: string | null, parentItemId: string | null): void {

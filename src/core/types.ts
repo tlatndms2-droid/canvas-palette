@@ -105,8 +105,6 @@ export interface PaletteWorkspace {
   representativeCanvasPath: string | null;
   rootCollectionIds: string[];
   looseItemIds: string[];
-  /** A Canvas-derived, workspace-local Outliner.  It references canonical items without moving them. */
-  outlineImport?: { itemIds: string[]; rootItemIds: string[]; childItemIdsByParent: Record<string, string[]>; sourceCanvasPath: string; };
   sideLayout: SideLayoutState;
   createdAt: number;
   modifiedAt: number;

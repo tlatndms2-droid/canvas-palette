@@ -1,4 +1,4 @@
-import { Editor, EventRef, Menu, Modal, Notice, Plugin, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
+import { Editor, EventRef, Menu, Notice, Plugin, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
 import { CanvasAdapter } from "./canvas/canvas-adapter";
 import { ExportPlacementController } from "./canvas/export-placement-controller";
 import { mergeCanvasNodeIds } from "./core/canvas-node-presence";
@@ -335,40 +335,6 @@ export default class CanvasPalettePlugin extends Plugin {
     return item.id;
   }
 
-  async importCurrentCanvasOutline(): Promise<void> {
-    const canvasPath = this.currentCanvasPath();
-    if (!canvasPath) { new Notice("Canvas를 먼저 열어 주세요."); return; }
-    new CanvasOutlineDirectionModal(this.app, (direction) => void this.createCanvasOutlineWorkspace(canvasPath, direction)).open();
-  }
-
-  private async createCanvasOutlineWorkspace(canvasPath: string, direction: "from-to" | "to-from"): Promise<void> {
-    const document = await this.canvas.readCanvasDocument(canvasPath);
-    if (!document || document.nodes.length === 0) { new Notice("가져올 Canvas 항목을 찾지 못했습니다."); return; }
-    const nodes = document.nodes.filter((node) => node.type !== "group");
-    const resolved = new Map<string, PaletteItem>();
-    for (const node of nodes) {
-      const item = this.store.linkedItemForNode(canvasPath, node.id) ?? await this.canvas.itemForCanvasNode(node, canvasPath);
-      if (item) resolved.set(node.id, item);
-    }
-    if (!resolved.size) { new Notice("Outliner로 만들 수 있는 Canvas 항목이 없습니다."); return; }
-    const parentByChild = new Map<string, string>(); let skipped = 0;
-    const wouldCycle = (parentId: string, childId: string): boolean => { let cursor: string | undefined = parentId; while (cursor) { if (cursor === childId) return true; cursor = parentByChild.get(cursor); } return false; };
-    for (const edge of document.edges) {
-      const parent = direction === "from-to" ? edge.fromNode : edge.toNode;
-      const child = direction === "from-to" ? edge.toNode : edge.fromNode;
-      if (!resolved.has(parent) || !resolved.has(child) || parent === child || parentByChild.has(child) || wouldCycle(parent, child)) { skipped++; continue; }
-      parentByChild.set(child, parent);
-    }
-    const children: Record<string, string[]> = {};
-    for (const [child, parent] of parentByChild) (children[resolved.get(parent)!.id] ??= []).push(resolved.get(child)!.id);
-    const roots = [...resolved.entries()].filter(([nodeId]) => !parentByChild.has(nodeId)).map(([, item]) => item.id);
-    const base = canvasPath.split("/").pop()?.replace(/\.canvas$/i, "") ?? "Canvas";
-    let name = `${base} 구조`; let suffix = 2;
-    while (Object.values(this.store.data.workspaces).some((workspace) => workspace.name === name)) name = `${base} 구조 ${suffix++}`;
-    const items = [...new Map([...resolved.values()].map((item) => [item.id, item])).values()];
-    this.store.createCanvasOutlineWorkspace(name, canvasPath, items, roots, children);
-    new Notice(`${name} Workspace를 만들었습니다.${skipped ? ` 연결 ${skipped}개는 순환·중복이라 제외했습니다.` : ""}`);
-  }
 
   createCollection(): void {
     const workspace = this.activeWorkspace();
@@ -861,19 +827,5 @@ export default class CanvasPalettePlugin extends Plugin {
     if (!existing) await leaf.setViewState({ type: SIDE_PALETTE_VIEW, active: true });
     this.app.workspace.revealLeaf(leaf);
     return leaf.view instanceof SidePaletteView ? leaf.view : null;
-  }
-}
-
-class CanvasOutlineDirectionModal extends Modal {
-  constructor(app: import("obsidian").App, private readonly onChoose: (direction: "from-to" | "to-from") => void) { super(app); }
-  onOpen(): void {
-    this.contentEl.addClass("canvas-palette");
-    this.contentEl.createEl("h2", { text: "Canvas 구조를 Outliner로 가져오기" });
-    this.contentEl.createEl("p", { text: "Canvas의 연결선 방향을 부모 → 자식으로 읽을 방향을 고르세요. 원본 Canvas와 기존 Workspace는 바뀌지 않습니다." });
-    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
-    const reverse = actions.createEl("button", { text: "도착점 → 출발점" });
-    const normal = actions.createEl("button", { text: "출발점 → 도착점", cls: "mod-cta" });
-    reverse.addEventListener("click", () => { this.close(); this.onChoose("to-from"); });
-    normal.addEventListener("click", () => { this.close(); this.onChoose("from-to"); });
   }
 }

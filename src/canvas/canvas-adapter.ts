@@ -446,16 +446,6 @@ export class CanvasAdapter {
     return this.app.vault.getFiles().filter((file) => file.extension.toLowerCase() === "canvas").sort((left, right) => left.path.localeCompare(right.path, undefined, { numeric: true }));
   }
 
-  async readCanvasDocument(canvasPath: string): Promise<{ nodes: CanvasNodeSnapshot[]; edges: CanvasEdgeSnapshot[] } | null> {
-    const file = this.app.vault.getAbstractFileByPath(canvasPath);
-    if (!(file instanceof TFile)) return null;
-    try {
-      const raw = JSON.parse(await this.app.vault.read(file)) as CanvasDocument;
-      return { nodes: Array.isArray(raw.nodes) ? raw.nodes : [], edges: Array.isArray(raw.edges) ? raw.edges : [] };
-    } catch { return null; }
-  }
-
-  async itemForCanvasNode(node: CanvasNodeSnapshot, canvasPath: string): Promise<PaletteItem | null> { return this.itemFromNode(node, canvasPath); }
 
   async openContext(file: TFile): Promise<CanvasContext | null> {
     const existing = this.openContexts().find((context) => context.file.path === file.path);
