@@ -52,6 +52,8 @@ The user distinguishes these modes precisely:
 
 **Status:** User explicitly stopped implementation. This is an approved-for-future-work product contract, not implemented behavior and not a release. Resume from this section on another PC; inspect the listed source and current git state before editing because the worktree already contained unrelated changes.
 
+**Detailed companion:** [`docs/SIDE_PALETTE_INLINE_EDITING_PLAN.md`](docs/SIDE_PALETTE_INLINE_EDITING_PLAN.md) is the implementation-ready UI and verification specification for this pending work.
+
 ### Exact UI contract
 
 1. **New Memo title only.** Clicking either Side Palette `+ Memo` creates and imports a normal Card draft, reveals it in the Viewport, and immediately makes only its header title editable. Its default/current value is `New memo`.
