@@ -50,7 +50,7 @@ The user distinguishes these modes precisely:
 
 ## Pending implementation plan — Side Palette inline editing and Explorer Canvas opening (2026-09-03)
 
-**Status:** User explicitly stopped implementation. This is an approved-for-future-work product contract, not implemented behavior and not a release. Resume from this section on another PC; inspect the listed source and current git state before editing because the worktree already contained unrelated changes.
+**Status:** Implemented and Sandbox-validated for `0.3.60`. The release contains only the inline title/body editing and Explorer Canvas-opening contract below; unrelated worktree changes remain uncommitted.
 
 **Detailed companion:** [`docs/SIDE_PALETTE_INLINE_EDITING_PLAN.md`](docs/SIDE_PALETTE_INLINE_EDITING_PLAN.md) is the implementation-ready UI and verification specification for this pending work.
 
@@ -65,7 +65,7 @@ The user distinguishes these modes precisely:
    - Card saves the edited text through `PaletteStore.updateItem(...content)`.
    - Markdown saves the linked original `.md` through the native editor's normal file-save path; fail gracefully with the existing unavailable-source Notice when its source is missing.
    - While the body editor is open, disable card dragging and stop editor pointer/click/double-click propagation into the card. Keep the editor within the current card body/height and let its body scroll rather than opening a floating editor.
-   - Clicking outside the card or pressing `Escape` saves and closes the inline editor. `Ctrl/Cmd+S` saves without closing it. Starting another inline editor must first save/close the currently active one.
+   - Clicking outside the card or pressing `Escape` saves and closes the inline editor. Starting another inline editor must first save/close the currently active one.
 4. **Existing double-click remains.** Outside title inputs, header buttons, and an active inline editor, a card double-click retains the existing full native Quick Editor route. The inline controls must not trigger that handler.
 5. **Workspace Explorer Canvas opening.** Keep the existing ownership tree scope: only Canvas paths with at least one Canvas Workspace appear. Add a visible right-side `Canvas 열기 ↗` button to each Canvas-folder row. It opens the real `.canvas` in an Obsidian tab. The left `› / ⌄` control continues to only collapse/expand that Canvas's Workspace rows. Do not turn folder-row clicks into Canvas opening; Workspace-row double-click continues to select/open its Workspace in Side Palette.
 

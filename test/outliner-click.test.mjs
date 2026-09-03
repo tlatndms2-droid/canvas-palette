@@ -87,7 +87,7 @@ test("Side search preserves Korean IME composition and renders guided suggestion
   assert.match(source, /normalize\("NFC"\)/);
   assert.match(source, /renderSearchAssistant/);
   assert.match(source, /refreshSearchSurface/);
-  assert.match(source, /if \(this\.activeBackEditor \|\| this\.searchComposing\) return/);
+  assert.match(source, /if \(this\.activeBackEditor \|\| this\.activeFrontEditor \|\| this\.searchComposing\) return/);
   assert.match(source, /root\.onpointerdown/);
   assert.match(source, /this\.searchAssistantOpen = false/);
   assert.match(source, /precedingQuery/);

@@ -1,4 +1,4 @@
-import { ItemView, Menu, setIcon, WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, Notice, setIcon, TFile, WorkspaceLeaf } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { Collection, OutlineSelectionTarget, PaletteItem, SideLayoutState } from "../core/types";
 import { CardToMarkdownModal, ConfirmDeleteCollectionModal, ConfirmDeleteModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
@@ -28,6 +28,8 @@ export class SidePaletteView extends ItemView {
   private searchAssistantOpen = false;
   private pendingReveal: "viewport" | "outliner" | null = null;
   private activeBackEditor: { itemId: string; close: (save: boolean) => Promise<void> } | null = null;
+  private activeFrontEditor: { itemId: string; close: (save: boolean) => Promise<void> } | null = null;
+  private titleEditingItemId: string | null = null;
   private readonly scrollSelectors = [".cp-viewport", ".cp-outliner", ".cp-tag-index", ".cp-label-index"] as const;
   private readonly scrollMemory: Record<string, number> = {};
   private layoutMode: SideLayoutMode = "wide";
@@ -41,7 +43,7 @@ export class SidePaletteView extends ItemView {
   getDisplayText(): string { return "Canvas Palette"; }
   getIcon(): string { return "library-big"; }
   async onOpen(): Promise<void> { this.unsubscribe = this.plugin.store.subscribe(() => this.render()); this.render(); }
-  async onClose(): Promise<void> { this.resizeObserver?.disconnect(); this.indexesFlyoutCleanup?.(); this.unsubscribe?.(); await this.activeBackEditor?.close(true); }
+  async onClose(): Promise<void> { this.resizeObserver?.disconnect(); this.indexesFlyoutCleanup?.(); this.unsubscribe?.(); await this.activeFrontEditor?.close(true); await this.activeBackEditor?.close(true); }
 
   revealItem(itemId: string): void {
     this.query = "";
@@ -69,7 +71,7 @@ export class SidePaletteView extends ItemView {
   }
 
   private render(): void {
-    if (this.activeBackEditor || this.searchComposing) return;
+    if (this.activeBackEditor || this.activeFrontEditor || this.searchComposing) return;
     const root = this.contentEl;
     const previousWorkspaceId = root.dataset.cpWorkspaceId;
     this.captureScrollMemory(root);
@@ -403,7 +405,7 @@ export class SidePaletteView extends ItemView {
     const grid = viewSwitch.createEl("button", { text: "Grid", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "grid" ? "is-active" : "" });
     const list = viewSwitch.createEl("button", { text: "List", cls: this.plugin.activeWorkspace()?.sideLayout.viewMode === "list" ? "is-active" : "" });
     grid.addEventListener("click", () => this.setSideView("grid")); list.addEventListener("click", () => this.setSideView("list"));
-    const memo = tools.createEl("button", { text: "+ Memo", cls: "cp-viewport-memo" }); memo.addEventListener("click", () => void this.plugin.createMemo());
+    const memo = tools.createEl("button", { text: "+ Memo", cls: "cp-viewport-memo" }); memo.addEventListener("click", () => void this.plugin.createMemo().then((id) => this.startTitleEdit(id)));
     const workspaceLayout = this.plugin.activeWorkspace()?.sideLayout;
     const listEl = parent.createDiv({ cls: "cp-grid" });
     const applyViewSettings = (): void => {
@@ -459,9 +461,9 @@ export class SidePaletteView extends ItemView {
     const renderCard = (host: HTMLElement, item: PaletteItem): void => {
       const facesEnabled = supportsFrontBack(item) && item.facesEnabled;
       const face = facesEnabled ? this.plugin.store.data.uiState.sideItemFaces[item.id] ?? "front" : "front";
-      const card = renderItem(host, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, dragItemIds: selectedIds, currentFace: face, unlinked: !this.plugin.store.itemLinkedToWorkspace(item, workspaceId), markdownSourceStatus: this.plugin.markdownSourceStatus(item), onMarkdownSourceStatus: (event) => this.plugin.showMarkdownSourceMenu(item, event), onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("side", item.id, next) : undefined, onSelect: (event) => { this.pendingReveal = "outliner"; this.selectSideItem(item.id, event); }, onOpen: () => face === "back" ? void this.openInlineBackEditor(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => this.plugin.findLinkedCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+      const card = renderItem(host, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, dragItemIds: selectedIds, currentFace: face, unlinked: !this.plugin.store.itemLinkedToWorkspace(item, workspaceId), markdownSourceStatus: this.plugin.markdownSourceStatus(item), onMarkdownSourceStatus: (event) => this.plugin.showMarkdownSourceMenu(item, event), onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("side", item.id, next) : undefined, titleEditing: this.titleEditingItemId === item.id, onStartTitleEdit: () => this.startTitleEdit(item.id), onCommitTitle: (title) => this.commitTitleEdit(item.id, title), onCancelTitleEdit: () => this.cancelTitleEdit(), onStartBodyEdit: () => void this.openInlineFrontEditor(item.id), onSelect: (event) => { this.pendingReveal = "outliner"; this.selectSideItem(item.id, event); }, onOpen: () => face === "back" ? void this.openInlineBackEditor(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => this.plugin.findLinkedCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
       const body = card.querySelector<HTMLElement>(".cp-item__body");
-      if (body) {
+      if (body && this.activeFrontEditor?.itemId !== item.id) {
         const compactLimit = Math.round(360 * 14 / this.plugin.store.data.settings.fontSize);
         const canBrowseFullBody = selectedIds.includes(item.id) && (face === "back" || item.type === "card" || item.type === "markdown");
         void this.plugin.preview.render(body, item, true, canBrowseFullBody ? Number.MAX_SAFE_INTEGER : compactLimit, face);
@@ -552,6 +554,7 @@ export class SidePaletteView extends ItemView {
 
   private async openInlineBackEditor(itemId: string): Promise<void> {
     if (this.activeBackEditor?.itemId === itemId) return;
+    await this.activeFrontEditor?.close(true);
     await this.activeBackEditor?.close(true);
     const item = this.plugin.store.data.items[itemId];
     const card = this.contentEl.querySelector<HTMLElement>(`.cp-item[data-item-id="${CSS.escape(itemId)}"]`);
@@ -606,10 +609,41 @@ export class SidePaletteView extends ItemView {
     }
   }
 
+  private startTitleEdit(itemId: string): void {
+    this.titleEditingItemId = itemId; this.render();
+    window.requestAnimationFrame(() => this.contentEl.querySelector<HTMLInputElement>(`.cp-item[data-item-id="${CSS.escape(itemId)}"] .cp-item__title-input`)?.focus());
+  }
+
+  private commitTitleEdit(itemId: string, title: string): void {
+    if (this.titleEditingItemId !== itemId) return;
+    this.titleEditingItemId = null;
+    const item = this.plugin.store.data.items[itemId]; const displayTitle = title.trim() || item?.displayTitle || "Untitled";
+    if (item && displayTitle !== item.displayTitle) this.plugin.store.updateItem(itemId, { displayTitle, tags: item.tags, label: item.label, labelColor: item.labelColor, caption: item.caption }); else this.render();
+  }
+
+  private cancelTitleEdit(): void { if (!this.titleEditingItemId) return; this.titleEditingItemId = null; this.render(); }
+
+  private async openInlineFrontEditor(itemId: string): Promise<void> {
+    if (this.activeFrontEditor?.itemId === itemId) return;
+    await this.activeBackEditor?.close(true);
+    const item = this.plugin.store.data.items[itemId]; const card = this.contentEl.querySelector<HTMLElement>(`.cp-item[data-item-id="${CSS.escape(itemId)}"]`); const body = card?.querySelector<HTMLElement>(".cp-item__body");
+    if (!item || !card || !body || body.dataset.face !== "front" || (item.type !== "card" && item.type !== "markdown")) return;
+    const file = item.type === "markdown" && item.origin.filePath ? this.app.vault.getAbstractFileByPath(item.origin.filePath) : null;
+    if (item.type === "markdown" && !(file instanceof TFile)) { new Notice("원본 Markdown 파일을 찾을 수 없습니다."); return; }
+    body.empty(); body.removeClass("is-pan-enabled", "is-panning"); body.addClass("is-front-editing"); card.addClass("is-front-editing"); card.draggable = false;
+    const host = body.createDiv({ cls: "cp-side-front-editor cp-native-editor-host" }); const editor = new NativeMarkdownEditor(this.app, { itemId, kind: item.type === "markdown" ? "file" : "card", file: file instanceof TFile ? file : null, title: item.displayTitle, initialText: item.content ?? "" }); const doc = body.ownerDocument; let finishing = false;
+    const save = async (): Promise<void> => { if (item.type === "card") this.plugin.store.updateItem(itemId, { displayTitle: item.displayTitle, tags: item.tags, label: item.label, labelColor: item.labelColor, caption: item.caption, content: editor.getText() }); else await editor.saveFile(); };
+    const close = async (persist: boolean): Promise<void> => { if (finishing) return; finishing = true; doc.removeEventListener("pointerdown", outside, true); host.removeEventListener("keydown", keydown, true); if (persist) await save(); editor.detach(); if (this.activeFrontEditor?.itemId === itemId) this.activeFrontEditor = null; this.render(); };
+    const outside = (event: PointerEvent): void => { if (!card.contains(event.target as Node)) window.setTimeout(() => void close(true), 0); };
+    const keydown = (event: KeyboardEvent): void => { event.stopPropagation(); if (event.key === "Escape") { event.preventDefault(); void close(true); } };
+    this.activeFrontEditor = { itemId, close }; host.addEventListener("pointerdown", (event) => event.stopPropagation()); host.addEventListener("click", (event) => event.stopPropagation()); host.addEventListener("dblclick", (event) => event.stopPropagation()); host.addEventListener("keydown", keydown, true);
+    try { await editor.mount(host, false); window.requestAnimationFrame(() => editor.remeasure()); window.setTimeout(() => doc.addEventListener("pointerdown", outside, true), 0); } catch (error) { editor.detach(); this.activeFrontEditor = null; this.render(); console.error("Canvas Palette could not mount the Side Palette front editor", error); }
+  }
+
   private renderOutliner(parent: HTMLElement, workspaceId: string): void {
     const header = parent.createDiv({ cls: "cp-panel__header" }); header.createEl("h4", { text: "Outliner" });
     const collection = header.createEl("button", { text: "+ Collection" }); collection.addEventListener("click", () => this.promptCollection(workspaceId, null));
-    const memo = header.createEl("button", { text: "+ Memo" }); memo.addEventListener("click", () => void this.plugin.createMemo());
+    const memo = header.createEl("button", { text: "+ Memo" }); memo.addEventListener("click", () => void this.plugin.createMemo().then((id) => this.startTitleEdit(id)));
     const workspace = this.plugin.store.data.workspaces[workspaceId]; if (!workspace) return;
     parent.style.setProperty("--cp-outline-height", `${workspace.sideLayout.outlinerItemHeight}px`);
     parent.style.setProperty("--cp-outline-font", `${workspace.sideLayout.outlinerFontSize}px`);

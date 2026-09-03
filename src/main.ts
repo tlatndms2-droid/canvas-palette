@@ -329,13 +329,14 @@ export default class CanvasPalettePlugin extends Plugin {
     if (appWithSettings.setting) { void appWithSettings.setting.open(); appWithSettings.setting.openTabById(this.manifest.id); }
   }
 
-  async createMemo(): Promise<void> {
+  async createMemo(): Promise<string> {
     const now = Date.now();
     const workspace = this.activeWorkspace();
     const item: PaletteItem = { id: createId("card"), type: "card", displayTitle: "New memo", tags: [], label: "", caption: "", backContent: "", facesEnabled: false, createdAt: now, modifiedAt: now, origin: { canvasPath: workspace?.kind === "canvas" ? workspace.ownerCanvasPath ?? undefined : undefined }, canvasPlacements: [], content: "" };
     this.store.addPending(item);
     if (workspace) this.store.importPending(workspace.id, [item.id]);
     this.selectItem(item.id);
+    return item.id;
   }
 
   createCollection(): void {

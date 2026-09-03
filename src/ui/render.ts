@@ -19,7 +19,7 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
 }
 
 export type MarkdownSourceStatus = "deleted";
-export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; dragItemIds?: string[]; miniCollect?: boolean; currentFace?: CardFace; unlinked?: boolean; markdownSourceStatus?: MarkdownSourceStatus | null; onMarkdownSourceStatus?: (event: MouseEvent) => void; onToggleFace?: (face: CardFace) => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
+export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; dragItemIds?: string[]; miniCollect?: boolean; currentFace?: CardFace; unlinked?: boolean; markdownSourceStatus?: MarkdownSourceStatus | null; onMarkdownSourceStatus?: (event: MouseEvent) => void; onToggleFace?: (face: CardFace) => void; titleEditing?: boolean; onStartTitleEdit?: () => void; onCommitTitle?: (title: string) => void; onCancelTitleEdit?: () => void; onStartBodyEdit?: () => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
 
 export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group" && item.type !== "link"; }
 
@@ -43,13 +43,19 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   const icon = header.createSpan({ cls: "cp-item__icon" });
   setIcon(icon, TYPE_ICON[item.type]);
   icon.addClass("cp-item__type-badge", `cp-item__type-badge--${item.type}`);
-  header.createSpan({ cls: "cp-item__title", text: item.displayTitle || "Untitled" });
+  if (options.titleEditing) {
+    const title = header.createEl("input", { cls: "cp-item__title-input", value: item.displayTitle, attr: { type: "text", "aria-label": "카드 제목" } });
+    const stop = (event: Event): void => event.stopPropagation();
+    title.addEventListener("pointerdown", stop); title.addEventListener("click", stop); title.addEventListener("dblclick", stop);
+    title.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Enter") { event.preventDefault(); options.onCommitTitle?.(title.value); } else if (event.key === "Escape") { event.preventDefault(); options.onCancelTitleEdit?.(); } });
+    title.addEventListener("blur", () => options.onCommitTitle?.(title.value));
+  } else header.createSpan({ cls: "cp-item__title", text: item.displayTitle || "Untitled" });
   const face = options.currentFace ?? "front";
   if (item.label) {
     const label = header.createSpan({ cls: "cp-label", text: item.label });
     if (item.labelColor) label.style.setProperty("--cp-label-color", item.labelColor);
   }
-  if (unlinked || options.onToggleFace || options.markdownSourceStatus) {
+  if (unlinked || options.onToggleFace || options.markdownSourceStatus || options.onStartTitleEdit || options.onStartBodyEdit) {
     const actions = header.createSpan({ cls: "cp-item__header-actions" });
     if (options.markdownSourceStatus) {
       const source = options.markdownSourceStatus;
@@ -72,6 +78,14 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
       flip.addEventListener("pointerdown", (event) => event.stopPropagation());
       flip.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); options.onToggleFace?.(face === "front" ? "back" : "front"); });
       flip.addEventListener("dblclick", (event) => event.stopPropagation());
+    }
+    if (options.onStartTitleEdit && (item.type === "card" || item.type === "markdown")) {
+      const editTitle = actions.createEl("button", { cls: "clickable-icon cp-item-edit-title", attr: { type: "button", "aria-label": "제목 편집", title: "제목 편집" } }); setIcon(editTitle, "pencil");
+      editTitle.addEventListener("pointerdown", (event) => event.stopPropagation()); editTitle.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); options.onStartTitleEdit?.(); }); editTitle.addEventListener("dblclick", (event) => event.stopPropagation());
+    }
+    if (options.onStartBodyEdit && face === "front" && (item.type === "card" || item.type === "markdown")) {
+      const editBody = actions.createEl("button", { cls: "clickable-icon cp-item-edit-body", attr: { type: "button", "aria-label": "본문 편집", title: "본문 편집" } }); setIcon(editBody, "file-pen-line");
+      editBody.addEventListener("pointerdown", (event) => event.stopPropagation()); editBody.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); options.onStartBodyEdit?.(); }); editBody.addEventListener("dblclick", (event) => event.stopPropagation());
     }
   }
   const body = card.createDiv({ cls: "cp-item__body" });
