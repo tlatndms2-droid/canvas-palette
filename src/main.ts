@@ -1,4 +1,4 @@
-import { Editor, EventRef, Menu, Notice, Plugin, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
+import { Editor, EventRef, Menu, Modal, Notice, Plugin, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
 import { CanvasAdapter } from "./canvas/canvas-adapter";
 import { ExportPlacementController } from "./canvas/export-placement-controller";
 import { mergeCanvasNodeIds } from "./core/canvas-node-presence";
@@ -153,23 +153,19 @@ export default class CanvasPalettePlugin extends Plugin {
     return workspace.kind === "canvas" ? `${representativeMark}${workspace.name} · ${ownerCanvas}` : `${representativeMark}${workspace.name}`;
   }
 
-  workspaceAcceptsCanvas(workspace: PaletteWorkspace, canvasPath: string): boolean {
-    return workspace.kind === "general" || workspace.ownerCanvasPath === canvasPath;
-  }
-
-  isOtherCanvasRepresentativeWorkspace(workspaceId: string, canvasPath = this.currentCanvasPath()): boolean {
+  isForeignCanvasWorkspace(workspaceId: string, canvasPath = this.currentCanvasPath()): boolean {
     const workspace = this.store.data.workspaces[workspaceId];
-    return Boolean(canvasPath && workspace?.kind === "canvas" && workspace.representativeCanvasPath && workspace.representativeCanvasPath !== canvasPath);
+    return Boolean(canvasPath && workspace?.kind === "canvas" && workspace.ownerCanvasPath !== canvasPath);
   }
 
   canSaveCanvasToWorkspace(workspace: PaletteWorkspace, canvasPath: string): boolean {
-    return this.workspaceAcceptsCanvas(workspace, canvasPath) || this.isOtherCanvasRepresentativeWorkspace(workspace.id, canvasPath);
+    return Boolean(workspace && canvasPath);
   }
 
   confirmWorkspaceSave(workspaceId: string, onConfirm: () => void): void {
     const workspace = this.store.data.workspaces[workspaceId];
     if (!workspace) return;
-    if (!this.isOtherCanvasRepresentativeWorkspace(workspaceId)) { onConfirm(); return; }
+    if (!this.isForeignCanvasWorkspace(workspaceId)) { onConfirm(); return; }
     new ConfirmForeignCanvasWorkspaceModal(this.app, workspace.name, onConfirm).open();
   }
 
@@ -339,6 +335,41 @@ export default class CanvasPalettePlugin extends Plugin {
     return item.id;
   }
 
+  async importCurrentCanvasOutline(): Promise<void> {
+    const canvasPath = this.currentCanvasPath();
+    if (!canvasPath) { new Notice("Canvas를 먼저 열어 주세요."); return; }
+    new CanvasOutlineDirectionModal(this.app, (direction) => void this.createCanvasOutlineWorkspace(canvasPath, direction)).open();
+  }
+
+  private async createCanvasOutlineWorkspace(canvasPath: string, direction: "from-to" | "to-from"): Promise<void> {
+    const document = await this.canvas.readCanvasDocument(canvasPath);
+    if (!document || document.nodes.length === 0) { new Notice("가져올 Canvas 항목을 찾지 못했습니다."); return; }
+    const nodes = document.nodes.filter((node) => node.type !== "group");
+    const resolved = new Map<string, PaletteItem>();
+    for (const node of nodes) {
+      const item = this.store.linkedItemForNode(canvasPath, node.id) ?? await this.canvas.itemForCanvasNode(node, canvasPath);
+      if (item) resolved.set(node.id, item);
+    }
+    if (!resolved.size) { new Notice("Outliner로 만들 수 있는 Canvas 항목이 없습니다."); return; }
+    const parentByChild = new Map<string, string>(); let skipped = 0;
+    const wouldCycle = (parentId: string, childId: string): boolean => { let cursor: string | undefined = parentId; while (cursor) { if (cursor === childId) return true; cursor = parentByChild.get(cursor); } return false; };
+    for (const edge of document.edges) {
+      const parent = direction === "from-to" ? edge.fromNode : edge.toNode;
+      const child = direction === "from-to" ? edge.toNode : edge.fromNode;
+      if (!resolved.has(parent) || !resolved.has(child) || parent === child || parentByChild.has(child) || wouldCycle(parent, child)) { skipped++; continue; }
+      parentByChild.set(child, parent);
+    }
+    const children: Record<string, string[]> = {};
+    for (const [child, parent] of parentByChild) (children[resolved.get(parent)!.id] ??= []).push(resolved.get(child)!.id);
+    const roots = [...resolved.entries()].filter(([nodeId]) => !parentByChild.has(nodeId)).map(([, item]) => item.id);
+    const base = canvasPath.split("/").pop()?.replace(/\.canvas$/i, "") ?? "Canvas";
+    let name = `${base} 구조`; let suffix = 2;
+    while (Object.values(this.store.data.workspaces).some((workspace) => workspace.name === name)) name = `${base} 구조 ${suffix++}`;
+    const items = [...new Map([...resolved.values()].map((item) => [item.id, item])).values()];
+    this.store.createCanvasOutlineWorkspace(name, canvasPath, items, roots, children);
+    new Notice(`${name} Workspace를 만들었습니다.${skipped ? ` 연결 ${skipped}개는 순환·중복이라 제외했습니다.` : ""}`);
+  }
+
   createCollection(): void {
     const workspace = this.activeWorkspace();
     if (!workspace) return;
@@ -451,7 +482,7 @@ export default class CanvasPalettePlugin extends Plugin {
 
   private collectCanvasTextToWorkspace(text: string, canvasPath: string, textRange: { from: { line: number; ch: number }; to: { line: number; ch: number } }, workspaceId: string): void {
     const item = this.textItem(text, canvasPath, textRange);
-    const saved = this.isOtherCanvasRepresentativeWorkspace(workspaceId, canvasPath) ? this.store.addToWorkspaceAsUnlinked(workspaceId, item) : this.store.addToWorkspace(workspaceId, item);
+    const saved = this.isForeignCanvasWorkspace(workspaceId, canvasPath) ? this.store.addToWorkspaceAsUnlinked(workspaceId, item) : this.store.addToWorkspace(workspaceId, item);
     if (!saved) { new Notice("This Canvas Workspace only accepts items from its own Canvas."); return; }
     this.store.data.uiState.activeWorkspaceId = workspaceId;
     this.selectItem(item.id);
@@ -463,7 +494,7 @@ export default class CanvasPalettePlugin extends Plugin {
     const items = await this.canvas.collectSelection();
     if (items.length === 0) return;
     const candidates = items.map((item) => this.store.existingCollectedItem(item) ?? item);
-    const save = this.isOtherCanvasRepresentativeWorkspace(workspaceId) ? (item: PaletteItem) => this.store.addToWorkspaceAsUnlinked(workspaceId, item) : (item: PaletteItem) => this.store.addToWorkspace(workspaceId, item);
+    const save = this.isForeignCanvasWorkspace(workspaceId) ? (item: PaletteItem) => this.store.addToWorkspaceAsUnlinked(workspaceId, item) : (item: PaletteItem) => this.store.addToWorkspace(workspaceId, item);
     const unique = candidates.filter((item, index) => candidates.findIndex((candidate) => candidate.id === item.id) === index);
     const alreadySaved = unique.filter((item) => this.store.workspaceForItem(item.id)?.id === workspaceId);
     const accepted = unique.filter((item) => !alreadySaved.includes(item) && save(item));
@@ -830,5 +861,19 @@ export default class CanvasPalettePlugin extends Plugin {
     if (!existing) await leaf.setViewState({ type: SIDE_PALETTE_VIEW, active: true });
     this.app.workspace.revealLeaf(leaf);
     return leaf.view instanceof SidePaletteView ? leaf.view : null;
+  }
+}
+
+class CanvasOutlineDirectionModal extends Modal {
+  constructor(app: import("obsidian").App, private readonly onChoose: (direction: "from-to" | "to-from") => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette");
+    this.contentEl.createEl("h2", { text: "Canvas 구조를 Outliner로 가져오기" });
+    this.contentEl.createEl("p", { text: "Canvas의 연결선 방향을 부모 → 자식으로 읽을 방향을 고르세요. 원본 Canvas와 기존 Workspace는 바뀌지 않습니다." });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    const reverse = actions.createEl("button", { text: "도착점 → 출발점" });
+    const normal = actions.createEl("button", { text: "출발점 → 도착점", cls: "mod-cta" });
+    reverse.addEventListener("click", () => { this.close(); this.onChoose("to-from"); });
+    normal.addEventListener("click", () => { this.close(); this.onChoose("from-to"); });
   }
 }

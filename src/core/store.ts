@@ -49,6 +49,24 @@ export class PaletteStore {
     return workspace;
   }
 
+  createCanvasOutlineWorkspace(name: string, canvasPath: string, items: PaletteItem[], rootItemIds: string[], childItemIdsByParent: Record<string, string[]>): PaletteWorkspace {
+    const workspace = this.createWorkspace(name, "canvas", canvasPath, false);
+    const ids = [...new Set(items.map((item) => item.id))];
+    for (const item of items) {
+      const existing = this.existingCollectedItem(item);
+      if (existing) continue;
+      item.origin.workspaceId = workspace.id;
+      item.parentItemId = null;
+      item.childItemIds = [];
+      this.data.items[item.id] = item;
+    }
+    workspace.outlineImport = { itemIds: ids, rootItemIds: [...rootItemIds], childItemIdsByParent: Object.fromEntries(Object.entries(childItemIdsByParent).map(([id, children]) => [id, [...children]])), sourceCanvasPath: canvasPath };
+    workspace.modifiedAt = Date.now();
+    this.data.uiState.activeWorkspaceId = workspace.id;
+    this.changed();
+    return workspace;
+  }
+
   archiveWorkspace(): PaletteWorkspace { return this.ensureArchiveWorkspace(true); }
 
   private ensureArchiveWorkspace(notify: boolean): PaletteWorkspace {
@@ -826,6 +844,7 @@ export class PaletteStore {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace) return [];
     const ids = new Set(workspace.looseItemIds);
+    for (const id of workspace.outlineImport?.itemIds ?? []) ids.add(id);
     if (includeCollections) for (const collection of Object.values(this.data.collections)) if (collection.workspaceId === workspaceId) for (const id of collection.itemIds) ids.add(id);
     const addChildren = (id: string): void => { const item = this.data.items[id]; if (!item) return; for (const childId of item.childItemIds ?? []) { ids.add(childId); addChildren(childId); } };
     for (const id of [...ids]) addChildren(id);

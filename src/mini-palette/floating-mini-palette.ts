@@ -159,7 +159,7 @@ export class FloatingMiniPalette {
     importButton.addEventListener("click", () => {
       const select = bottom.querySelector("select"); if (!select) return;
       this.plugin.confirmWorkspaceSave(select.value, () => {
-        const result = this.plugin.store.importPending(select.value, this.collectSelectedIds(), this.plugin.isOtherCanvasRepresentativeWorkspace(select.value));
+        const result = this.plugin.store.importPending(select.value, this.collectSelectedIds(), this.plugin.isForeignCanvasWorkspace(select.value));
         if (result.rejected.length > 0) new Notice("Some items could not be imported because the selected Workspace is unavailable.");
         if (result.alreadySaved.length > 0) this.plugin.showAlreadySavedToWorkspace(select.value, result.imported.length, result.alreadySaved.length);
         else if (result.imported.length > 0) new Notice(`${result.imported.length} item${result.imported.length === 1 ? "" : "s"} imported.`);

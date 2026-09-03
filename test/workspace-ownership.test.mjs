@@ -91,7 +91,7 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   assert.match(main, /Set as representative/);
   assert.match(main, /representativePath === currentPath \? "★ " : "☆ "/);
   assert.match(main, /ConfirmForeignCanvasWorkspaceModal/);
-  assert.match(main, /isOtherCanvasRepresentativeWorkspace/);
+  assert.match(main, /isForeignCanvasWorkspace/);
   assert.match(main, /addToWorkspaceAsUnlinked/);
   assert.match(main, /const alreadySaved = unique\.filter/);
   assert.match(main, /AlreadySavedToWorkspaceModal/);

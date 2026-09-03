@@ -19,7 +19,7 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
 }
 
 export type MarkdownSourceStatus = "deleted";
-export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; dragItemIds?: string[]; miniCollect?: boolean; currentFace?: CardFace; unlinked?: boolean; markdownSourceStatus?: MarkdownSourceStatus | null; onMarkdownSourceStatus?: (event: MouseEvent) => void; onToggleFace?: (face: CardFace) => void; titleEditing?: boolean; onStartTitleEdit?: () => void; onCommitTitle?: (title: string) => void; onCancelTitleEdit?: () => void; onStartBodyEdit?: () => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
+export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: boolean; compact?: boolean; draggable?: boolean; dragItemIds?: string[]; miniCollect?: boolean; currentFace?: CardFace; unlinked?: boolean; markdownSourceStatus?: MarkdownSourceStatus | null; onMarkdownSourceStatus?: (event: MouseEvent) => void; onToggleFace?: (face: CardFace) => void; titleEditing?: boolean; onStartTitleEdit?: () => void; onCommitTitle?: (title: string) => void; onCancelTitleEdit?: () => void; onStartBodyEdit?: () => void; onEditMenu?: (event: MouseEvent, anchor: HTMLElement) => void; onSelect: (event: MouseEvent | KeyboardEvent) => void; onOpen?: () => void; onLocate?: () => void; onContextMenu?: (event: MouseEvent) => void; }
 
 export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group" && item.type !== "link"; }
 
@@ -55,7 +55,7 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
     const label = header.createSpan({ cls: "cp-label", text: item.label });
     if (item.labelColor) label.style.setProperty("--cp-label-color", item.labelColor);
   }
-  if (unlinked || options.onToggleFace || options.markdownSourceStatus || options.onStartTitleEdit || options.onStartBodyEdit) {
+  if (unlinked || options.onToggleFace || options.markdownSourceStatus || options.onEditMenu) {
     const actions = header.createSpan({ cls: "cp-item__header-actions" });
     if (options.markdownSourceStatus) {
       const source = options.markdownSourceStatus;
@@ -79,13 +79,9 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
       flip.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); options.onToggleFace?.(face === "front" ? "back" : "front"); });
       flip.addEventListener("dblclick", (event) => event.stopPropagation());
     }
-    if (options.onStartTitleEdit && (item.type === "card" || item.type === "markdown")) {
-      const editTitle = actions.createEl("button", { cls: "clickable-icon cp-item-edit-title", attr: { type: "button", "aria-label": "제목 편집", title: "제목 편집" } }); setIcon(editTitle, "pencil");
-      editTitle.addEventListener("pointerdown", (event) => event.stopPropagation()); editTitle.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); options.onStartTitleEdit?.(); }); editTitle.addEventListener("dblclick", (event) => event.stopPropagation());
-    }
-    if (options.onStartBodyEdit && face === "front" && (item.type === "card" || item.type === "markdown")) {
-      const editBody = actions.createEl("button", { cls: "clickable-icon cp-item-edit-body", attr: { type: "button", "aria-label": "본문 편집", title: "본문 편집" } }); setIcon(editBody, "file-pen-line");
-      editBody.addEventListener("pointerdown", (event) => event.stopPropagation()); editBody.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); options.onStartBodyEdit?.(); }); editBody.addEventListener("dblclick", (event) => event.stopPropagation());
+    if (options.onEditMenu && (item.type === "card" || item.type === "markdown")) {
+      const edit = actions.createEl("button", { cls: "clickable-icon cp-item-edit", attr: { type: "button", "aria-label": "편집", title: "편집" } }); setIcon(edit, "pencil");
+      edit.addEventListener("pointerdown", (event) => event.stopPropagation()); edit.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); options.onEditMenu?.(event, edit); }); edit.addEventListener("dblclick", (event) => event.stopPropagation());
     }
   }
   const body = card.createDiv({ cls: "cp-item__body" });
