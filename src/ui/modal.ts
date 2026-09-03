@@ -47,6 +47,22 @@ export class TextPromptModal extends Modal {
   onClose(): void { this.contentEl.empty(); }
 }
 
+export class OutlineStructureRuleModal extends Modal {
+  private rule: "edge" | "position" = "edge";
+  constructor(app: App, private readonly onSubmit: (rule: "edge" | "position") => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-outline-structure-modal");
+    this.contentEl.createEl("h2", { text: "Outliner 구조를 읽는 기준" });
+    this.contentEl.createEl("p", { text: "선택한 Canvas 노드의 위·아래 관계를 정합니다." });
+    for (const [rule, label, detail] of [["edge", "화살표 방향으로 읽기", "A → B이면 A 아래에 B를 표시"], ["position", "화면 위치로 읽기", "왼쪽·위에 있는 노드를 상위로 표시"]] as const) {
+      const row = this.contentEl.createEl("label", { cls: "cp-outline-structure-modal__choice" }); const radio = row.createEl("input", { attr: { type: "radio", name: "outline-structure-rule" } }); radio.checked = this.rule === rule;
+      row.createSpan({ text: label }); row.createEl("small", { text: detail }); radio.addEventListener("change", () => { this.rule = rule; });
+    }
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" }); actions.createEl("button", { text: "취소" }).addEventListener("click", () => this.close()); actions.createEl("button", { text: "구조 추가", cls: "mod-cta" }).addEventListener("click", () => { this.onSubmit(this.rule); this.close(); });
+  }
+  onClose(): void { this.contentEl.empty(); }
+}
+
 export class CanvasWorkspaceModal extends Modal {
   private value = "";
   constructor(app: App, private readonly canvasName: string, private readonly onSubmit: (value: string) => void) { super(app); }

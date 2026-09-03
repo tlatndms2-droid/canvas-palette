@@ -32,7 +32,7 @@ test("Side item menu uses focused metadata, move, and Find link actions", async 
   assert.match(source, /setTitle\("Export collection to Canvas"\)[\s\S]{0,160}exportCollectionSubtree\(collection\.id\)/);
   assert.match(source, /this\.mountOutlineDropTarget\(rootRow, workspaceId, null\)/);
   assert.match(source, /selected\.includes\(itemId\) \? selected : \[itemId\]/);
-  assert.match(source, /this\.plugin\.store\.moveCollection\(draggedCollectionId, collectionId\)/);
+  assert.match(source, /this\.plugin\.store\.moveCollection\(draggedCollectionId, zone === "inside" \? collectionId : collectionParentId/);
   assert.match(main, /new FindLinkModal\(this\.app, item\.displayTitle, locations/);
   assert.match(modal, /"Tags, label & caption"/);
   assert.match(modal, /cls: "cp-tag-label-caption"/);

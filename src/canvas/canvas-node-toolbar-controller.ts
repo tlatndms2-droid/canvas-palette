@@ -10,6 +10,7 @@ interface CanvasNodeToolbarActions {
   editMetadata: (nodes: CanvasRuntimeNodeLike[]) => void;
   collectToMini: () => void;
   saveToSide: (anchor: HTMLElement) => void;
+  exportStructure: (anchor: HTMLElement) => void;
   supportsFaces: (node: CanvasRuntimeNodeLike) => boolean;
   facesEnabled: (canvasPath: string, nodeId: string) => boolean;
   enableFaces: (canvasPath: string, nodeId: string) => void;
@@ -89,7 +90,7 @@ export class CanvasNodeToolbarController {
     const selectionKey = `${nodes.map((node) => this.nodeId(node)).sort().join("|")}:${supportsFaces ? "eligible" : "excluded"}:${facesEnabled ? "faces" : "plain"}:${linked ? "linked" : "local"}`;
     const currentButtons = menuEl.querySelectorAll(":scope > .cp-canvas-toolbar-action");
     const separator = menuEl.querySelector(":scope > .cp-canvas-toolbar-separator");
-    const expectedButtons = 3 + (singleNodeId && supportsFaces ? 1 : 0) + (linked ? 1 : 0);
+    const expectedButtons = 4 + (singleNodeId && supportsFaces ? 1 : 0) + (linked ? 1 : 0);
     if (nodes.length === 0) { this.clear(menuEl); return; }
     if (menuEl.dataset.cpToolbarSelectionKey === selectionKey && currentButtons.length === expectedButtons && separator) return;
     this.clear(menuEl);
@@ -98,6 +99,7 @@ export class CanvasNodeToolbarController {
     this.button(menuEl, "tags", "Edit Palette Metadata", () => this.actions.editMetadata(nodes));
     this.button(menuEl, "inbox", "Collect to Mini Palette", () => this.actions.collectToMini());
     this.button(menuEl, "panel-right", "Save directly to Side Palette", (button) => this.actions.saveToSide(button));
+    this.button(menuEl, "git-branch", "선택한 구조를 Side Palette로 내보내기", (button) => this.actions.exportStructure(button));
     if (singleNodeId && supportsFaces && !facesEnabled) this.button(menuEl, "refresh-cw", "Enable Front / Back", () => this.actions.enableFaces(context.file.path, singleNodeId));
     if (singleNodeId && supportsFaces && facesEnabled) this.button(menuEl, "circle-off", "Remove Front / Back", () => this.actions.disableFaces(context.file.path, singleNodeId));
     if (linked) this.button(menuEl, "unlink", "Unlink from Palette", () => this.actions.unlink(context.file.path, singleNodeId));

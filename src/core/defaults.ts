@@ -11,7 +11,7 @@ export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
 };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 27,
+  schemaVersion: 28,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4, canvasCaptionFontSize: 11 },
   items: {},
   workspaces: {},
@@ -37,6 +37,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     kind: workspace.kind ?? "general",
     ownerCanvasPath: workspace.ownerCanvasPath ?? null,
     representativeCanvasPath: workspace.representativeCanvasPath ?? null,
+    outlineStructures: workspace.outlineStructures ?? [],
     sideLayout: { ...DEFAULT_SIDE_LAYOUT, ...workspace.sideLayout, densityLevel: workspace.sideLayout?.densityLevel ?? legacyDensity(workspace.sideLayout?.viewMode, rawSettings?.cardHeight) },
     createdAt: workspace.createdAt ?? migratedAt,
     modifiedAt: workspace.modifiedAt ?? workspace.createdAt ?? migratedAt
@@ -46,7 +47,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, canvasCaptionFontSize: captionFontSize(rawSettings?.canvasCaptionFontSize), labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 27,
+    schemaVersion: 28,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
       const repairedType = item.type === "markdown" && !item.origin?.filePath ? "card" : item.type;
       const supportsFaces = repairedType !== "group" && repairedType !== "link";

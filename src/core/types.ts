@@ -108,7 +108,11 @@ export interface PaletteWorkspace {
   sideLayout: SideLayoutState;
   createdAt: number;
   modifiedAt: number;
+  /** Canvas selections shown as additional Outliner trees. They do not change an item's normal folder. */
+  outlineStructures?: OutlineStructure[];
 }
+
+export interface OutlineStructure { id: string; canvasPath: string; rule: "edge" | "position"; rootItemIds: string[]; childItemIds: Record<string, string[]>; itemIds: string[]; }
 
 export interface PaletteSettings {
   theme: PaletteTheme;

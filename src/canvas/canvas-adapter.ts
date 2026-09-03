@@ -32,6 +32,7 @@ export interface CanvasRuntimeNodeLike {
 interface CanvasViewLike { getViewType?: () => string; file?: TFile; containerEl?: HTMLElement; canvas?: CanvasRuntimeLike; }
 export interface CanvasContext { file: TFile; view: CanvasViewLike; runtime: CanvasRuntimeLike; }
 export interface CanvasExportEntry { id: string; name: string; parentId: string | null; item?: PaletteItem; }
+export interface CanvasOutlineSelection { canvasPath: string; items: PaletteItem[]; nodeIds: string[]; edges: Array<{ fromNode: string; toNode: string }>; positions: Record<string, { x: number; y: number }>; }
 export interface ExportBundle {
   nodes: CanvasNodeSnapshot[];
   edges: CanvasEdgeSnapshot[];
@@ -444,6 +445,23 @@ export class CanvasAdapter {
 
   canvasFiles(): TFile[] {
     return this.app.vault.getFiles().filter((file) => file.extension.toLowerCase() === "canvas").sort((left, right) => left.path.localeCompare(right.path, undefined, { numeric: true }));
+  }
+
+  async collectOutlineSelection(): Promise<CanvasOutlineSelection | null> {
+    const context = this.activeContext();
+    if (!context) { new Notice("Open a Canvas before exporting its structure."); return null; }
+    const document = await this.read(context.file);
+    const nodeIds = this.runtimeSelectionIds(context.view);
+    if (nodeIds.length === 0) { new Notice("Select one or more Canvas items first."); return null; }
+    const selected = new Set(nodeIds);
+    const nodes = document.nodes.filter((node) => selected.has(node.id));
+    return {
+      canvasPath: context.file.path,
+      items: await this.collectIds(document, context.file.path, nodeIds),
+      nodeIds,
+      edges: document.edges.filter((edge) => selected.has(edge.fromNode) && selected.has(edge.toNode)).map((edge) => ({ fromNode: edge.fromNode, toNode: edge.toNode })),
+      positions: Object.fromEntries(nodes.map((node) => [node.id, { x: node.x, y: node.y }]))
+    };
   }
 
 

@@ -16,7 +16,7 @@ import { PreviewService } from "./preview/preview-service";
 import { SearchService } from "./search/search-service";
 import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
-import { AlreadySavedToWorkspaceModal, CanvasTargetModal, CanvasWorkspaceModal, ConfirmDeleteModal, ConfirmExportDuplicateModal, ConfirmForeignCanvasWorkspaceModal, DeletedCanvasWorkspacesModal, ItemEditorModal, MetadataEditorModal, TextPromptModal } from "./ui/modal";
+import { AlreadySavedToWorkspaceModal, CanvasTargetModal, CanvasWorkspaceModal, ConfirmDeleteModal, ConfirmExportDuplicateModal, ConfirmForeignCanvasWorkspaceModal, DeletedCanvasWorkspacesModal, ItemEditorModal, MetadataEditorModal, OutlineStructureRuleModal, TextPromptModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 import { FindLinkModal } from "./ui/find-link-modal";
 import { WorkspaceExplorerModal } from "./ui/workspace-explorer-modal";
@@ -43,6 +43,7 @@ export default class CanvasPalettePlugin extends Plugin {
     editMetadata: (nodes) => this.editCanvasNodesMetadata(nodes),
     collectToMini: () => void this.collectCanvasSelection(),
     saveToSide: (anchor) => this.saveCanvasSelectionFromToolbar(anchor),
+    exportStructure: () => this.exportCanvasSelectionStructure(),
     supportsFaces: (node) => this.canvas.supportsFrontBack(node),
     facesEnabled: (canvasPath, nodeId) => this.store.getCanvasNodeMetadata(canvasPath, nodeId)?.facesEnabled ?? false,
     enableFaces: (canvasPath, nodeId) => {
@@ -332,7 +333,44 @@ export default class CanvasPalettePlugin extends Plugin {
     this.store.addPending(item);
     if (workspace) this.store.importPending(workspace.id, [item.id]);
     this.selectItem(item.id);
+    if (workspace) (await this.activateSidePalette())?.revealItem(item.id);
     return item.id;
+  }
+
+  private async exportCanvasSelectionStructure(): Promise<void> {
+    const workspace = this.activeWorkspace();
+    if (!workspace) { new Notice("Side Palette에서 Workspace를 먼저 선택하세요."); return; }
+    const selection = await this.canvas.collectOutlineSelection();
+    if (!selection) return;
+    new OutlineStructureRuleModal(this.app, (rule) => void this.saveCanvasSelectionStructure(workspace.id, selection, rule)).open();
+  }
+
+  private async saveCanvasSelectionStructure(workspaceId: string, selection: Awaited<ReturnType<CanvasAdapter["collectOutlineSelection"]>>, rule: "edge" | "position"): Promise<void> {
+    if (!selection) return;
+    const ids = new Set(selection.items.map((item) => item.origin.canvasNodeId).filter((id): id is string => Boolean(id)));
+    const edges = selection.edges.filter((edge) => ids.has(edge.fromNode) && ids.has(edge.toNode)).map((edge) => {
+      if (rule === "edge") return edge;
+      const from = selection.positions[edge.fromNode]; const to = selection.positions[edge.toNode];
+      return !from || !to || from.y < to.y || (from.y === to.y && from.x <= to.x) ? edge : { fromNode: edge.toNode, toNode: edge.fromNode };
+    });
+    const children: Record<string, string[]> = {}; const parents = new Set<string>();
+    const reaches = (start: string, goal: string, seen = new Set<string>()): boolean => {
+      if (start === goal) return true; if (seen.has(start)) return false; seen.add(start);
+      return (children[start] ?? []).some((child) => reaches(child, goal, seen));
+    };
+    for (const edge of edges) {
+      if (edge.fromNode === edge.toNode || reaches(edge.toNode, edge.fromNode)) continue;
+      const row = children[edge.fromNode] ??= [];
+      if (!row.includes(edge.toNode)) row.push(edge.toNode);
+      parents.add(edge.toNode);
+    }
+    const roots = [...ids].filter((id) => !parents.has(id));
+    const result = this.store.saveOutlineStructure(workspaceId, { canvasPath: selection.canvasPath, rule, roots, children, items: selection.items });
+    if (result === "missing") { new Notice("선택한 Workspace를 찾을 수 없습니다."); return; }
+    this.store.data.uiState.activeWorkspaceId = workspaceId; this.store.changed();
+    await this.openSidePalette();
+    if (result === "duplicate") new Notice("같은 구조가 이미 Outliner에 있습니다.");
+    else new Notice("선택한 Canvas 구조를 Side Palette에 추가했습니다.");
   }
 
 
