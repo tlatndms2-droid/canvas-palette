@@ -99,8 +99,7 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   assert.match(main, /alreadySaved\.length > 0/);
   assert.match(mini, /confirmWorkspaceSave\(select\.value/);
   assert.match(mini, /result\.alreadySaved\.length > 0/);
-  assert.match(main, /const changedCanvas = context\.file\.path !== this\.lastCanvasPath/);
-  assert.match(main, /if \(changedCanvas\) this\.selectRepresentativeWorkspace\(context\.file\.path\)/);
+  assert.doesNotMatch(main, /selectRepresentativeWorkspace/);
   assert.match(main, /representativeWorkspaceForCanvas\(canvasPath\)/);
   assert.doesNotMatch(main, /ensureCanvasWorkspace\(canvasPath/);
   assert.match(main, /activeContext\(\)\?\.file\.path \?\? this\.lastCanvasPath/);
@@ -128,14 +127,14 @@ test("Workspace Explorer prioritizes the current Canvas and offers search, dates
   assert.match(explorer, /type: "date"/);
   assert.match(explorer, /"icons"[\s\S]*"list"[\s\S]*"details"/);
   assert.match(explorer, /Created: newest/);
-  assert.match(render, /Number\(bCurrent\) - Number\(aCurrent\)/);
+  assert.match(render, /현재 Canvas Workspace/);
   assert.match(styles, /\.cp-workspace-explorer__body\.is-icons/);
   assert.match(styles, /\.cp-workspace-explorer__columns/);
   assert.match(styles, /\.cp-current-canvas-empty/);
   assert.match(styles, /\.cp-canvas-workspace-modal/);
 });
 
-test("deleting a Workspace preserves its Palette items in Mini Palette storage", async () => {
+test("deleting a Workspace moves its Palette items to Archive", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
   const target = store.createWorkspace("Delete me", "general");
@@ -143,8 +142,24 @@ test("deleting a Workspace preserves its Palette items in Mini Palette storage",
   store.addToWorkspace(target.id, item("preserved", "EP01.canvas"));
   assert.equal(store.removeWorkspace(target.id), true);
   assert.equal(store.data.items.preserved.displayTitle, "preserved");
-  assert.equal(store.data.items.preserved.origin.workspaceId, undefined);
-  assert.ok(store.data.pendingItemIds.includes("preserved"));
+  assert.equal(store.data.items.preserved.origin.workspaceId, "canvas-palette-archive");
+  assert.ok(store.archiveWorkspace().looseItemIds.includes("preserved"));
+  await cleanup();
+});
+
+test("Canvas Workspace conversion and Archive snapshots preserve the source item", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  const workspace = store.createWorkspace("Canvas work", "canvas", "EP01.canvas", true);
+  store.addToWorkspace(workspace.id, item("original", "EP01.canvas"));
+  assert.equal(store.makeWorkspaceGeneral(workspace.id), true);
+  assert.equal(workspace.kind, "general");
+  assert.equal(workspace.ownerCanvasPath, null);
+  const [copy] = store.cloneItemsToArchive(["original"]);
+  assert.notEqual(copy.id, "original");
+  assert.equal(copy.archivedFromItemId, "original");
+  assert.equal(copy.origin.workspaceId, "canvas-palette-archive");
+  assert.deepEqual(copy.canvasPlacements, []);
   await cleanup();
 });
 

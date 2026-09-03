@@ -140,13 +140,15 @@ export function renderPreviewInCard(service: PreviewService, parent: HTMLElement
 export function workspaceSelect(plugin: CanvasPalettePlugin, parent: HTMLElement, value: string | null, onChange: (id: string) => void): HTMLSelectElement {
   const select = parent.createEl("select", { cls: "dropdown cp-workspace-select" });
   const currentCanvas = plugin.currentCanvasPath();
-  const workspaces = Object.values(plugin.store.data.workspaces).sort((a, b) => {
-    const aCurrent = a.kind === "canvas" && a.ownerCanvasPath === currentCanvas;
-    const bCurrent = b.kind === "canvas" && b.ownerCanvasPath === currentCanvas;
-    return Number(bCurrent) - Number(aCurrent) || a.name.localeCompare(b.name, undefined, { numeric: true });
-  });
-  for (const workspace of workspaces) {
-    const option = select.createEl("option", { text: plugin.workspaceDisplayName(workspace), value: workspace.id });
+  const active = value ? plugin.store.data.workspaces[value] : undefined;
+  const current = Object.values(plugin.store.data.workspaces).filter((workspace) => workspace.kind === "canvas" && workspace.ownerCanvasPath === currentCanvas).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  if (active && !current.some((workspace) => workspace.id === active.id)) {
+    const group = select.createEl("optgroup", { attr: { label: "현재 선택" } });
+    const option = group.createEl("option", { text: plugin.workspaceDisplayName(active), value: active.id }); option.selected = true;
+  }
+  const group = select.createEl("optgroup", { attr: { label: currentCanvas ? "현재 Canvas Workspace" : "Canvas를 열어 선택" } });
+  for (const workspace of current) {
+    const option = group.createEl("option", { text: plugin.workspaceDisplayName(workspace), value: workspace.id });
     option.selected = workspace.id === value;
   }
   select.addEventListener("change", () => onChange(select.value));

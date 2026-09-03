@@ -3,7 +3,7 @@ import type CanvasPalettePlugin from "../main";
 import type { PaletteWorkspace, WorkspaceExplorerSort, WorkspaceExplorerViewMode } from "../core/types";
 import { TextPromptModal } from "./modal";
 
-type WorkspaceFilter = "all" | "canvas" | "general";
+type WorkspaceFilter = "all" | "canvas" | "general" | "archive";
 
 export class WorkspaceExplorerModal extends Modal {
   private query = "";
@@ -37,7 +37,7 @@ export class WorkspaceExplorerModal extends Modal {
     if (restoreSearch) window.requestAnimationFrame(() => { search.focus(); search.setSelectionRange(cursor, cursor); });
 
     const controls = toolbar.createDiv({ cls: "cp-workspace-explorer__controls" });
-    for (const [value, label] of [["all", "All"], ["canvas", "Canvas"], ["general", "General"]] as const) {
+    for (const [value, label] of [["all", "All"], ["canvas", "Canvas"], ["general", "General"], ["archive", "Archive"]] as const) {
       const button = controls.createEl("button", { text: label, cls: this.filter === value ? "is-active" : "" });
       button.addEventListener("click", () => { this.filter = value; this.render(); });
     }
@@ -61,9 +61,11 @@ export class WorkspaceExplorerModal extends Modal {
     const results = this.filteredWorkspaces();
     const currentCanvas = this.plugin.currentCanvasPath();
     const current = currentCanvas ? results.filter((workspace) => workspace.kind === "canvas" && workspace.ownerCanvasPath === currentCanvas) : [];
-    const other = results.filter((workspace) => !current.includes(workspace));
+    const archive = results.filter((workspace) => workspace.kind === "archive");
+    const other = results.filter((workspace) => !current.includes(workspace) && !archive.includes(workspace));
     const body = this.contentEl.createDiv({ cls: `cp-workspace-explorer__body is-${this.viewState().viewMode}` });
     if (currentCanvas) this.renderSection(body, `Current Canvas · ${this.baseName(currentCanvas)}`, current, true);
+    this.renderSection(body, "Archive", archive, true);
     this.renderSection(body, currentCanvas ? "Other Workspaces" : "Workspaces", other, false);
     if (results.length === 0) body.createDiv({ cls: "cp-empty", text: "No matching Workspaces." });
 
@@ -96,13 +98,13 @@ export class WorkspaceExplorerModal extends Modal {
     const active = this.plugin.store.data.uiState.activeWorkspaceId === workspace.id;
     const representative = workspace.kind === "canvas" && workspace.ownerCanvasPath === workspace.representativeCanvasPath;
     const row = parent.createDiv({ cls: `cp-workspace-file${active ? " is-selected" : ""}`, attr: { tabindex: "0", role: "button" } });
-    const icon = row.createSpan({ cls: "cp-workspace-file__icon" }); setIcon(icon, workspace.kind === "canvas" ? "folder-kanban" : "folder");
+    const icon = row.createSpan({ cls: "cp-workspace-file__icon" }); setIcon(icon, workspace.kind === "canvas" ? "folder-kanban" : workspace.kind === "archive" ? "archive" : "folder");
     const name = row.createDiv({ cls: "cp-workspace-file__name" });
     const label = name.createDiv(); if (representative) { const star = label.createSpan({ cls: "cp-workspace-file__star" }); setIcon(star, "star"); } label.createSpan({ text: workspace.name });
     if (this.viewState().viewMode === "icons") name.createSpan({ cls: "cp-workspace-file__date", text: this.formatDate(workspace.modifiedAt) });
     const meta = row.createDiv({ cls: "cp-workspace-file__meta" });
-    meta.createSpan({ cls: "cp-workspace-file__badge", text: workspace.kind === "canvas" ? (representative ? "Representative" : "Canvas") : "General" });
-    meta.createSpan({ text: workspace.kind === "canvas" ? `소속 Canvas · ${this.baseName(workspace.ownerCanvasPath ?? "")}` : "All Canvases" });
+    meta.createSpan({ cls: "cp-workspace-file__badge", text: workspace.kind === "canvas" ? (representative ? "Representative" : "Canvas") : workspace.kind === "archive" ? "Archive" : "General" });
+    meta.createSpan({ text: workspace.kind === "canvas" ? `소속 Canvas · ${this.baseName(workspace.ownerCanvasPath ?? "")}` : workspace.kind === "archive" ? "Independent snapshots" : "All Canvases" });
     row.createSpan({ cls: "cp-workspace-file__modified", text: this.formatDate(workspace.modifiedAt) });
     const more = row.createEl("button", { cls: "cp-icon-button cp-workspace-file__more", attr: { title: "Workspace actions", "aria-label": "Workspace actions" } }); setIcon(more, "more-vertical");
     const open = (): void => { this.plugin.store.data.uiState.activeWorkspaceId = workspace.id; this.plugin.store.changed(); };
@@ -121,8 +123,8 @@ export class WorkspaceExplorerModal extends Modal {
     }));
     menu.addItem((item) => item.setTitle("Rename").setIcon("pencil").onClick(() => new TextPromptModal(this.app, "Rename Workspace", workspace.name, (name) => this.plugin.store.renameWorkspace(workspace.id, name), "Workspace name").open()));
     menu.addSeparator();
-    menu.addItem((item) => item.setTitle("Delete").setIcon("trash-2").setDisabled(Object.keys(this.plugin.store.data.workspaces).length <= 1).onClick(() => new ConfirmDeleteWorkspaceModal(this.app, workspace.name, this.plugin.store.itemsForWorkspace(workspace.id).length, () => {
-      if (this.plugin.store.removeWorkspace(workspace.id)) new Notice(`${workspace.name} deleted. Its Palette items remain in Mini Palette storage.`);
+    menu.addItem((item) => item.setTitle("Delete").setIcon("trash-2").setDisabled(workspace.kind === "archive").onClick(() => new ConfirmDeleteWorkspaceModal(this.app, workspace.name, this.plugin.store.itemsForWorkspace(workspace.id).length, () => {
+      if (this.plugin.store.removeWorkspace(workspace.id)) new Notice(`${workspace.name} deleted. Its Palette items moved to Archive.`);
     }).open()));
     const rect = anchor.getBoundingClientRect(); menu.showAtPosition({ x: rect.right, y: rect.bottom + 2 });
   }

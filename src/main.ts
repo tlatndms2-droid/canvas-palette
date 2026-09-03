@@ -15,13 +15,14 @@ import { PreviewService } from "./preview/preview-service";
 import { SearchService } from "./search/search-service";
 import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
-import { AlreadySavedToWorkspaceModal, CanvasTargetModal, CanvasWorkspaceModal, ConfirmDeleteModal, ConfirmExportDuplicateModal, ConfirmForeignCanvasWorkspaceModal, ItemEditorModal, MetadataEditorModal, TextPromptModal } from "./ui/modal";
+import { AlreadySavedToWorkspaceModal, CanvasTargetModal, CanvasWorkspaceModal, ConfirmDeleteModal, ConfirmExportDuplicateModal, ConfirmForeignCanvasWorkspaceModal, DeletedCanvasWorkspacesModal, ItemEditorModal, MetadataEditorModal, TextPromptModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 import { FindLinkModal } from "./ui/find-link-modal";
 import { WorkspaceExplorerModal } from "./ui/workspace-explorer-modal";
 
 export default class CanvasPalettePlugin extends Plugin {
   private readonly canvasSyncTimers = new Map<string, number>();
+  private readonly cleanupDialogs = new Set<string>();
   private lastCanvasPath: string | null = null;
   store = new PaletteStore(this);
   search = new SearchService();
@@ -91,14 +92,20 @@ export default class CanvasPalettePlugin extends Plugin {
       if (file.extension.toLowerCase() === "canvas") this.scheduleCanvasSync(file);
       else if (file.extension.toLowerCase() === "md") void this.refreshMarkdownSource(file);
     }));
-    this.registerEvent(this.app.vault.on("delete", (file) => this.store.reconcileDeletedFile(file.path, file instanceof TFolder)));
+    this.registerEvent(this.app.vault.on("delete", (file) => {
+      this.store.reconcileDeletedFile(file.path, file instanceof TFolder);
+      if (file instanceof TFile && file.extension.toLowerCase() === "canvas") this.handleDeletedCanvas(file.path);
+      if (file instanceof TFolder) {
+        const prefix = `${file.path}/`;
+        for (const workspace of Object.values(this.store.data.workspaces)) if (workspace.kind === "canvas" && workspace.ownerCanvasPath?.startsWith(prefix)) this.handleDeletedCanvas(workspace.ownerCanvasPath);
+      }
+    }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => void this.handleVaultRename(file, oldPath)));
     this.registerEvent(this.app.vault.on("create", (file) => { if (file instanceof TFile && file.extension.toLowerCase() === "md") void this.reconnectMovedMarkdown(file); }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
       const context = this.canvas.activeContext();
       if (!this.exportPlacement.isFor(context)) this.exportPlacement.cancel();
       if (context) {
-        const changedCanvas = context.file.path !== this.lastCanvasPath;
         this.lastCanvasPath = context.file.path;
         if (this.store.data.uiState.lastCanvasPath !== context.file.path) {
           this.store.data.uiState.lastCanvasPath = context.file.path;
@@ -106,7 +113,6 @@ export default class CanvasPalettePlugin extends Plugin {
         }
         this.miniPalette.mount();
         this.scheduleCanvasSync(context.file);
-        if (changedCanvas) this.selectRepresentativeWorkspace(context.file.path);
       }
       else this.miniPalette.destroy();
       this.canvasMetadata.refreshSoon();
@@ -120,9 +126,11 @@ export default class CanvasPalettePlugin extends Plugin {
       this.store.data.uiState.lastCanvasPath = initialCanvas.file.path;
       this.miniPalette.mount();
       this.scheduleCanvasSync(initialCanvas.file);
-      this.selectRepresentativeWorkspace(initialCanvas.file.path);
     }
     this.canvasMetadata.refreshSoon();
+    window.setTimeout(() => {
+      for (const path of this.store.data.uiState.pendingCanvasWorkspaceCleanup) if (!this.app.vault.getAbstractFileByPath(path)) this.handleDeletedCanvas(path);
+    }, 0);
   }
 
   async onunload(): Promise<void> { for (const timer of this.canvasSyncTimers.values()) window.clearTimeout(timer); this.canvasSyncTimers.clear(); this.exportPlacement.cancel(); this.canvasToolbar.destroy(); this.canvasMetadata.destroy(); this.miniPalette.destroy(); await this.editorManager.close(); await this.store.flush(); }
@@ -170,7 +178,11 @@ export default class CanvasPalettePlugin extends Plugin {
     const canvasPath = this.currentCanvasPath();
     if (!canvasPath) { new Notice("Open a Canvas first."); return; }
     const workspace = this.store.representativeWorkspaceForCanvas(canvasPath);
-    if (!workspace) { this.openCanvasWorkspaceCreator(canvasPath); return; }
+    if (!workspace) {
+      const candidates = this.store.canvasWorkspaces(canvasPath);
+      if (candidates.length) { this.store.setRepresentativeWorkspace(candidates[0].id, canvasPath); this.store.data.uiState.activeWorkspaceId = candidates[0].id; this.store.changed(); return; }
+      this.openCanvasWorkspaceCreator(canvasPath); return;
+    }
     this.store.data.uiState.activeWorkspaceId = workspace.id;
     this.store.changed();
   }
@@ -206,6 +218,69 @@ export default class CanvasPalettePlugin extends Plugin {
   }
 
   openWorkspaceExplorer(): void { new WorkspaceExplorerModal(this.app, this).open(); }
+
+  openArchive(): void { this.store.data.uiState.activeWorkspaceId = this.store.archiveWorkspace().id; this.store.changed(); }
+
+  async archiveItems(itemIds: string[]): Promise<void> {
+    const sources = itemIds.map((id) => this.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item));
+    if (!sources.length) return;
+    const filePaths = new Set<string>();
+    for (const item of sources) {
+      if ((item.type === "markdown" || item.type === "image") && item.origin.filePath) filePaths.add(item.origin.filePath);
+      for (const node of item.group?.nodes ?? []) if (node.type === "file" && typeof node.file === "string") filePaths.add(node.file);
+    }
+    for (const path of filePaths) if (!(this.app.vault.getAbstractFileByPath(path) instanceof TFile)) { new Notice(`Archive copy failed: ${path} is unavailable.`); return; }
+    const archiveId = createId("snapshot");
+    const folder = normalizePath(`Canvas Palette Archive/${archiveId}`);
+    const fileMap = new Map<string, string>();
+    let index = 0;
+    for (const path of filePaths) {
+      const file = this.app.vault.getAbstractFileByPath(path) as TFile;
+      fileMap.set(path, normalizePath(`${folder}/${String(++index).padStart(2, "0")}-${file.name}`));
+    }
+    const copies = this.store.cloneItemsToArchive(itemIds);
+    const created: string[] = [];
+    try {
+      await this.ensureVaultFolder(folder);
+      for (const [source, destination] of fileMap) { await this.app.vault.adapter.copy(source, destination); created.push(destination); }
+      for (const copy of copies) {
+        const source = copy.archivedFromItemId ? this.store.data.items[copy.archivedFromItemId] : undefined;
+        if (source?.origin.filePath && fileMap.has(source.origin.filePath)) copy.origin.filePath = fileMap.get(source.origin.filePath)!;
+        for (const node of copy.group?.nodes ?? []) if (node.type === "file" && typeof node.file === "string" && fileMap.has(node.file)) node.file = fileMap.get(node.file)!;
+      }
+      this.store.changed();
+      this.openArchive();
+      new Notice(`${copies.length} independent item${copies.length === 1 ? "" : "s"} saved to Archive.`);
+    } catch (error) {
+      console.error("Canvas Palette failed to create Archive copies", error);
+      for (const path of created) {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (file) await this.app.vault.delete(file, true);
+      }
+      const createdFolder = this.app.vault.getAbstractFileByPath(folder);
+      if (createdFolder instanceof TFolder) await this.app.vault.delete(createdFolder, true);
+      this.store.removeItems(copies.map((item) => item.id));
+      new Notice("Archive copy failed. No Archive item was kept.");
+    }
+  }
+
+  private handleDeletedCanvas(canvasPath: string): void {
+    if (this.cleanupDialogs.has(canvasPath)) return;
+    const workspaces = this.store.canvasWorkspaces(canvasPath);
+    if (!workspaces.length) return;
+    this.cleanupDialogs.add(canvasPath);
+    this.store.queueDeletedCanvasWorkspaceCleanup(canvasPath);
+    new DeletedCanvasWorkspacesModal(this.app, this.canvasBaseName(canvasPath), workspaces, (id) => this.store.itemsForWorkspace(id).length, (choices) => {
+      if (this.app.vault.getAbstractFileByPath(canvasPath)) { this.store.clearDeletedCanvasWorkspaceCleanup(canvasPath); this.cleanupDialogs.delete(canvasPath); return; }
+      for (const workspace of workspaces) {
+        if (!this.store.data.workspaces[workspace.id]) continue;
+        if ((choices.get(workspace.id) ?? "general") === "general") this.store.makeWorkspaceGeneral(workspace.id);
+        else this.store.removeWorkspace(workspace.id);
+      }
+      this.store.clearDeletedCanvasWorkspaceCleanup(canvasPath);
+      this.cleanupDialogs.delete(canvasPath);
+    }, () => undefined).open();
+  }
 
   selectedItem(): PaletteItem | undefined {
     const id = this.store.data.uiState.selectedItemId;
@@ -714,12 +789,6 @@ export default class CanvasPalettePlugin extends Plugin {
   }
 
   async openSidePalette(): Promise<void> { await this.activateSidePalette(); }
-
-  private selectRepresentativeWorkspace(canvasPath = this.currentCanvasPath()): void {
-    if (!canvasPath) return;
-    const workspace = this.store.representativeWorkspaceForCanvas(canvasPath);
-    if (workspace && workspace.id !== this.store.data.uiState.activeWorkspaceId) { this.store.data.uiState.activeWorkspaceId = workspace.id; this.store.changed(); }
-  }
 
   private canvasBaseName(path: string): string { return path.split("/").pop()?.replace(/\.canvas$/i, "") || "Canvas"; }
 

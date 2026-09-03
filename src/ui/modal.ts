@@ -1,6 +1,6 @@
 import { App, Modal, Setting, TFile } from "obsidian";
 import type CanvasPalettePlugin from "../main";
-import type { Collection, PaletteItem, PaletteMetadata } from "../core/types";
+import type { Collection, PaletteItem, PaletteMetadata, PaletteWorkspace } from "../core/types";
 import { createLabelColorPicker } from "./label-color-picker";
 
 export class MetadataEditorModal extends Modal {
@@ -64,6 +64,39 @@ export class CanvasWorkspaceModal extends Modal {
       this.onSubmit(value); this.close();
     });
     window.setTimeout(() => input.focus(), 0);
+  }
+  onClose(): void { this.contentEl.empty(); }
+}
+
+export class DeletedCanvasWorkspacesModal extends Modal {
+  private choices = new Map<string, "general" | "delete">();
+  constructor(app: App, private readonly canvasName: string, private readonly workspaces: PaletteWorkspace[], private readonly itemCount: (id: string) => number, private readonly onApply: (choices: Map<string, "general" | "delete">) => void, private readonly onLater: () => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-confirm-modal");
+    this.contentEl.createEl("h2", { text: "Canvas가 삭제되었습니다" });
+    this.contentEl.createEl("p", { text: `“${this.canvasName}”에 연결되어 있던 Workspace를 처리하세요.` });
+    const all = this.contentEl.createEl("button", { text: "모두 일반 Workspace로 전환" });
+    const rows = this.contentEl.createDiv({ cls: "cp-deleted-canvas-workspaces" });
+    const renderRows = (): void => {
+      rows.empty();
+      for (const workspace of this.workspaces) {
+        const row = rows.createDiv();
+        const representative = workspace.representativeCanvasPath === workspace.ownerCanvasPath;
+        row.createDiv({ text: `${workspace.name}${representative ? " · 대표 Workspace" : ""} · ${this.itemCount(workspace.id)} items` });
+        const choice = row.createEl("select", { attr: { "aria-label": `${workspace.name} 처리` } });
+        choice.createEl("option", { value: "general", text: "일반 Workspace로 전환" });
+        choice.createEl("option", { value: "delete", text: "Workspace 삭제" });
+        choice.value = this.choices.get(workspace.id) ?? "general";
+        choice.addEventListener("change", () => this.choices.set(workspace.id, choice.value as "general" | "delete"));
+      }
+    };
+    for (const workspace of this.workspaces) this.choices.set(workspace.id, "general");
+    all.addEventListener("click", () => { for (const workspace of this.workspaces) this.choices.set(workspace.id, "general"); renderRows(); });
+    renderRows();
+    this.contentEl.createEl("p", { text: "Workspace를 삭제해도 Palette Item과 원본 파일은 Archive에 보관됩니다." });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "나중에 처리" }).addEventListener("click", () => { this.onLater(); this.close(); });
+    actions.createEl("button", { text: "적용", cls: "mod-cta" }).addEventListener("click", () => { this.onApply(this.choices); this.close(); });
   }
   onClose(): void { this.contentEl.empty(); }
 }

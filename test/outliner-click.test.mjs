@@ -48,7 +48,7 @@ test("Outliner files support metadata, context menus, child files, and grouping 
   assert.match(source, /zone === "inside"[\s\S]*targetId/);
   assert.match(store, /parentItemId: string \| null = null/);
   assert.match(store, /this\.isItemDescendant\(parentItemId, id\)/);
-  assert.match(defaults, /schemaVersion: 23/);
+  assert.match(defaults, /schemaVersion: 24/);
 });
 
 test("Outliner selection uses one visible-row sequence while Viewport selection remains item-only", async () => {

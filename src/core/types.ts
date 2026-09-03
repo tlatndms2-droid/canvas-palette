@@ -3,7 +3,7 @@ export type PaletteTheme = "obsidian" | "light" | "dark";
 export type AccentMode = "obsidian" | "custom";
 export type AssetViewMode = "grid" | "list";
 export type CardFace = "front" | "back";
-export type WorkspaceKind = "general" | "canvas";
+export type WorkspaceKind = "general" | "canvas" | "archive";
 export type WorkspaceExplorerViewMode = "list" | "details" | "icons";
 export type WorkspaceExplorerSort = "modified-desc" | "modified-asc" | "created-desc" | "created-asc" | "name-asc" | "name-desc";
 
@@ -73,6 +73,8 @@ export interface PaletteItem {
   group?: GroupSnapshot;
   parentItemId?: string | null;
   childItemIds?: string[];
+  /** ID of the source Item when this is an independent Archive snapshot. */
+  archivedFromItemId?: string;
 }
 
 export interface Collection { id: string; workspaceId: string; parentId: string | null; name: string; childCollectionIds: string[]; itemIds: string[]; }
@@ -152,6 +154,7 @@ export interface UIState {
   quickEditor: QuickEditorGeometry;
   miniPalette: MiniPaletteState;
   workspaceExplorer: { viewMode: WorkspaceExplorerViewMode; sort: WorkspaceExplorerSort };
+  pendingCanvasWorkspaceCleanup: string[];
 }
 
 export interface PaletteData {
