@@ -92,6 +92,8 @@ The user distinguishes these modes precisely:
 
 ## Current state
 
+- Version: `0.3.71` (mixed Outliner hierarchy movement).
+- `0.3.71`: Items and Collections can now both be dropped before, inside, or after either row at any Outliner depth. An Item may therefore contain Collections as well as Items, and Collections can be nested under Items. The only rejected moves are into the same entry or any descendant reached through the mixed hierarchy. Existing `0.3.70` Item/Collection order migrates without changing Item IDs, Vault files, or Canvas links. Validation: focused mixed-hierarchy tests, complete automated suite, TypeScript no-emit, production build, and `git diff --check` passed. An isolated `Canvas Palette 0371 Mixed Sandbox` loaded `0.3.71`; a Folder moved beneath a parent Item remained nested after restart and was visibly rendered after opening Outliner and expanding that Item.
 - Version: `0.3.70` (mixed Outliner folder and card ordering).
 - `0.3.70`: Outliner folders and cards now share one order at every level, so either can be placed before or after the other. A card can be dropped into a folder; a folder can contain cards or folders. Folder drops into the folder itself or any nested folder are rejected, and a folder dragged across one of its own child cards exposes no drop location. Legacy separate card/folder lists are normalized to the former card-then-folder order. Validation: 112 automated tests, TypeScript no-emit production build, and `git diff --check`.
 - Version: `0.3.69` (named structure collection folders).

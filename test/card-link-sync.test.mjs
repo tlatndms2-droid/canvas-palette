@@ -74,7 +74,7 @@ test("Group snapshot migration preserves legacy Front Back metadata and new per-
   raw.workspaces.workspace.looseItemIds.push("group");
   const store = new PaletteStore({ loadData: async () => raw, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
   await store.load();
-  assert.equal(store.data.schemaVersion, 30);
+  assert.equal(store.data.schemaVersion, 31);
   assert.equal(store.data.items.group.group.nodeMetadata.inside.backContent, "Legacy back");
   assert.deepEqual(store.data.items.group.group.nodeMetadata.inside.tags, []);
   await cleanup();
@@ -341,6 +341,28 @@ test("Outliner moves multiple items and safely reparents collections", async () 
   store.moveCollection("parent", "child");
   assert.equal(store.data.collections.parent.parentId, null);
   assert.deepEqual(store.data.collections.child.childCollectionIds, []);
+  await cleanup();
+});
+
+test("Outliner permits Collections inside Items while rejecting mixed hierarchy cycles", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
+  const store = new PaletteStore(plugin);
+  store.data = fixture();
+  store.data.items.second = { ...store.data.items.card, id: "second", displayTitle: "Second", origin: {}, canvasPlacements: [] };
+  store.data.workspaces.workspace.looseItemIds = ["card", "second"];
+  store.data.collections.folder = { id: "folder", workspaceId: "workspace", parentId: null, name: "Folder", childCollectionIds: [], itemIds: [] };
+  store.data.workspaces.workspace.rootCollectionIds = ["folder"];
+
+  store.moveCollection("folder", null, null, false, "card");
+  assert.equal(store.data.collections.folder.parentItemId, "card");
+  assert.deepEqual(store.outlineEntryIds("workspace", null, "card"), ["folder"]);
+  store.moveItems("workspace", ["second"], null, null, false, "card");
+  assert.deepEqual(store.outlineEntryIds("workspace", null, "card"), ["folder", "second"]);
+
+  store.moveItems("workspace", ["card"], "folder");
+  assert.deepEqual(store.data.workspaces.workspace.looseItemIds, ["card"]);
+  assert.equal(store.data.collections.folder.itemIds.length, 0);
   await cleanup();
 });
 

@@ -773,37 +773,38 @@ export default class CanvasPalettePlugin extends Plugin {
     const workspace = this.store.data.workspaces[workspaceId];
     if (!workspace) return [];
     const entries: Array<{ id: string; name: string; parentId: string | null; item?: PaletteItem }> = [];
-    const itemStack = new Set<string>();
+    const stack = new Set<string>();
+    const addEntries = (parentId: string, collectionId: string | null, parentItemId: string | null): void => {
+      for (const childId of this.store.outlineEntryIds(workspaceId, collectionId, parentItemId)) {
+        if (this.store.data.collections[childId]) addCollection(childId, parentId);
+        else addItem(childId, parentId);
+      }
+    };
     const addItem = (itemId: string, parentId: string): void => {
       const item = this.store.data.items[itemId];
-      if (!item || itemStack.has(itemId)) return;
+      if (!item || stack.has(itemId)) return;
       const id = `${parentId}/item:${item.id}`;
       entries.push({ id, name: item.displayTitle, parentId, item });
-      itemStack.add(itemId);
-      for (const childId of item.childItemIds ?? []) addItem(childId, id);
-      itemStack.delete(itemId);
+      stack.add(itemId); addEntries(id, null, item.id); stack.delete(itemId);
     };
     const addCollection = (collectionId: string, parentId: string): void => {
       const collection = this.store.data.collections[collectionId];
-      if (!collection || collection.workspaceId !== workspaceId) return;
+      if (!collection || collection.workspaceId !== workspaceId || stack.has(collectionId)) return;
       const id = `${parentId}/collection:${collection.id}`;
       entries.push({ id, name: collection.name, parentId });
-      for (const itemId of collection.itemIds) addItem(itemId, id);
-      for (const childId of collection.childCollectionIds) addCollection(childId, id);
+      stack.add(collectionId); addEntries(id, collection.id, null); stack.delete(collectionId);
     };
     if (rootCollectionId) {
       const collection = this.store.data.collections[rootCollectionId];
       if (!collection || collection.workspaceId !== workspaceId) return [];
       const root = `collection:${collection.id}`;
       entries.push({ id: root, name: collection.name, parentId: null });
-      for (const itemId of collection.itemIds) addItem(itemId, root);
-      for (const childId of collection.childCollectionIds) addCollection(childId, root);
+      addEntries(root, collection.id, null);
       return entries;
     }
     const root = `workspace:${workspace.id}`;
     entries.push({ id: root, name: workspace.name, parentId: null });
-    for (const collectionId of workspace.rootCollectionIds) addCollection(collectionId, root);
-    for (const itemId of workspace.looseItemIds) addItem(itemId, root);
+    addEntries(root, null, null);
     return entries;
   }
 

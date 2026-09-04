@@ -85,12 +85,16 @@ export interface PaletteItem {
   group?: GroupSnapshot;
   parentItemId?: string | null;
   childItemIds?: string[];
+  /** Collections may be nested beneath any Item, just like child Items. */
+  childCollectionIds?: string[];
+  /** Mixed display order for direct child Items and Collections. */
+  outlineOrder?: string[];
   /** ID of the source Item when this is an independent Archive snapshot. */
   archivedFromItemId?: string;
 }
 
 /** Mixed display order for direct cards and folders in an Outliner level. */
-export interface Collection { id: string; workspaceId: string; parentId: string | null; name: string; childCollectionIds: string[]; itemIds: string[]; outlineOrder?: string[]; }
+export interface Collection { id: string; workspaceId: string; parentId: string | null; /** Mutually exclusive with parentId. */ parentItemId?: string | null; name: string; childCollectionIds: string[]; itemIds: string[]; outlineOrder?: string[]; }
 /** A visible Outliner row. This is session UI state, never persisted with a workspace. */
 export interface OutlineSelectionTarget { kind: "collection" | "item"; id: string; }
 

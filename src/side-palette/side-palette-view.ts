@@ -697,7 +697,7 @@ export class SidePaletteView extends ItemView {
     for (const id of entryIds) {
       const collection = this.plugin.store.data.collections[id];
       if (collection) this.renderCollection(parent, collection, 0);
-      else { const item = this.plugin.store.data.items[id]; if (item && !structuredItemIds.has(item.id)) this.renderOutlineItem(parent, item, 0, focused?.id ?? null); }
+      else { const item = this.plugin.store.data.items[id]; if (item && !structuredItemIds.has(item.id)) this.renderOutlineItem(parent, item, 0, focused?.id ?? null, null); }
     }
     if (!focused) for (const structure of workspace.outlineStructures ?? []) for (const rootId of structure.rootItemIds) this.renderOutlineStructureItem(parent, structure, rootId, 0, new Set());
   }
@@ -741,7 +741,7 @@ export class SidePaletteView extends ItemView {
       menu.addItem((entry) => entry.setTitle("Export collection to Canvas").setIcon("file-output").onClick(() => void this.plugin.exportCollectionSubtree(collection.id)));
       menu.showAtMouseEvent(event);
     });
-    this.mountOutlineDropTarget(row, collection.workspaceId, collection.id, collection.parentId);
+    this.mountOutlineDropTarget(row, collection.workspaceId, collection.id, collection.parentId, collection.parentItemId ?? null);
     iconButton(row, "plus", "Add nested collection", () => this.promptCollection(collection.workspaceId, collection.id));
     iconButton(row, "pencil", "Rename collection", () => new TextPromptModal(this.app, "Rename collection", collection.name, (value) => this.plugin.store.renameCollection(collection.id, value)).open());
     iconButton(row, "trash-2", "Delete collection", () => {
@@ -756,18 +756,18 @@ export class SidePaletteView extends ItemView {
       for (const id of this.plugin.store.outlineEntryIds(collection.workspaceId, collection.id)) {
         const childCollection = this.plugin.store.data.collections[id];
         if (childCollection) this.renderCollection(parent, childCollection, depth + 1);
-        else { const item = this.plugin.store.data.items[id]; if (item) this.renderOutlineItem(parent, item, depth + 1, collection.id); }
+        else { const item = this.plugin.store.data.items[id]; if (item) this.renderOutlineItem(parent, item, depth + 1, collection.id, null); }
       }
     }
   }
 
-  private renderOutlineItem(parent: HTMLElement, item: PaletteItem, depth: number, collectionId: string | null): void {
+  private renderOutlineItem(parent: HTMLElement, item: PaletteItem, depth: number, collectionId: string | null, parentItemId: string | null): void {
     const target: OutlineSelectionTarget = { kind: "item", id: item.id };
     this.outlineRows.push(target);
     const selected = this.outlineTargetSelected(target);
     const showMarker = selected && this.outlineSelection.length > 1;
     const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${selected ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.itemId = item.id; row.draggable = true;
-    const children = item.childItemIds ?? [];
+    const children = this.plugin.store.outlineEntryIds(this.plugin.activeWorkspace()?.id ?? "", null, item.id);
     const layout = this.plugin.activeWorkspace()?.sideLayout;
     const collapsed = layout?.collapsedItemIds.includes(item.id) ?? false;
     if (children.length > 0) {
@@ -786,8 +786,12 @@ export class SidePaletteView extends ItemView {
     row.addEventListener("contextmenu", (event) => { if (!this.outlineTargetSelected(target)) this.selectOutlineTarget(target); this.itemMenu(event, item, true); });
     row.addEventListener("dragstart", (event) => { const selectedIds = this.sideSelectedIds(); event.dataTransfer?.setData("application/x-canvas-palette-item", item.id); event.dataTransfer?.setData("application/x-canvas-palette-items", JSON.stringify(selectedIds.includes(item.id) ? selectedIds : [item.id])); if (event.dataTransfer) event.dataTransfer.effectAllowed = "copyMove"; row.addClass("is-dragging"); });
     row.addEventListener("dragend", () => row.removeClass("is-dragging"));
-    this.mountOutlineItemDropTarget(row, item.id, collectionId, item.parentItemId ?? null);
-    if (!collapsed) for (const childId of children) { const child = this.plugin.store.data.items[childId]; if (child) this.renderOutlineItem(parent, child, depth + 1, collectionId); }
+    this.mountOutlineItemDropTarget(row, item.id, collectionId, parentItemId);
+    if (!collapsed) for (const childId of children) {
+      const childCollection = this.plugin.store.data.collections[childId];
+      if (childCollection) this.renderCollection(parent, childCollection, depth + 1);
+      else { const child = this.plugin.store.data.items[childId]; if (child) this.renderOutlineItem(parent, child, depth + 1, null, item.id); }
+    }
   }
 
   private renderOutlineStructureItem(parent: HTMLElement, structure: OutlineStructure, itemId: string, depth: number, ancestors: Set<string>): void {
@@ -824,29 +828,30 @@ export class SidePaletteView extends ItemView {
       const draggedCollectionId = this.draggedOutlineCollectionId ?? event.dataTransfer?.getData("application/x-canvas-palette-collection");
       const draggedItem = event.dataTransfer?.types.includes("application/x-canvas-palette-item");
       if (!draggedCollectionId && !draggedItem) return;
-      if (draggedCollectionId && !this.plugin.store.canMoveCollection(draggedCollectionId, collectionId)) return;
       event.preventDefault(); event.stopPropagation(); const ratio = (event.clientY - row.getBoundingClientRect().top) / row.getBoundingClientRect().height;
-      zone = draggedCollectionId ? (ratio < .5 ? "before" : "after") : ratio < .25 ? "before" : ratio > .75 ? "after" : "inside";
+      zone = ratio < .25 ? "before" : ratio > .75 ? "after" : "inside";
+      if (draggedCollectionId && !this.plugin.store.canMoveCollection(draggedCollectionId, zone === "inside" ? null : collectionId, zone === "inside" ? targetId : parentItemId)) { clear(); return; }
       clear(); row.addClass(`is-drop-${zone}`);
     });
     row.addEventListener("dragleave", clear); row.addEventListener("drop", (event) => {
       const workspace = this.plugin.activeWorkspace(); if (!workspace) return;
       const draggedCollectionId = this.draggedOutlineCollectionId ?? event.dataTransfer?.getData("application/x-canvas-palette-collection");
-      if (draggedCollectionId) { if (!this.plugin.store.canMoveCollection(draggedCollectionId, collectionId)) return; event.preventDefault(); event.stopPropagation(); clear(); this.plugin.store.moveCollection(draggedCollectionId, collectionId, targetId, zone === "after"); return; }
+      if (draggedCollectionId) { const targetCollectionId = zone === "inside" ? null : collectionId; const targetParentItemId = zone === "inside" ? targetId : parentItemId; if (!this.plugin.store.canMoveCollection(draggedCollectionId, targetCollectionId, targetParentItemId)) return; event.preventDefault(); event.stopPropagation(); clear(); this.plugin.store.moveCollection(draggedCollectionId, targetCollectionId, zone === "inside" ? null : targetId, zone === "after", targetParentItemId); return; }
       const source = event.dataTransfer?.getData("application/x-canvas-palette-item"); if (!source) return;
       event.preventDefault(); event.stopPropagation(); clear(); const selected = this.sideSelectedIds(); const moving = selected.includes(source) ? selected : [source]; if (zone === "inside") this.plugin.store.moveItems(workspace.id, moving, collectionId, null, false, targetId); else this.plugin.store.moveItems(workspace.id, moving, collectionId, targetId, zone === "after", parentItemId);
     });
   }
 
-  private mountOutlineDropTarget(row: HTMLElement, workspaceId: string, collectionId: string | null, collectionParentId: string | null = null): void {
+  private mountOutlineDropTarget(row: HTMLElement, workspaceId: string, collectionId: string | null, collectionParentId: string | null = null, collectionParentItemId: string | null = null): void {
     const accepts = (event: DragEvent): boolean => Boolean(event.dataTransfer?.types.includes("application/x-canvas-palette-item") || event.dataTransfer?.types.includes("application/x-canvas-palette-collection"));
     let zone: "before" | "inside" | "after" = "inside"; const clear = (): void => row.removeClass("is-drop-target", "is-drop-before", "is-drop-after");
     row.addEventListener("dragover", (event) => {
       if (!accepts(event)) return;
       const draggedCollectionId = this.draggedOutlineCollectionId ?? event.dataTransfer?.getData("application/x-canvas-palette-collection");
-      if (draggedCollectionId && (draggedCollectionId === collectionId || !this.plugin.store.canMoveCollection(draggedCollectionId, collectionId))) return;
       event.preventDefault(); event.stopPropagation(); const ratio = (event.clientY - row.getBoundingClientRect().top) / row.getBoundingClientRect().height;
       zone = collectionId ? ratio < .25 ? "before" : ratio > .75 ? "after" : "inside" : "inside";
+      const targetCollectionId = zone === "inside" ? collectionId : collectionParentId; const targetParentItemId = zone === "inside" ? null : collectionParentItemId;
+      if (draggedCollectionId && !this.plugin.store.canMoveCollection(draggedCollectionId, targetCollectionId, targetParentItemId)) { clear(); return; }
       clear(); row.addClass(zone === "inside" ? "is-drop-target" : `is-drop-${zone}`); if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
     });
     row.addEventListener("dragleave", (event) => { if (!(event.relatedTarget instanceof Node) || !row.contains(event.relatedTarget)) clear(); });
@@ -856,11 +861,11 @@ export class SidePaletteView extends ItemView {
       const itemId = event.dataTransfer?.getData("application/x-canvas-palette-item");
       if (itemId) {
         const selected = this.sideSelectedIds();
-        this.plugin.store.moveItems(workspaceId, selected.includes(itemId) ? selected : [itemId], zone === "inside" ? collectionId : collectionParentId, zone === "inside" ? null : collectionId, zone === "after");
+        this.plugin.store.moveItems(workspaceId, selected.includes(itemId) ? selected : [itemId], zone === "inside" ? collectionId : collectionParentId, zone === "inside" ? null : collectionId, zone === "after", zone === "inside" ? null : collectionParentItemId);
         return;
       }
       const draggedCollectionId = this.draggedOutlineCollectionId ?? event.dataTransfer?.getData("application/x-canvas-palette-collection");
-      if (draggedCollectionId && draggedCollectionId !== collectionId && this.plugin.store.canMoveCollection(draggedCollectionId, zone === "inside" ? collectionId : collectionParentId)) this.plugin.store.moveCollection(draggedCollectionId, zone === "inside" ? collectionId : collectionParentId, zone === "inside" ? null : collectionId, zone === "after");
+      if (draggedCollectionId && this.plugin.store.canMoveCollection(draggedCollectionId, zone === "inside" ? collectionId : collectionParentId, zone === "inside" ? null : collectionParentItemId)) this.plugin.store.moveCollection(draggedCollectionId, zone === "inside" ? collectionId : collectionParentId, zone === "inside" ? null : collectionId, zone === "after", zone === "inside" ? null : collectionParentItemId);
     });
   }
 
