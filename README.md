@@ -2,7 +2,7 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, web links, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.68**
+Current version: **0.3.69**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 

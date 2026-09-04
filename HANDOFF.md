@@ -92,6 +92,8 @@ The user distinguishes these modes precisely:
 
 ## Current state
 
+- Version: `0.3.69` (named structure collection folders).
+- `0.3.69`: The structure collection dialog requires the user to name the top-level Outliner folder. The entered name becomes the outer folder; no selected Canvas group or automatic label is used as its substitute. Arrow-derived cards remain inside that user-named folder. Validation: 112 automated tests, TypeScript no-emit production build, `git diff --check`, and a visible dedicated Sandbox process with the current bundle installed.
 - Version: `0.3.68` (structure collection ordering and independent image reference repair).
 - `0.3.68`: Structure collection reads Canvas relationships from left to right and lists same-level items from top to bottom. Independent image cards created by structure collection retain a reference-only source path, so their previews, source-file action, and path filtering work without restoring a Canvas connection. Legacy independent image cards are repaired only when their title matches exactly one Vault image. Validation: 112 automated tests, TypeScript no-emit production build, `git diff --check`, and a visible dedicated Sandbox process persisted the repaired reference-only path.
 - `0.3.67` (Canvas Group item collection and Side Palette decomposition).

@@ -48,16 +48,22 @@ export class TextPromptModal extends Modal {
 }
 
 export class OutlineStructureRuleModal extends Modal {
-  constructor(app: App, private readonly onSubmit: () => void) { super(app); }
+  constructor(app: App, private readonly onSubmit: (folderName: string) => void) { super(app); }
   onOpen(): void {
     this.contentEl.addClass("canvas-palette", "cp-outline-structure-modal");
     this.contentEl.createEl("h2", { text: "Outliner 구조로 수집" });
+    this.contentEl.createEl("label", { text: "이 구조를 담을 상위 폴더 이름" });
+    const folderName = this.contentEl.createEl("input", { attr: { type: "text", placeholder: "예: 수정 계획", "aria-label": "상위 폴더 이름" } });
     this.contentEl.createEl("p", { text: "왼쪽에서 오른쪽으로는 상위·하위, 위에서 아래로는 표시 순서를 정합니다." });
     const example = this.contentEl.createDiv({ cls: "cp-outline-structure-modal__example", attr: { "aria-label": "Canvas 화살표와 Outliner 구조 예시" } });
     const canvas = example.createDiv({ cls: "cp-outline-structure-modal__canvas" }); canvas.createSpan({ text: "상위 카드" }); canvas.createSpan({ cls: "cp-outline-structure-modal__arrow", text: "→" }); canvas.createSpan({ text: "하위 카드" });
     const outliner = example.createDiv({ cls: "cp-outline-structure-modal__outliner" }); outliner.createDiv({ text: "▾ 상위 카드" }); outliner.createDiv({ text: "└─ 하위 카드" });
     this.contentEl.createEl("small", { text: "같은 단계의 항목은 Canvas에서 위에 있는 항목부터 표시합니다." });
-    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" }); actions.createEl("button", { text: "취소" }).addEventListener("click", () => this.close()); actions.createEl("button", { text: "구조 수집", cls: "mod-cta" }).addEventListener("click", () => { this.onSubmit(); this.close(); });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" }); actions.createEl("button", { text: "취소" }).addEventListener("click", () => this.close()); actions.createEl("button", { text: "구조 수집", cls: "mod-cta" }).addEventListener("click", () => {
+      const name = folderName.value.trim(); if (!name) { folderName.focus(); return; }
+      this.onSubmit(name); this.close();
+    });
+    window.setTimeout(() => folderName.focus(), 0);
   }
   onClose(): void { this.contentEl.empty(); }
 }

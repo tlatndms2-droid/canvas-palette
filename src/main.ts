@@ -346,10 +346,10 @@ export default class CanvasPalettePlugin extends Plugin {
     if (!workspace) { new Notice("Side Palette에서 Workspace를 먼저 선택하세요."); return; }
     const selection = await this.canvas.collectOutlineSelection();
     if (!selection) return;
-    new OutlineStructureRuleModal(this.app, () => void this.saveCanvasSelectionStructure(workspace.id, selection)).open();
+    new OutlineStructureRuleModal(this.app, (folderName) => void this.saveCanvasSelectionStructure(workspace.id, selection, folderName)).open();
   }
 
-  private async saveCanvasSelectionStructure(workspaceId: string, selection: Awaited<ReturnType<CanvasAdapter["collectOutlineSelection"]>>): Promise<void> {
+  private async saveCanvasSelectionStructure(workspaceId: string, selection: Awaited<ReturnType<CanvasAdapter["collectOutlineSelection"]>>, folderName: string): Promise<void> {
     if (!selection) return;
     const ids = new Set(selection.items.map((item) => item.origin.canvasNodeId).filter((id): id is string => Boolean(id)));
     const compareCanvasOrder = (left: string, right: string): number => {
@@ -374,7 +374,7 @@ export default class CanvasPalettePlugin extends Plugin {
     }
     for (const row of Object.values(children)) row.sort(compareCanvasOrder);
     const roots = [...ids].filter((id) => !parents.has(id)).sort(compareCanvasOrder);
-    const result = this.store.saveOutlineCollection(workspaceId, { name: selection.title, roots, children, items: selection.items });
+    const result = this.store.saveOutlineCollection(workspaceId, { name: folderName, roots, children, items: selection.items });
     if (result === "missing") { new Notice("선택한 Workspace를 찾을 수 없습니다."); return; }
     this.store.data.uiState.activeWorkspaceId = workspaceId; this.store.changed();
     await this.openSidePalette();

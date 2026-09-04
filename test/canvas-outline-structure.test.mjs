@@ -11,6 +11,8 @@ test("Canvas selection structure is saved independently from regular Outliner pl
   assert.match(toolbar, /선택한 구조를 Side Palette로 내보내기/);
   assert.match(main, /new OutlineStructureRuleModal/);
   assert.match(main, /collectOutlineSelection/);
+  assert.match(main, /\(folderName\) => void this\.saveCanvasSelectionStructure/);
+  assert.match(main, /name: folderName/);
   assert.match(store, /saveOutlineCollection/);
   assert.match(store, /createCollection\(workspaceId, input\.name\)/);
   assert.match(store, /collection\.itemIds\.push\(\.\.\.roots\)/);
@@ -24,6 +26,9 @@ test("Canvas selection structure is saved independently from regular Outliner pl
   assert.match(await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8"), /renderOutlineStructureItem[\s\S]*?row\.draggable = true/);
   assert.doesNotMatch(store.match(/saveOutlineStructure[\s\S]*?return "saved"/)?.[0] ?? "", /detachWorkspaceLinks/);
   assert.match(modal, /Outliner 구조로 수집/);
+  assert.match(modal, /이 구조를 담을 상위 폴더 이름/);
+  assert.match(modal, /placeholder: "예: 수정 계획"/);
+  assert.match(modal, /if \(!name\) \{ folderName\.focus\(\); return; \}/);
   assert.match(main, /compareCanvasOrder/);
   assert.match(main, /from\.x > to\.x/);
   assert.match(modal, /왼쪽에서 오른쪽으로는 상위·하위/);
