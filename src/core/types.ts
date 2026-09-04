@@ -89,7 +89,8 @@ export interface PaletteItem {
   archivedFromItemId?: string;
 }
 
-export interface Collection { id: string; workspaceId: string; parentId: string | null; name: string; childCollectionIds: string[]; itemIds: string[]; }
+/** Mixed display order for direct cards and folders in an Outliner level. */
+export interface Collection { id: string; workspaceId: string; parentId: string | null; name: string; childCollectionIds: string[]; itemIds: string[]; outlineOrder?: string[]; }
 /** A visible Outliner row. This is session UI state, never persisted with a workspace. */
 export interface OutlineSelectionTarget { kind: "collection" | "item"; id: string; }
 
@@ -115,6 +116,8 @@ export interface PaletteWorkspace {
   representativeCanvasPath: string | null;
   rootCollectionIds: string[];
   looseItemIds: string[];
+  /** Mixed display order for the Workspace root. */
+  outlineOrder?: string[];
   sideLayout: SideLayoutState;
   createdAt: number;
   modifiedAt: number;

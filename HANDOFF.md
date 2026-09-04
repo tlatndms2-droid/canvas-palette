@@ -92,6 +92,8 @@ The user distinguishes these modes precisely:
 
 ## Current state
 
+- Version: `0.3.70` (mixed Outliner folder and card ordering).
+- `0.3.70`: Outliner folders and cards now share one order at every level, so either can be placed before or after the other. A card can be dropped into a folder; a folder can contain cards or folders. Folder drops into the folder itself or any nested folder are rejected, and a folder dragged across one of its own child cards exposes no drop location. Legacy separate card/folder lists are normalized to the former card-then-folder order. Validation: 112 automated tests, TypeScript no-emit production build, and `git diff --check`.
 - Version: `0.3.69` (named structure collection folders).
 - `0.3.69`: The structure collection dialog requires the user to name the top-level Outliner folder. The entered name becomes the outer folder; no selected Canvas group or automatic label is used as its substitute. Arrow-derived cards remain inside that user-named folder. Validation: 112 automated tests, TypeScript no-emit production build, `git diff --check`, and a visible dedicated Sandbox process with the current bundle installed.
 - Version: `0.3.68` (structure collection ordering and independent image reference repair).

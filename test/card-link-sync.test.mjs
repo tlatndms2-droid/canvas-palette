@@ -335,6 +335,9 @@ test("Outliner moves multiple items and safely reparents collections", async () 
   store.moveCollection("child", "parent");
   assert.equal(store.data.collections.child.parentId, "parent");
   assert.deepEqual(store.data.collections.parent.childCollectionIds, ["child"]);
+  store.moveItems("workspace", ["card"], "parent");
+  store.moveCollection("child", "parent", "card", false);
+  assert.deepEqual(store.outlineEntryIds("workspace", "parent"), ["child", "card"]);
   store.moveCollection("parent", "child");
   assert.equal(store.data.collections.parent.parentId, null);
   assert.deepEqual(store.data.collections.child.childCollectionIds, []);

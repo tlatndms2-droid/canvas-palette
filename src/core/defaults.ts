@@ -39,6 +39,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ownerCanvasPath: workspace.ownerCanvasPath ?? null,
     representativeCanvasPath: workspace.representativeCanvasPath ?? null,
     outlineStructures: workspace.outlineStructures ?? [],
+    outlineOrder: workspace.outlineOrder ?? [...(workspace.looseItemIds ?? []), ...(workspace.rootCollectionIds ?? [])],
     sideLayout: { ...DEFAULT_SIDE_LAYOUT, ...workspace.sideLayout, densityLevel: workspace.sideLayout?.densityLevel ?? legacyDensity(workspace.sideLayout?.viewMode, rawSettings?.cardHeight) },
     createdAt: workspace.createdAt ?? migratedAt,
     modifiedAt: workspace.modifiedAt ?? workspace.createdAt ?? migratedAt
@@ -62,7 +63,12 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
       return [id, { ...item, group, type: repairedType, content: repairedType === "video" ? undefined : item.content, webLink, sourceDeletedAt: repairedType === "markdown" ? item.sourceDeletedAt : undefined, backContent: supportsFaces ? item.backContent ?? "" : "", facesEnabled: supportsFaces && (item.facesEnabled ?? Boolean(item.backContent)), labelColor: item.labelColor ?? "", captionFontSize: captionFontSize(item.captionFontSize), canvasPlacements: item.canvasPlacements ?? [], parentItemId: item.parentItemId ?? null, childItemIds: item.childItemIds ?? [] }];
     })),
     workspaces,
-    collections: raw.collections ?? {},
+    collections: Object.fromEntries(Object.entries(raw.collections ?? {}).map(([id, collection]) => [id, {
+      ...collection,
+      childCollectionIds: collection.childCollectionIds ?? [],
+      itemIds: collection.itemIds ?? [],
+      outlineOrder: collection.outlineOrder ?? [...(collection.itemIds ?? []), ...(collection.childCollectionIds ?? [])]
+    }])),
     pendingItemIds: raw.pendingItemIds ?? [],
     canvasNodeMetadata: Object.fromEntries(Object.entries(raw.canvasNodeMetadata ?? {}).map(([canvasPath, nodes]) => [canvasPath,
       Object.fromEntries(Object.entries(nodes).map(([nodeId, metadata]) => [nodeId, {

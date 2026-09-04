@@ -44,7 +44,7 @@ export class PaletteStore {
     const id = createId("workspace");
     const now = Date.now();
     const owner = kind === "canvas" ? ownerCanvasPath : null;
-    const workspace: PaletteWorkspace = { id, name, kind, ownerCanvasPath: owner, canvasPaths: owner ? [owner] : [], representativeCanvasPath: representative && owner ? owner : null, rootCollectionIds: [], looseItemIds: [], sideLayout: structuredClone(DEFAULT_SIDE_LAYOUT), createdAt: now, modifiedAt: now };
+    const workspace: PaletteWorkspace = { id, name, kind, ownerCanvasPath: owner, canvasPaths: owner ? [owner] : [], representativeCanvasPath: representative && owner ? owner : null, rootCollectionIds: [], looseItemIds: [], outlineOrder: [], sideLayout: structuredClone(DEFAULT_SIDE_LAYOUT), createdAt: now, modifiedAt: now };
     this.data.workspaces[id] = workspace;
     if (representative && owner) this.setRepresentativeWorkspace(id, owner, false);
     this.data.uiState.activeWorkspaceId ??= id;
@@ -190,7 +190,7 @@ export class PaletteStore {
     const existing = Object.values(this.data.workspaces).find((workspace) => workspace.kind === "archive");
     if (existing) return existing;
     const now = Date.now();
-    const archive: PaletteWorkspace = { id: "canvas-palette-archive", name: "Archive", kind: "archive", ownerCanvasPath: null, canvasPaths: [], representativeCanvasPath: null, rootCollectionIds: [], looseItemIds: [], sideLayout: structuredClone(DEFAULT_SIDE_LAYOUT), createdAt: now, modifiedAt: now };
+    const archive: PaletteWorkspace = { id: "canvas-palette-archive", name: "Archive", kind: "archive", ownerCanvasPath: null, canvasPaths: [], representativeCanvasPath: null, rootCollectionIds: [], looseItemIds: [], outlineOrder: [], sideLayout: structuredClone(DEFAULT_SIDE_LAYOUT), createdAt: now, modifiedAt: now };
     this.data.workspaces[archive.id] = archive;
     if (notify) this.changed();
     return archive;
@@ -304,10 +304,10 @@ export class PaletteStore {
 
   createCollection(workspaceId: string, name: string, parentId: string | null = null): Collection {
     const id = createId("collection");
-    const collection: Collection = { id, workspaceId, parentId, name, childCollectionIds: [], itemIds: [] };
+    const collection: Collection = { id, workspaceId, parentId, name, childCollectionIds: [], itemIds: [], outlineOrder: [] };
     this.data.collections[id] = collection;
-    if (parentId) this.data.collections[parentId]?.childCollectionIds.push(id);
-    else this.data.workspaces[workspaceId]?.rootCollectionIds.push(id);
+    if (parentId) { const parent = this.data.collections[parentId]; parent?.childCollectionIds.push(id); if (parent) (parent.outlineOrder ??= []).push(id); }
+    else { const workspace = this.data.workspaces[workspaceId]; workspace?.rootCollectionIds.push(id); if (workspace) (workspace.outlineOrder ??= []).push(id); }
     this.changed();
     return collection;
   }
@@ -610,6 +610,33 @@ export class PaletteStore {
     this.changed();
   }
 
+  /** Returns cards and folders in their shared display order, repairing legacy separate lists on first use. */
+  outlineEntryIds(workspaceId: string, collectionId: string | null): string[] {
+    const workspace = this.data.workspaces[workspaceId]; const collection = collectionId ? this.data.collections[collectionId] : null;
+    if (!workspace || (collectionId && (!collection || collection.workspaceId !== workspaceId))) return [];
+    const allowed = collection ? [...collection.itemIds, ...collection.childCollectionIds] : [...workspace.looseItemIds, ...workspace.rootCollectionIds];
+    const owner = collection ?? workspace; const order = owner.outlineOrder ?? [];
+    const normalized = [...new Set([...order.filter((id) => allowed.includes(id)), ...allowed])];
+    owner.outlineOrder = normalized;
+    return normalized;
+  }
+
+  /** A folder cannot be dropped into itself or any folder nested beneath it. */
+  canMoveCollection(id: string, parentId: string | null): boolean {
+    return Boolean(this.data.collections[id]) && id !== parentId && !this.wouldCreateCycle(id, parentId);
+  }
+
+  private removeOutlineEntry(workspaceId: string, id: string): void {
+    const workspace = this.data.workspaces[workspaceId]; if (workspace) workspace.outlineOrder = (workspace.outlineOrder ?? []).filter((entry) => entry !== id);
+    for (const collection of Object.values(this.data.collections)) if (collection.workspaceId === workspaceId) collection.outlineOrder = (collection.outlineOrder ?? []).filter((entry) => entry !== id);
+  }
+
+  private insertOutlineEntry(workspaceId: string, collectionId: string | null, id: string, targetId: string | null, insertAfter: boolean): void {
+    const order = this.outlineEntryIds(workspaceId, collectionId); const index = targetId ? order.indexOf(targetId) : -1;
+    order.splice(index >= 0 ? index + (insertAfter ? 1 : 0) : order.length, 0, id);
+    const owner = collectionId ? this.data.collections[collectionId] : this.data.workspaces[workspaceId]; if (owner) owner.outlineOrder = order;
+  }
+
   moveItems(workspaceId: string, itemIds: string[], collectionId: string | null, targetId: string | null = null, insertAfter = false, parentItemId: string | null = null): void {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace) return;
@@ -619,12 +646,14 @@ export class PaletteStore {
     const containers = this.itemContainers(workspaceId);
     if (!valid.some((id) => containers.some((ids) => ids.includes(id)))) return;
     for (const ids of containers) for (const id of valid) { const index = ids.indexOf(id); if (index >= 0) ids.splice(index, 1); }
+    for (const id of valid) this.removeOutlineEntry(workspaceId, id);
     for (const id of valid) this.data.items[id].parentItemId = parentItemId;
     const collection = collectionId ? this.data.collections[collectionId] : null;
     const parentItem = parentItemId ? this.data.items[parentItemId] : null;
     const target = parentItem ? (parentItem.childItemIds ??= []) : collection?.workspaceId === workspaceId ? collection.itemIds : workspace.looseItemIds;
     const targetIndex = targetId ? target.indexOf(targetId) : -1;
     target.splice(targetIndex >= 0 ? targetIndex + (insertAfter ? 1 : 0) : target.length, 0, ...valid);
+    if (!parentItem) for (const id of valid) this.insertOutlineEntry(workspaceId, collectionId, id, targetId, insertAfter);
     this.changed();
   }
 
@@ -662,7 +691,7 @@ export class PaletteStore {
 
   moveCollection(id: string, parentId: string | null, targetId: string | null = null, insertAfter = false): void {
     const collection = this.data.collections[id];
-    if (!collection || id === parentId || this.wouldCreateCycle(id, parentId)) return;
+    if (!collection || !this.canMoveCollection(id, parentId)) return;
     const workspace = this.data.workspaces[collection.workspaceId];
     if (!workspace) return;
     if (collection.parentId) {
@@ -671,11 +700,13 @@ export class PaletteStore {
       if (siblings && index >= 0) siblings.splice(index, 1);
     }
     else workspace.rootCollectionIds = workspace.rootCollectionIds.filter((childId) => childId !== id);
+    this.removeOutlineEntry(collection.workspaceId, id);
     collection.parentId = parentId;
     const target = parentId ? this.data.collections[parentId]?.childCollectionIds : workspace.rootCollectionIds;
     if (!target) return;
     const targetIndex = targetId ? target.indexOf(targetId) : -1;
     target.splice(targetIndex >= 0 ? targetIndex + (insertAfter ? 1 : 0) : target.length, 0, id);
+    this.insertOutlineEntry(collection.workspaceId, parentId, id, targetId, insertAfter);
     this.changed();
   }
 
