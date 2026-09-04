@@ -49,17 +49,22 @@ export class PaletteStore {
     return workspace;
   }
 
-  saveOutlineStructure(workspaceId: string, input: Omit<OutlineStructure, "id" | "itemIds" | "rootItemIds" | "childItemIds"> & { roots: string[]; children: Record<string, string[]>; items: PaletteItem[] }): "saved" | "duplicate" | "missing" {
+  saveOutlineStructure(workspaceId: string, input: Omit<OutlineStructure, "id" | "itemIds" | "rootItemIds" | "childItemIds"> & { roots: string[]; children: Record<string, string[]>; items: PaletteItem[] }): "saved" | "missing" {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace) return "missing";
     const mapped = new Map<string, string>();
     for (const item of input.items) {
-      const existing = this.existingCollectedItem(item);
-      const stored = existing ?? item;
-      if (!existing) {
-        this.data.items[stored.id] = stored;
-        if (!workspace.looseItemIds.includes(stored.id)) workspace.looseItemIds.push(stored.id);
-      }
+      const sourceReferencePath = item.type === "markdown" ? item.origin.filePath : item.sourceReferencePath;
+      const stored: PaletteItem = {
+        ...structuredClone(item),
+        id: createId(item.type === "markdown" ? "card" : item.type),
+        type: item.type === "markdown" ? "card" : item.type,
+        origin: { workspaceId },
+        canvasPlacements: [],
+        ...(sourceReferencePath ? { sourceReferencePath } : {})
+      };
+      this.data.items[stored.id] = stored;
+      if (!workspace.looseItemIds.includes(stored.id)) workspace.looseItemIds.push(stored.id);
       const nodeId = item.origin.canvasNodeId;
       if (nodeId) mapped.set(nodeId, stored.id);
     }
@@ -72,8 +77,7 @@ export class PaletteStore {
     const itemIds: string[] = [...new Set([...roots, ...Object.values(children).flat()])];
     const fingerprint = `${input.canvasPath}:${input.rule}:${[...itemIds].sort().join("|")}:${Object.entries(children).sort(([a], [b]) => a.localeCompare(b)).map(([parent, ids]) => `${parent}>${ids.join(",")}`).join("|")}`;
     const structures = workspace.outlineStructures ??= [];
-    if (structures.some((entry) => entry.id === fingerprint)) return "duplicate";
-    structures.push({ id: fingerprint, canvasPath: input.canvasPath, rule: input.rule, rootItemIds: roots, childItemIds: children, itemIds });
+    structures.push({ id: `${fingerprint}:${createId("outline")}`, canvasPath: input.canvasPath, rule: input.rule, rootItemIds: roots, childItemIds: children, itemIds });
     workspace.modifiedAt = Date.now(); this.changed();
     return "saved";
   }

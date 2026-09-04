@@ -68,6 +68,8 @@ export interface PaletteItem {
   sourceDeletedAt?: number;
   canvasPlacements: CanvasPlacement[];
   content?: string;
+  /** Reference-only source path retained by independent Canvas-structure copies. */
+  sourceReferencePath?: string;
   /** A one-time, display-only snapshot of a native Canvas link. */
   webLink?: { url: string; siteName: string; description: string; thumbnailUrl: string; width: number; height: number; color?: string; capturedAt: number; };
   backContent: string;

@@ -788,16 +788,26 @@ export class SidePaletteView extends ItemView {
     const target: OutlineSelectionTarget = { kind: "item", id: itemId }; this.outlineRows.push(target);
     const layout = this.plugin.activeWorkspace()?.sideLayout; const children = structure.childItemIds[itemId] ?? [];
     const collapsed = layout?.collapsedItemIds.includes(itemId) ?? false;
-    const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${this.outlineTargetSelected(target) ? " is-selected" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.itemId = itemId;
+    const selected = this.outlineTargetSelected(target);
+    const showMarker = selected && this.outlineSelection.length > 1;
+    const row = parent.createDiv({ cls: `cp-outline-item cp-outline-item--${item.type}${selected ? " is-selected" : ""}${this.query && this.plugin.search.matches(item, this.query) ? " is-match" : ""}`, attr: { style: `--cp-depth:${depth}` } }); row.dataset.itemId = itemId; row.draggable = true;
     if (children.length) {
       const arrow = row.createEl("button", { cls: "cp-outline-arrow", attr: { "aria-label": collapsed ? "Expand structure" : "Collapse structure" } }); setIcon(arrow, collapsed ? "chevron-right" : "chevron-down");
       arrow.addEventListener("click", (event) => { event.stopPropagation(); if (!layout) return; layout.collapsedItemIds = collapsed ? layout.collapsedItemIds.filter((id) => id !== itemId) : [...layout.collapsedItemIds, itemId]; this.plugin.store.changed(); });
     } else row.createSpan({ cls: "cp-outline-arrow cp-outline-arrow--empty" });
     const icon = row.createSpan({ cls: "cp-outline-item__icon" }); setIcon(icon, item.type === "image" ? "image" : item.type === "markdown" ? "file-text" : item.type === "group" ? "group" : "sticky-note");
+    if (showMarker) row.createSpan({ cls: "cp-outline-item__check", text: "✓" });
     row.createSpan({ cls: "cp-outline-item__title", text: item.displayTitle });
+    const metadata = row.createSpan({ cls: "cp-outline-item__metadata" });
+    for (const tag of item.tags) metadata.createSpan({ cls: "cp-outline-item__tag", text: `#${tag}` });
+    if (item.label) { const label = metadata.createSpan({ cls: "cp-outline-item__label", text: item.label }); if (item.labelColor) label.style.setProperty("--cp-label-color", item.labelColor); }
     let clickTimer: number | null = null;
     row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.pendingReveal = "viewport"; this.selectOutlineTarget(target, event); }, 220); });
-    row.addEventListener("dblclick", () => { if (clickTimer !== null) window.clearTimeout(clickTimer); void this.plugin.openSideItemPreview(itemId); });
+    row.addEventListener("dblclick", () => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; void this.plugin.openSideItemPreview(itemId); });
+    row.addEventListener("contextmenu", (event) => { if (!this.outlineTargetSelected(target)) this.selectOutlineTarget(target); this.itemMenu(event, item, true); });
+    row.addEventListener("dragstart", (event) => { const selectedIds = this.sideSelectedIds(); event.dataTransfer?.setData("application/x-canvas-palette-item", item.id); event.dataTransfer?.setData("application/x-canvas-palette-items", JSON.stringify(selectedIds.includes(item.id) ? selectedIds : [item.id])); if (event.dataTransfer) event.dataTransfer.effectAllowed = "copyMove"; row.addClass("is-dragging"); });
+    row.addEventListener("dragend", () => row.removeClass("is-dragging"));
+    this.mountOutlineItemDropTarget(row, item.id, null, null);
     if (!collapsed) for (const childId of children) this.renderOutlineStructureItem(parent, structure, childId, depth + 1, new Set([...ancestors, itemId]));
   }
 

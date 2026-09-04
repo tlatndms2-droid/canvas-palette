@@ -369,8 +369,7 @@ export default class CanvasPalettePlugin extends Plugin {
     if (result === "missing") { new Notice("선택한 Workspace를 찾을 수 없습니다."); return; }
     this.store.data.uiState.activeWorkspaceId = workspaceId; this.store.changed();
     await this.openSidePalette();
-    if (result === "duplicate") new Notice("같은 구조가 이미 Outliner에 있습니다.");
-    else new Notice("선택한 Canvas 구조를 Side Palette에 추가했습니다.");
+    new Notice("선택한 Canvas 구조를 독립 복사본으로 Side Palette에 추가했습니다.");
   }
 
 

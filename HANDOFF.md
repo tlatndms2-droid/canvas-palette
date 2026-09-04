@@ -52,7 +52,7 @@ The user distinguishes these modes precisely:
 
 **Status:** Implemented and Sandbox-validated for `0.3.60`. The release contains only the inline title/body editing and Explorer Canvas-opening contract below; unrelated worktree changes remain uncommitted.
 
-**Detailed companion:** [`docs/SIDE_PALETTE_INLINE_EDITING_PLAN.md`](docs/SIDE_PALETTE_INLINE_EDITING_PLAN.md) is the implementation-ready UI and verification specification for this pending work.
+**Detailed companion:** [`docs/SIDE_PALETTE_INLINE_EDITING_PLAN.md`](docs/SIDE_PALETTE_INLINE_EDITING_PLAN.md) records the UI and verification specification for this released work.
 
 ### Exact UI contract
 
@@ -65,7 +65,7 @@ The user distinguishes these modes precisely:
    - Card saves the edited text through `PaletteStore.updateItem(...content)`.
    - Markdown saves the linked original `.md` through the native editor's normal file-save path; fail gracefully with the existing unavailable-source Notice when its source is missing.
    - While the body editor is open, disable card dragging and stop editor pointer/click/double-click propagation into the card. Keep the editor within the current card body/height and let its body scroll rather than opening a floating editor.
-   - Clicking outside the card or pressing `Escape` saves and closes the inline editor. Starting another inline editor must first save/close the currently active one.
+   - Clicking outside the card or pressing `Escape` saves and closes the inline editor. `Ctrl/Cmd+S` saves without closing it. Starting another inline editor must first save/close the currently active one.
 4. **Existing double-click remains.** Outside title inputs, header buttons, and an active inline editor, a card double-click retains the existing full native Quick Editor route. The inline controls must not trigger that handler.
 5. **Workspace Explorer Canvas opening.** Keep the existing ownership tree scope: only Canvas paths with at least one Canvas Workspace appear. Add a visible right-side `Canvas 열기 ↗` button to each Canvas-folder row. It opens the real `.canvas` in an Obsidian tab. The left `› / ⌄` control continues to only collapse/expand that Canvas's Workspace rows. Do not turn folder-row clicks into Canvas opening; Workspace-row double-click continues to select/open its Workspace in Side Palette.
 
@@ -92,6 +92,8 @@ The user distinguishes these modes precisely:
 
 ## Current state
 
+- Version: `0.3.64` (independent Canvas-structure copies and Markdown-to-Card conversion).
+- `0.3.64`: Canvas structure collection now creates new independent Palette Items instead of reusing existing Items. Markdown nodes become standalone Cards with a snapshot of their content and a reference-only `sourceReferencePath`; original files, Canvas links, and source Items are not modified. Repeated collection creates another independent copy. Structure rows now support the same drag-and-drop and context-menu actions as regular Outliner rows. Validation: 107 automated tests, TypeScript no-emit, production build, and `git diff --check` passed. Runtime Sandbox validation remains pending.
 - Version: `0.3.59` (global Canvas caption control and metadata order release).
 - `0.3.59`: Canvas itself now owns the bottom-right `캡션` popover. Its `8–32px` slider persists one global `canvasCaptionFontSize` value and immediately renders that same size for every Canvas Item caption; legacy per-Item size values are retained only for data compatibility and no longer affect display. Palette captions remain independent at fixed 11px, render inside a clearly separated final card row, and do not change when the Canvas slider moves. `Edit Palette Metadata` places the optional single-file `File name` first and removes the per-Item size input. Schema 27 migrates the shared value to 11px. Validation: 106 automated tests, TypeScript no-emit, production build, and `git diff --check` passed. A dedicated Sandbox profile launched only the isolated Vault, but its hidden process exposed no window title, so the required Vault-title confirmation and runtime UI interaction were not claimed. The plugin assets, `data.json`, `Mini Test.canvas`, and `workspace.json` were restored to their recorded backup SHA-256 hashes.
 - `0.3.58`: Explorer Canvas folders now list only Canvases with at least one Canvas Workspace, while `Canvas로 이동…` still lists all Vault Canvases. Workspace `⋯` and right-click menus preserve their pointer location across Explorer rerenders. Side header export controls moved into the Item context menu: Mini Palette transfer, individual Canvas export, and current-Workspace export. `Edit Palette Metadata` added the now-superseded synced per-Item Canvas caption size and a single Canvas file-node rename field. Palette captions now render inside fixed-height cards rather than being clipped outside. Schema 26 persisted caption size with an 11px migration default. Validation: 106 automated tests, TypeScript no-emit, production build, and `git diff --check` passed. A fresh registered Sandbox profile and backup were created, but this host rejected both background Obsidian launch attempts before a process or CDP target could start; no runtime interaction was claimed. `data.json`, workspace, Canvas, and the original Sandbox plugin assets were restored to their recorded SHA-256 hashes.
