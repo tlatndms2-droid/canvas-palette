@@ -1,7 +1,7 @@
 import type CanvasPalettePlugin from "../main";
 import { DEFAULT_SIDE_LAYOUT, migrateData } from "./defaults";
 import { createId } from "./ids";
-import type { CardFace, Collection, NumberedCanvasLink, OutlineStructure, PaletteData, PaletteItem, PaletteMetadata, PaletteWorkspace } from "./types";
+import type { CardFace, Collection, NumberedCanvasLink, PaletteData, PaletteItem, PaletteMetadata, PaletteWorkspace } from "./types";
 
 type Listener = () => void;
 
@@ -15,9 +15,10 @@ export class PaletteStore {
   async load(): Promise<void> {
     this.data = migrateData(await this.plugin.loadData() as Partial<PaletteData> | null);
     this.ensureArchiveWorkspace(false);
+    const migratedOutlineStructures = this.migrateOutlineStructuresToCollections();
     const repairedDuplicates = this.repairDuplicateCanvasItems();
     if (!this.data.uiState.activeWorkspaceId || !this.data.workspaces[this.data.uiState.activeWorkspaceId]) this.data.uiState.activeWorkspaceId = this.archiveWorkspace().id;
-    if (repairedDuplicates) await this.flush();
+    if (migratedOutlineStructures || repairedDuplicates) await this.flush();
   }
 
   subscribe(listener: Listener): () => void {
@@ -49,9 +50,10 @@ export class PaletteStore {
     return workspace;
   }
 
-  saveOutlineStructure(workspaceId: string, input: Omit<OutlineStructure, "id" | "itemIds" | "rootItemIds" | "childItemIds"> & { roots: string[]; children: Record<string, string[]>; items: PaletteItem[] }): "saved" | "missing" {
+  saveOutlineCollection(workspaceId: string, input: { name: string; roots: string[]; children: Record<string, string[]>; items: PaletteItem[] }): "saved" | "missing" {
     const workspace = this.data.workspaces[workspaceId];
     if (!workspace) return "missing";
+    const collection = this.createCollection(workspaceId, input.name);
     const mapped = new Map<string, string>();
     for (const item of input.items) {
       const sourceReferencePath = item.type === "markdown" ? item.origin.filePath : item.sourceReferencePath;
@@ -61,10 +63,11 @@ export class PaletteStore {
         type: item.type === "markdown" ? "card" : item.type,
         origin: { workspaceId },
         canvasPlacements: [],
+        parentItemId: null,
+        childItemIds: [],
         ...(sourceReferencePath ? { sourceReferencePath } : {})
       };
       this.data.items[stored.id] = stored;
-      if (!workspace.looseItemIds.includes(stored.id)) workspace.looseItemIds.push(stored.id);
       const nodeId = item.origin.canvasNodeId;
       if (nodeId) mapped.set(nodeId, stored.id);
     }
@@ -74,12 +77,38 @@ export class PaletteStore {
       const parentId = mapped.get(parentNodeId); if (!parentId || !this.data.items[parentId]) continue;
       children[parentId] = [...new Set(nodeIds.map((nodeId) => mapped.get(nodeId)).filter((id): id is string => Boolean(id)))];
     }
-    const itemIds: string[] = [...new Set([...roots, ...Object.values(children).flat()])];
-    const fingerprint = `${input.canvasPath}:${input.rule}:${[...itemIds].sort().join("|")}:${Object.entries(children).sort(([a], [b]) => a.localeCompare(b)).map(([parent, ids]) => `${parent}>${ids.join(",")}`).join("|")}`;
-    const structures = workspace.outlineStructures ??= [];
-    structures.push({ id: `${fingerprint}:${createId("outline")}`, canvasPath: input.canvasPath, rule: input.rule, rootItemIds: roots, childItemIds: children, itemIds });
+    collection.itemIds.push(...roots);
+    for (const [parentId, childIds] of Object.entries(children)) {
+      const parent = this.data.items[parentId]; if (!parent) continue;
+      parent.childItemIds = childIds;
+      for (const childId of childIds) { const child = this.data.items[childId]; if (child) child.parentItemId = parentId; }
+    }
     workspace.modifiedAt = Date.now(); this.changed();
     return "saved";
+  }
+
+  private migrateOutlineStructuresToCollections(): boolean {
+    let migrated = false;
+    for (const workspace of Object.values(this.data.workspaces)) {
+      const structures = workspace.outlineStructures ?? [];
+      if (structures.length === 0) continue;
+      for (const structure of structures) {
+        const name = structure.canvasPath.split("/").pop()?.replace(/\.canvas$/i, "") || "Canvas 구조";
+        const collection = this.createCollection(workspace.id, name);
+        const roots = structure.rootItemIds.filter((id) => Boolean(this.data.items[id]));
+        collection.itemIds.push(...roots);
+        workspace.looseItemIds = workspace.looseItemIds.filter((id) => !roots.includes(id));
+        for (const [parentId, childIds] of Object.entries(structure.childItemIds)) {
+          const parent = this.data.items[parentId]; if (!parent) continue;
+          const children = childIds.filter((id) => Boolean(this.data.items[id]));
+          parent.childItemIds = children;
+          for (const childId of children) this.data.items[childId].parentItemId = parentId;
+        }
+      }
+      workspace.outlineStructures = [];
+      migrated = true;
+    }
+    return migrated;
   }
 
 

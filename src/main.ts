@@ -365,11 +365,11 @@ export default class CanvasPalettePlugin extends Plugin {
       parents.add(edge.toNode);
     }
     const roots = [...ids].filter((id) => !parents.has(id));
-    const result = this.store.saveOutlineStructure(workspaceId, { canvasPath: selection.canvasPath, rule, roots, children, items: selection.items });
+    const result = this.store.saveOutlineCollection(workspaceId, { name: selection.title, roots, children, items: selection.items });
     if (result === "missing") { new Notice("선택한 Workspace를 찾을 수 없습니다."); return; }
     this.store.data.uiState.activeWorkspaceId = workspaceId; this.store.changed();
     await this.openSidePalette();
-    new Notice("선택한 Canvas 구조를 독립 복사본으로 Side Palette에 추가했습니다.");
+    new Notice("선택한 Canvas 구조를 일반 Outliner 폴더로 추가했습니다.");
   }
 
 

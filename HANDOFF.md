@@ -92,6 +92,8 @@ The user distinguishes these modes precisely:
 
 ## Current state
 
+- Version: `0.3.65` (Canvas group collection becomes a normal Outliner folder).
+- `0.3.65`: Canvas group/structure collection now expands selected group contents into independent Cards and adds them to a regular Outliner Collection named from the Canvas group label or Canvas name. The resulting folder and cards use the same drag/drop, context-menu, rename, delete, and nested-folder behavior as existing Outliner content. Existing `0.3.64` saved structure views migrate to normal Collections on load so they no longer remain a separate interaction area. Validation: 107 automated tests, TypeScript no-emit, production build, and `git diff --check` passed. Sandbox runtime interaction was not performed.
 - Version: `0.3.64` (independent Canvas-structure copies and Markdown-to-Card conversion).
 - `0.3.64`: Canvas structure collection now creates new independent Palette Items instead of reusing existing Items. Markdown nodes become standalone Cards with a snapshot of their content and a reference-only `sourceReferencePath`; original files, Canvas links, and source Items are not modified. Repeated collection creates another independent copy. Structure rows now support the same drag-and-drop and context-menu actions as regular Outliner rows. Validation: 107 automated tests, TypeScript no-emit, production build, and `git diff --check` passed. Runtime Sandbox validation remains pending.
 - Version: `0.3.59` (global Canvas caption control and metadata order release).

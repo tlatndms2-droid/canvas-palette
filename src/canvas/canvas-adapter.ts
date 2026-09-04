@@ -32,7 +32,7 @@ export interface CanvasRuntimeNodeLike {
 interface CanvasViewLike { getViewType?: () => string; file?: TFile; containerEl?: HTMLElement; canvas?: CanvasRuntimeLike; }
 export interface CanvasContext { file: TFile; view: CanvasViewLike; runtime: CanvasRuntimeLike; }
 export interface CanvasExportEntry { id: string; name: string; parentId: string | null; item?: PaletteItem; }
-export interface CanvasOutlineSelection { canvasPath: string; items: PaletteItem[]; nodeIds: string[]; edges: Array<{ fromNode: string; toNode: string }>; positions: Record<string, { x: number; y: number }>; }
+export interface CanvasOutlineSelection { canvasPath: string; title: string; items: PaletteItem[]; nodeIds: string[]; edges: Array<{ fromNode: string; toNode: string }>; positions: Record<string, { x: number; y: number }>; }
 export interface ExportBundle {
   nodes: CanvasNodeSnapshot[];
   edges: CanvasEdgeSnapshot[];
@@ -454,12 +454,18 @@ export class CanvasAdapter {
     const nodeIds = this.runtimeSelectionIds(context.view);
     if (nodeIds.length === 0) { new Notice("Select one or more Canvas items first."); return null; }
     const selected = new Set(nodeIds);
-    const nodes = document.nodes.filter((node) => selected.has(node.id));
+    const selectedNodes = document.nodes.filter((node) => selected.has(node.id));
+    const selectedGroups = selectedNodes.filter((node) => node.type === "group");
+    const expanded = new Set(selectedNodes.filter((node) => node.type !== "group").map((node) => node.id));
+    for (const group of selectedGroups) for (const node of this.expandGroupNodes(document.nodes, [group.id])) if (node.type !== "group") expanded.add(node.id);
+    const nodes = document.nodes.filter((node) => expanded.has(node.id));
+    if (nodes.length === 0) { new Notice("The selected Canvas group has no items to collect."); return null; }
     return {
       canvasPath: context.file.path,
-      items: await this.collectIds(document, context.file.path, nodeIds),
-      nodeIds,
-      edges: document.edges.filter((edge) => selected.has(edge.fromNode) && selected.has(edge.toNode)).map((edge) => ({ fromNode: edge.fromNode, toNode: edge.toNode })),
+      title: selectedGroups[0]?.label?.trim() || `${context.file.basename} 구조`,
+      items: await this.collectIds(document, context.file.path, [...expanded]),
+      nodeIds: [...expanded],
+      edges: document.edges.filter((edge) => expanded.has(edge.fromNode) && expanded.has(edge.toNode)).map((edge) => ({ fromNode: edge.fromNode, toNode: edge.toNode })),
       positions: Object.fromEntries(nodes.map((node) => [node.id, { x: node.x, y: node.y }]))
     };
   }
