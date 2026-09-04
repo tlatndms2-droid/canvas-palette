@@ -326,7 +326,7 @@ export class SidePaletteView extends ItemView {
       else if (facet === "label") addValues([item.label]);
       else if (facet === "type") addValues([item.type]);
       else if (facet === "file") addValues([item.displayTitle]);
-      else if (facet === "path") addValues([item.origin.filePath ?? ""]);
+      else if (facet === "path") addValues([item.origin.filePath ?? item.sourceReferencePath ?? ""]);
       else if (facet === "space") addValues([item.origin.canvasPath && item.origin.canvasNodeId ? item.origin.canvasPath : "", ...item.canvasPlacements.filter((placement) => placement.nodeIds.length > 0).map((placement) => placement.canvasPath)]);
       else if (facet === "group") addValues(this.searchContextForItem(workspaceId, item).groupNames ?? []);
     }
@@ -930,7 +930,7 @@ export class SidePaletteView extends ItemView {
     const linkedLocations = this.plugin.store.linkedCanvasLocations(item);
     if (linkedLocations.length > 0) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => this.plugin.findLinkedCanvas(item)));
     if (item.type === "link" && /^https?:\/\//i.test(item.webLink?.url ?? "")) menu.addItem((entry) => entry.setTitle("Open web link").setIcon("external-link").onClick(() => this.plugin.openWebLink(item)));
-    else if (item.origin.filePath) menu.addItem((entry) => entry.setTitle("Open source file").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
+    else if (item.origin.filePath || ((item.type === "image" || item.type === "video") && item.sourceReferencePath)) menu.addItem((entry) => entry.setTitle("Open source file").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
     menu.addSeparator(); menu.addItem((entry) => entry.setTitle(`Delete${targetIds.length > 1 ? ` ${targetIds.length} items` : ""}`).setIcon("trash").onClick(() => this.confirmDelete(targetIds)));
     menu.showAtMouseEvent(event);
   }

@@ -1,6 +1,7 @@
 import type CanvasPalettePlugin from "../main";
 import { DEFAULT_SIDE_LAYOUT, migrateData } from "./defaults";
 import { createId } from "./ids";
+import { IMAGE_EXTENSIONS } from "./media";
 import type { CardFace, Collection, GroupDecompositionInput, NumberedCanvasLink, PaletteData, PaletteItem, PaletteMetadata, PaletteWorkspace } from "./types";
 
 type Listener = () => void;
@@ -17,8 +18,9 @@ export class PaletteStore {
     this.ensureArchiveWorkspace(false);
     const migratedOutlineStructures = this.migrateOutlineStructuresToCollections();
     const repairedDuplicates = this.repairDuplicateCanvasItems();
+    const repairedImageReferences = this.repairIndependentImageReferences();
     if (!this.data.uiState.activeWorkspaceId || !this.data.workspaces[this.data.uiState.activeWorkspaceId]) this.data.uiState.activeWorkspaceId = this.archiveWorkspace().id;
-    if (migratedOutlineStructures || repairedDuplicates) await this.flush();
+    if (migratedOutlineStructures || repairedDuplicates || repairedImageReferences) await this.flush();
   }
 
   subscribe(listener: Listener): () => void {
@@ -56,7 +58,7 @@ export class PaletteStore {
     const collection = this.createCollection(workspaceId, input.name);
     const mapped = new Map<string, string>();
     for (const item of input.items) {
-      const sourceReferencePath = item.type === "markdown" || item.type === "video" ? item.origin.filePath : item.sourceReferencePath;
+      const sourceReferencePath = item.origin.filePath ?? item.sourceReferencePath;
       const stored: PaletteItem = {
         ...structuredClone(item),
         id: createId(item.type === "markdown" ? "card" : item.type),
@@ -85,6 +87,21 @@ export class PaletteStore {
     }
     workspace.modifiedAt = Date.now(); this.changed();
     return "saved";
+  }
+
+  /** Repairs only an unambiguous legacy image title; never guesses between files. */
+  repairIndependentImageReferences(): boolean {
+    const vault = this.plugin.app?.vault;
+    if (!vault) return false;
+    const images = vault.getFiles().filter((file) => IMAGE_EXTENSIONS.has(file.extension.toLowerCase()));
+    let repaired = false;
+    for (const item of Object.values(this.data.items)) {
+      if (item.type !== "image" || item.origin.filePath || item.sourceReferencePath) continue;
+      const matches = images.filter((file) => file.basename.localeCompare(item.displayTitle, undefined, { sensitivity: "accent" }) === 0);
+      if (matches.length !== 1) continue;
+      item.sourceReferencePath = matches[0].path; repaired = true;
+    }
+    return repaired;
   }
 
   /** Replaces one saved Canvas Group with ordinary Collections and independent Palette Items. */

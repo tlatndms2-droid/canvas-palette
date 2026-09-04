@@ -24,5 +24,7 @@ test("Canvas selection structure is saved independently from regular Outliner pl
   assert.match(await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8"), /renderOutlineStructureItem[\s\S]*?row\.draggable = true/);
   assert.doesNotMatch(store.match(/saveOutlineStructure[\s\S]*?return "saved"/)?.[0] ?? "", /detachWorkspaceLinks/);
   assert.match(modal, /Outliner 구조로 수집/);
-  assert.match(modal, /화살표 방향만 사용합니다/);
+  assert.match(main, /compareCanvasOrder/);
+  assert.match(main, /from\.x > to\.x/);
+  assert.match(modal, /왼쪽에서 오른쪽으로는 상위·하위/);
 });

@@ -18,8 +18,8 @@ export class PreviewService {
       if (!item.backContent) parent.createDiv({ cls: "cp-empty cp-back-empty", text: "Write on the back…" });
       return;
     }
-    if (item.type === "image" && item.origin.filePath) {
-      const file = this.app.vault.getAbstractFileByPath(item.origin.filePath);
+    if (item.type === "image" && (item.origin.filePath || item.sourceReferencePath)) {
+      const file = this.app.vault.getAbstractFileByPath(item.origin.filePath ?? item.sourceReferencePath!);
       if (file instanceof TFile) parent.createEl("img", { attr: { src: this.app.vault.getResourcePath(file), alt: item.displayTitle, draggable: "false" } });
       else parent.createDiv({ cls: "cp-empty", text: "Original image is unavailable." });
       return;
@@ -55,7 +55,7 @@ export class PreviewService {
       text.createSpan({ cls: "cp-link-preview__url", text: link.description || link.url });
       return;
     }
-    const source = item.content ?? item.origin.filePath ?? "No preview available.";
+    const source = item.content ?? item.origin.filePath ?? item.sourceReferencePath ?? "No preview available.";
     if (item.type === "markdown" || item.type === "card") {
       await MarkdownRenderer.render(this.app, compact ? source.slice(0, compactLimit) : source, parent, item.origin.filePath ?? "", this.component);
       return;

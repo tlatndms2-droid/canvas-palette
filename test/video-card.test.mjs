@@ -52,6 +52,6 @@ test("video cards use a native silent thumbnail and controlled large player", as
   assert.match(side, /item\.type === "video" \? "video"/);
   assert.match(mini, /"video"/);
   assert.match(main, /item\.type === "markdown" \|\| item\.type === "image" \|\| item\.type === "video"/);
-  assert.match(store, /item\.type === "markdown" \|\| item\.type === "video" \? item\.origin\.filePath/);
+  assert.match(store, /const sourceReferencePath = item\.origin\.filePath \?\? item\.sourceReferencePath/);
   assert.match(preview, /item\.origin\.filePath \|\| item\.sourceReferencePath/);
 });

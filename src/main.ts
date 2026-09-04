@@ -67,6 +67,10 @@ export default class CanvasPalettePlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.store.load();
+    this.app.workspace.onLayoutReady(() => window.setTimeout(() => {
+      if (!this.store.repairIndependentImageReferences()) return;
+      this.store.changed(); new Notice("독립 이미지 카드의 원본 경로를 복구했습니다.");
+    }, 0));
     this.lastCanvasPath = this.store.data.uiState.lastCanvasPath;
     this.reconcileLoadedMarkdownSources();
     this.register(this.dropController.mount(this.app.workspace.containerEl.ownerDocument));
@@ -348,7 +352,15 @@ export default class CanvasPalettePlugin extends Plugin {
   private async saveCanvasSelectionStructure(workspaceId: string, selection: Awaited<ReturnType<CanvasAdapter["collectOutlineSelection"]>>): Promise<void> {
     if (!selection) return;
     const ids = new Set(selection.items.map((item) => item.origin.canvasNodeId).filter((id): id is string => Boolean(id)));
-    const edges = selection.edges.filter((edge) => ids.has(edge.fromNode) && ids.has(edge.toNode));
+    const compareCanvasOrder = (left: string, right: string): number => {
+      const leftPosition = selection.positions[left]; const rightPosition = selection.positions[right];
+      if (leftPosition && rightPosition) return leftPosition.y - rightPosition.y || leftPosition.x - rightPosition.x || left.localeCompare(right);
+      return left.localeCompare(right);
+    };
+    const edges = selection.edges.filter((edge) => ids.has(edge.fromNode) && ids.has(edge.toNode)).map((edge) => {
+      const from = selection.positions[edge.fromNode]; const to = selection.positions[edge.toNode];
+      return from && to && from.x > to.x ? { fromNode: edge.toNode, toNode: edge.fromNode } : edge;
+    });
     const children: Record<string, string[]> = {}; const parents = new Set<string>();
     const reaches = (start: string, goal: string, seen = new Set<string>()): boolean => {
       if (start === goal) return true; if (seen.has(start)) return false; seen.add(start);
@@ -360,7 +372,8 @@ export default class CanvasPalettePlugin extends Plugin {
       if (!row.includes(edge.toNode)) row.push(edge.toNode);
       parents.add(edge.toNode);
     }
-    const roots = [...ids].filter((id) => !parents.has(id));
+    for (const row of Object.values(children)) row.sort(compareCanvasOrder);
+    const roots = [...ids].filter((id) => !parents.has(id)).sort(compareCanvasOrder);
     const result = this.store.saveOutlineCollection(workspaceId, { name: selection.title, roots, children, items: selection.items });
     if (result === "missing") { new Notice("선택한 Workspace를 찾을 수 없습니다."); return; }
     this.store.data.uiState.activeWorkspaceId = workspaceId; this.store.changed();
@@ -589,7 +602,7 @@ export default class CanvasPalettePlugin extends Plugin {
 
   async openOriginal(item: PaletteItem): Promise<void> {
     if (item.origin.canvasPath && item.origin.canvasNodeId && await this.canvas.revealNode(item.origin.canvasPath, item.origin.canvasNodeId)) return;
-    const sourcePath = item.origin.filePath ?? (item.type === "video" ? item.sourceReferencePath : undefined);
+    const sourcePath = item.origin.filePath ?? ((item.type === "image" || item.type === "video") ? item.sourceReferencePath : undefined);
     if (sourcePath) {
       const file = this.app.vault.getAbstractFileByPath(sourcePath);
       if (file instanceof TFile) { await this.app.workspace.getLeaf("tab").openFile(file); return; }
