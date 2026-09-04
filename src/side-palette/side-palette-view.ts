@@ -746,10 +746,14 @@ export class SidePaletteView extends ItemView {
     iconButton(row, "pencil", "Rename collection", () => new TextPromptModal(this.app, "Rename collection", collection.name, (value) => this.plugin.store.renameCollection(collection.id, value)).open());
     iconButton(row, "trash-2", "Delete collection", () => {
       const parentCollection = collection.parentId ? this.plugin.store.data.collections[collection.parentId] : null;
-      const destination = parentCollection?.name ?? this.plugin.store.data.workspaces[collection.workspaceId]?.name ?? "the Workspace";
+      const parentItem = collection.parentItemId ? this.plugin.store.data.items[collection.parentItemId] : null;
+      const destination = parentItem?.displayTitle ?? parentCollection?.name ?? this.plugin.store.data.workspaces[collection.workspaceId]?.name ?? "the Workspace";
       new ConfirmDeleteCollectionModal(this.app, collection.name, destination, collection.itemIds.length, collection.childCollectionIds.length, () => {
         this.outlineSelection = this.outlineSelection.filter((entry) => entry.kind !== "collection" || entry.id !== collection.id);
         this.plugin.store.removeCollection(collection.id);
+      }, () => {
+        this.outlineSelection = [];
+        this.plugin.store.removeCollectionWithContents(collection.id);
       }).open();
     });
     if (!collapsed) {

@@ -694,6 +694,50 @@ export class PaletteStore {
     this.changed();
   }
 
+  /** Removes a Collection and everything nested below it from Canvas Palette only. */
+  removeCollectionWithContents(id: string): void {
+    const root = this.data.collections[id];
+    if (!root) return;
+    const collectionIds = new Set<string>();
+    const itemIds = new Set<string>();
+    const collectItem = (itemId: string): void => {
+      if (itemIds.has(itemId)) return;
+      const item = this.data.items[itemId];
+      if (!item) return;
+      itemIds.add(itemId);
+      for (const childItemId of item.childItemIds ?? []) collectItem(childItemId);
+      for (const childCollectionId of item.childCollectionIds ?? []) collectCollection(childCollectionId);
+    };
+    const collectCollection = (collectionId: string): void => {
+      if (collectionIds.has(collectionId)) return;
+      const collection = this.data.collections[collectionId];
+      if (!collection) return;
+      collectionIds.add(collectionId);
+      for (const itemId of collection.itemIds) collectItem(itemId);
+      for (const childCollectionId of collection.childCollectionIds) collectCollection(childCollectionId);
+    };
+    collectCollection(id);
+
+    this.removeItems([...itemIds]);
+    for (const workspace of Object.values(this.data.workspaces)) {
+      workspace.rootCollectionIds = workspace.rootCollectionIds.filter((collectionId) => !collectionIds.has(collectionId));
+      workspace.outlineOrder = (workspace.outlineOrder ?? []).filter((entryId) => !collectionIds.has(entryId));
+      workspace.sideLayout.collapsedCollectionIds = workspace.sideLayout.collapsedCollectionIds.filter((collectionId) => !collectionIds.has(collectionId));
+      if (workspace.sideLayout.focusedCollectionId && collectionIds.has(workspace.sideLayout.focusedCollectionId)) workspace.sideLayout.focusedCollectionId = root.parentId;
+      if (workspace.sideLayout.selectedCollectionId && collectionIds.has(workspace.sideLayout.selectedCollectionId)) workspace.sideLayout.selectedCollectionId = root.parentId;
+    }
+    for (const collection of Object.values(this.data.collections)) {
+      collection.childCollectionIds = collection.childCollectionIds.filter((collectionId) => !collectionIds.has(collectionId));
+      collection.outlineOrder = (collection.outlineOrder ?? []).filter((entryId) => !collectionIds.has(entryId));
+    }
+    for (const item of Object.values(this.data.items)) {
+      item.childCollectionIds = (item.childCollectionIds ?? []).filter((collectionId) => !collectionIds.has(collectionId));
+      item.outlineOrder = (item.outlineOrder ?? []).filter((entryId) => !collectionIds.has(entryId));
+    }
+    for (const collectionId of collectionIds) delete this.data.collections[collectionId];
+    this.changed();
+  }
+
   moveCollection(id: string, parentId: string | null, targetId: string | null = null, insertAfter = false, parentItemId: string | null = null): void {
     const collection = this.data.collections[id];
     if (!collection || !this.canMoveCollection(id, parentId, parentItemId)) return;

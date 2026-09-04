@@ -23,7 +23,7 @@ test("Collection collapse remains authoritative while Viewport filters are activ
   assert.doesNotMatch(source, /if \(!collapsed \|\| Boolean\(this\.query\)\)/);
 });
 
-test("Collection deletion preserves items and promotes nested Collections", async () => {
+test("Collection deletion offers promotion or recursive Palette-only deletion", async () => {
   const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
   const store = await readFile(new URL("../src/core/store.ts", import.meta.url), "utf8");
   const modal = await readFile(new URL("../src/ui/modal.ts", import.meta.url), "utf8");
@@ -31,11 +31,17 @@ test("Collection deletion preserves items and promotes nested Collections", asyn
   assert.match(source, /iconButton\(row, "trash-2", "Delete collection"/);
   assert.match(source, /new ConfirmDeleteCollectionModal/);
   assert.match(store, /removeCollection\(id: string\)/);
+  assert.match(store, /removeCollectionWithContents\(id: string\)/);
   assert.match(removeCollection, /siblingIds\.splice\(index, 1, \.\.\.promotedChildren\)/);
   assert.match(removeCollection, /itemTarget\.push\(\.\.\.collection\.itemIds\.filter/);
   assert.match(removeCollection, /delete this\.data\.collections\[id\]/);
   assert.doesNotMatch(removeCollection, /delete this\.data\.items/);
-  assert.match(modal, /No Palette items, Vault files, or Canvas nodes will be deleted/);
+  assert.match(source, /removeCollectionWithContents\(collection\.id\)/);
+  assert.match(modal, /Collection만 삭제/);
+  assert.match(modal, /Collection과 내부 항목 모두 삭제/);
+  assert.match(modal, /원본 Vault 파일과 Canvas 노드는 삭제하지 않습니다/);
+  assert.match(store, /collectCollection\(id\)/);
+  assert.match(store, /for \(const collectionId of collectionIds\) delete this\.data\.collections\[collectionId\]/);
 });
 
 test("Outliner files support metadata, context menus, child files, and grouping selected items", async () => {

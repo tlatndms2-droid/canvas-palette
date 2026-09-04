@@ -92,6 +92,8 @@ The user distinguishes these modes precisely:
 
 ## Current state
 
+- Version: `0.3.72` (Collection deletion choice).
+- `0.3.72`: Deleting an Outliner Collection now opens a choice instead of immediately changing the hierarchy. `Collection만 삭제` keeps its Items and nested Collections, promoting them to the immediately enclosing Collection, Item, or Workspace in their existing order. `Collection과 내부 항목 모두 삭제` removes the selected Collection and every nested Palette Item and Collection. Neither choice deletes the original Vault files or Canvas nodes. Validation: 113 automated tests, TypeScript no-emit, production build, `git diff --check`, and an isolated Sandbox click-through of both choices. The promotion result and recursive deletion result both persisted after a dedicated Sandbox restart; `data.json` and `workspace.json` fixtures were restored to their pre-test hashes.
 - Version: `0.3.71` (mixed Outliner hierarchy movement).
 - `0.3.71`: Items and Collections can now both be dropped before, inside, or after either row at any Outliner depth. An Item may therefore contain Collections as well as Items, and Collections can be nested under Items. The only rejected moves are into the same entry or any descendant reached through the mixed hierarchy. Existing `0.3.70` Item/Collection order migrates without changing Item IDs, Vault files, or Canvas links. Validation: focused mixed-hierarchy tests, complete automated suite, TypeScript no-emit, production build, and `git diff --check` passed. An isolated `Canvas Palette 0371 Mixed Sandbox` loaded `0.3.71`; a Folder moved beneath a parent Item remained nested after restart and was visibly rendered after opening Outliner and expanding that Item.
 - Version: `0.3.70` (mixed Outliner folder and card ordering).
