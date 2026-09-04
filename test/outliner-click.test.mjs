@@ -23,25 +23,38 @@ test("Collection collapse remains authoritative while Viewport filters are activ
   assert.doesNotMatch(source, /if \(!collapsed \|\| Boolean\(this\.query\)\)/);
 });
 
-test("Collection deletion offers promotion or recursive Palette-only deletion", async () => {
+test("Collection and Item Collection deletion share the context-menu choice", async () => {
   const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
   const store = await readFile(new URL("../src/core/store.ts", import.meta.url), "utf8");
   const modal = await readFile(new URL("../src/ui/modal.ts", import.meta.url), "utf8");
   const removeCollection = store.match(/removeCollection\(id: string\): void \{[\s\S]*?\r?\n  \}\r?\n\r?\n  moveCollection/)?.[0] ?? "";
-  assert.match(source, /iconButton\(row, "trash-2", "Delete collection"/);
+  assert.doesNotMatch(source, /iconButton\(row, "trash-2", "Delete collection"/);
   assert.match(source, /new ConfirmDeleteCollectionModal/);
+  assert.match(source, /setTitle\("Delete"\).*onClick\(deleteCollection\)/);
+  assert.match(source, /confirmItemCollectionDelete\(item\)/);
   assert.match(store, /removeCollection\(id: string\)/);
   assert.match(store, /removeCollectionWithContents\(id: string\)/);
+  assert.match(store, /removeItemCollection\(id: string\)/);
+  assert.match(store, /removeItemCollectionWithContents\(id: string\)/);
   assert.match(removeCollection, /siblingIds\.splice\(index, 1, \.\.\.promotedChildren\)/);
   assert.match(removeCollection, /itemTarget\.push\(\.\.\.collection\.itemIds\.filter/);
   assert.match(removeCollection, /delete this\.data\.collections\[id\]/);
-  assert.doesNotMatch(removeCollection, /delete this\.data\.items/);
   assert.match(source, /removeCollectionWithContents\(collection\.id\)/);
   assert.match(modal, /Collection만 삭제/);
   assert.match(modal, /Collection과 내부 항목 모두 삭제/);
+  assert.match(modal, /아이템 Collection만 삭제/);
+  assert.match(modal, /아이템 Collection과 내부 항목 모두 삭제/);
   assert.match(modal, /원본 Vault 파일과 Canvas 노드는 삭제하지 않습니다/);
   assert.match(store, /collectCollection\(id\)/);
   assert.match(store, /for \(const collectionId of collectionIds\) delete this\.data\.collections\[collectionId\]/);
+});
+
+test("Item Collection arrows never open the preview and Item previews use the short click interval", async () => {
+  const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
+  assert.match(source, /arrow\.addEventListener\("dblclick", \(event\) => event\.stopPropagation\(\)\)/);
+  assert.match(source, /if \(\(event\.target as HTMLElement\)\.closest\("button"\)\) return; const now = performance\.now\(\); if \(now - lastPreviewClickAt <= 220\)/);
+  assert.match(source, /void this\.plugin\.openSideItemPreview\(item\.id\)/);
+  assert.match(source, /row\.addEventListener\("dblclick", \(event\) => \{ event\.preventDefault\(\); event\.stopPropagation\(\); \}\)/);
 });
 
 test("Outliner files support metadata, context menus, child files, and grouping selected items", async () => {

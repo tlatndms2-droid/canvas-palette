@@ -214,6 +214,22 @@ export class ConfirmDeleteCollectionModal extends Modal {
   onClose(): void { this.contentEl.empty(); }
 }
 
+export class ConfirmDeleteItemCollectionModal extends Modal {
+  constructor(app: App, private readonly name: string, private readonly destination: string, private readonly itemCount: number, private readonly childCount: number, private readonly onRemoveItemOnly: () => void, private readonly onRemoveEverything: () => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-confirm-modal");
+    this.contentEl.createEl("h2", { text: "아이템 Collection 삭제" });
+    this.contentEl.createEl("p", { text: `“${this.name}”을 어떻게 삭제할까요?` });
+    this.contentEl.createEl("p", { text: `안에 Item ${this.itemCount}개와 하위 Collection ${this.childCount}개가 있습니다.` });
+    this.contentEl.createEl("p", { text: "두 선택 모두 원본 Vault 파일과 Canvas 노드는 삭제하지 않습니다." });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
+    actions.createEl("button", { text: `아이템 Collection만 삭제 (${this.destination}로 이동)` }).addEventListener("click", () => { this.onRemoveItemOnly(); this.close(); });
+    actions.createEl("button", { text: "아이템 Collection과 내부 항목 모두 삭제", cls: "mod-warning" }).addEventListener("click", () => { this.onRemoveEverything(); this.close(); });
+  }
+  onClose(): void { this.contentEl.empty(); }
+}
+
 export class ConfirmCanvasReplacementModal extends Modal {
   private resolved = false;
   constructor(app: App, private readonly onResolve: (confirmed: boolean) => void) { super(app); }

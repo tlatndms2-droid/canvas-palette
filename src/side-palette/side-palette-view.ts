@@ -1,7 +1,7 @@
 import { ItemView, Menu, Notice, setIcon, TFile, WorkspaceLeaf } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { Collection, OutlineSelectionTarget, OutlineStructure, PaletteItem, SideLayoutState } from "../core/types";
-import { CardToMarkdownModal, ConfirmDeleteCollectionModal, ConfirmDeleteModal, GroupDecompositionModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
+import { CardToMarkdownModal, ConfirmDeleteCollectionModal, ConfirmDeleteItemCollectionModal, ConfirmDeleteModal, GroupDecompositionModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
 import { LinkedSpacesModal } from "../ui/linked-spaces-modal";
@@ -733,18 +733,10 @@ export class SidePaletteView extends ItemView {
     });
     row.addEventListener("dragstart", (event) => { this.draggedOutlineCollectionId = collection.id; event.dataTransfer?.setData("application/x-canvas-palette-collection", collection.id); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; row.addClass("is-dragging"); });
     row.addEventListener("dragend", () => { this.draggedOutlineCollectionId = null; row.removeClass("is-dragging"); });
-    row.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
-      if (!this.outlineTargetSelected(target)) this.selectOutlineTarget(target);
-      const menu = new Menu();
-      menu.addItem((entry) => entry.setTitle("Export selection as MindMap to Canvas").setIcon("git-branch").onClick(() => void this.plugin.exportOutlineSelectionAsMindMap(this.outlineSelection)));
-      menu.addItem((entry) => entry.setTitle("Export collection to Canvas").setIcon("file-output").onClick(() => void this.plugin.exportCollectionSubtree(collection.id)));
-      menu.showAtMouseEvent(event);
-    });
     this.mountOutlineDropTarget(row, collection.workspaceId, collection.id, collection.parentId, collection.parentItemId ?? null);
     iconButton(row, "plus", "Add nested collection", () => this.promptCollection(collection.workspaceId, collection.id));
     iconButton(row, "pencil", "Rename collection", () => new TextPromptModal(this.app, "Rename collection", collection.name, (value) => this.plugin.store.renameCollection(collection.id, value)).open());
-    iconButton(row, "trash-2", "Delete collection", () => {
+    const deleteCollection = (): void => {
       const parentCollection = collection.parentId ? this.plugin.store.data.collections[collection.parentId] : null;
       const parentItem = collection.parentItemId ? this.plugin.store.data.items[collection.parentItemId] : null;
       const destination = parentItem?.displayTitle ?? parentCollection?.name ?? this.plugin.store.data.workspaces[collection.workspaceId]?.name ?? "the Workspace";
@@ -755,6 +747,13 @@ export class SidePaletteView extends ItemView {
         this.outlineSelection = [];
         this.plugin.store.removeCollectionWithContents(collection.id);
       }).open();
+    };
+    row.addEventListener("contextmenu", (event) => {
+      event.preventDefault(); if (!this.outlineTargetSelected(target)) this.selectOutlineTarget(target);
+      const menu = new Menu();
+      menu.addItem((entry) => entry.setTitle("Export selection as MindMap to Canvas").setIcon("git-branch").onClick(() => void this.plugin.exportOutlineSelectionAsMindMap(this.outlineSelection)));
+      menu.addItem((entry) => entry.setTitle("Export collection to Canvas").setIcon("file-output").onClick(() => void this.plugin.exportCollectionSubtree(collection.id)));
+      menu.addSeparator(); menu.addItem((entry) => entry.setTitle("Delete").setIcon("trash").onClick(deleteCollection)); menu.showAtMouseEvent(event);
     });
     if (!collapsed) {
       for (const id of this.plugin.store.outlineEntryIds(collection.workspaceId, collection.id)) {
@@ -778,15 +777,16 @@ export class SidePaletteView extends ItemView {
       const arrow = row.createEl("button", { cls: "cp-outline-arrow", attr: { "aria-label": collapsed ? "Expand file children" : "Collapse file children" } });
       setIcon(arrow, collapsed ? "chevron-right" : "chevron-down");
       arrow.addEventListener("click", (event) => { event.stopPropagation(); if (!layout) return; layout.collapsedItemIds = collapsed ? layout.collapsedItemIds.filter((id) => id !== item.id) : [...layout.collapsedItemIds, item.id]; this.plugin.store.changed(); });
+      arrow.addEventListener("dblclick", (event) => event.stopPropagation());
     } else row.createSpan({ cls: "cp-outline-arrow cp-outline-arrow--empty" });
     const icon = row.createSpan({ cls: "cp-outline-item__icon" }); setIcon(icon, item.type === "image" ? "image" : item.type === "video" ? "video" : item.type === "markdown" ? "file-text" : item.type === "group" ? "group" : "sticky-note");
     if (showMarker) row.createSpan({ cls: "cp-outline-item__check", text: "✓" }); row.createSpan({ cls: "cp-outline-item__title", text: item.displayTitle });
     const metadata = row.createSpan({ cls: "cp-outline-item__metadata" });
     for (const tag of item.tags) metadata.createSpan({ cls: "cp-outline-item__tag", text: `#${tag}` });
     if (item.label) { const label = metadata.createSpan({ cls: "cp-outline-item__label", text: item.label }); if (item.labelColor) label.style.setProperty("--cp-label-color", item.labelColor); }
-    let clickTimer: number | null = null;
-    row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.pendingReveal = "viewport"; this.selectOutlineTarget(target, event); }, 220); });
-    row.addEventListener("dblclick", () => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; void this.plugin.openSideItemPreview(item.id); });
+    let clickTimer: number | null = null; let lastPreviewClickAt = 0;
+    row.addEventListener("click", (event) => { if ((event.target as HTMLElement).closest("button")) return; const now = performance.now(); if (now - lastPreviewClickAt <= 220) { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; lastPreviewClickAt = 0; void this.plugin.openSideItemPreview(item.id); return; } lastPreviewClickAt = now; if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.pendingReveal = "viewport"; this.selectOutlineTarget(target, event); }, 220); });
+    row.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); });
     row.addEventListener("contextmenu", (event) => { if (!this.outlineTargetSelected(target)) this.selectOutlineTarget(target); this.itemMenu(event, item, true); });
     row.addEventListener("dragstart", (event) => { const selectedIds = this.sideSelectedIds(); event.dataTransfer?.setData("application/x-canvas-palette-item", item.id); event.dataTransfer?.setData("application/x-canvas-palette-items", JSON.stringify(selectedIds.includes(item.id) ? selectedIds : [item.id])); if (event.dataTransfer) event.dataTransfer.effectAllowed = "copyMove"; row.addClass("is-dragging"); });
     row.addEventListener("dragend", () => row.removeClass("is-dragging"));
@@ -809,6 +809,7 @@ export class SidePaletteView extends ItemView {
     if (children.length) {
       const arrow = row.createEl("button", { cls: "cp-outline-arrow", attr: { "aria-label": collapsed ? "Expand structure" : "Collapse structure" } }); setIcon(arrow, collapsed ? "chevron-right" : "chevron-down");
       arrow.addEventListener("click", (event) => { event.stopPropagation(); if (!layout) return; layout.collapsedItemIds = collapsed ? layout.collapsedItemIds.filter((id) => id !== itemId) : [...layout.collapsedItemIds, itemId]; this.plugin.store.changed(); });
+      arrow.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); });
     } else row.createSpan({ cls: "cp-outline-arrow cp-outline-arrow--empty" });
     const icon = row.createSpan({ cls: "cp-outline-item__icon" }); setIcon(icon, item.type === "image" ? "image" : item.type === "video" ? "video" : item.type === "markdown" ? "file-text" : item.type === "group" ? "group" : "sticky-note");
     if (showMarker) row.createSpan({ cls: "cp-outline-item__check", text: "✓" });
@@ -816,9 +817,16 @@ export class SidePaletteView extends ItemView {
     const metadata = row.createSpan({ cls: "cp-outline-item__metadata" });
     for (const tag of item.tags) metadata.createSpan({ cls: "cp-outline-item__tag", text: `#${tag}` });
     if (item.label) { const label = metadata.createSpan({ cls: "cp-outline-item__label", text: item.label }); if (item.labelColor) label.style.setProperty("--cp-label-color", item.labelColor); }
-    let clickTimer: number | null = null;
-    row.addEventListener("click", (event) => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = window.setTimeout(() => { clickTimer = null; this.pendingReveal = "viewport"; this.selectOutlineTarget(target, event); }, 220); });
-    row.addEventListener("dblclick", () => { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; void this.plugin.openSideItemPreview(itemId); });
+    let clickTimer: number | null = null; let lastPreviewClickAt = 0;
+    row.addEventListener("click", (event) => {
+      if ((event.target as HTMLElement).closest("button")) return;
+      const now = performance.now();
+      if (now - lastPreviewClickAt <= 220) { if (clickTimer !== null) window.clearTimeout(clickTimer); clickTimer = null; lastPreviewClickAt = 0; void this.plugin.openSideItemPreview(itemId); return; }
+      lastPreviewClickAt = now;
+      if (clickTimer !== null) window.clearTimeout(clickTimer);
+      clickTimer = window.setTimeout(() => { clickTimer = null; this.pendingReveal = "viewport"; this.selectOutlineTarget(target, event); }, 220);
+    });
+    row.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); });
     row.addEventListener("contextmenu", (event) => { if (!this.outlineTargetSelected(target)) this.selectOutlineTarget(target); this.itemMenu(event, item, true); });
     row.addEventListener("dragstart", (event) => { const selectedIds = this.sideSelectedIds(); event.dataTransfer?.setData("application/x-canvas-palette-item", item.id); event.dataTransfer?.setData("application/x-canvas-palette-items", JSON.stringify(selectedIds.includes(item.id) ? selectedIds : [item.id])); if (event.dataTransfer) event.dataTransfer.effectAllowed = "copyMove"; row.addClass("is-dragging"); });
     row.addEventListener("dragend", () => row.removeClass("is-dragging"));
@@ -968,7 +976,10 @@ export class SidePaletteView extends ItemView {
     if (linkedLocations.length > 0) menu.addItem((entry) => entry.setTitle("Locate on Canvas").setIcon("locate-fixed").onClick(() => this.plugin.findLinkedCanvas(item)));
     if (item.type === "link" && /^https?:\/\//i.test(item.webLink?.url ?? "")) menu.addItem((entry) => entry.setTitle("Open web link").setIcon("external-link").onClick(() => this.plugin.openWebLink(item)));
     else if (item.origin.filePath || ((item.type === "image" || item.type === "video") && item.sourceReferencePath)) menu.addItem((entry) => entry.setTitle("Open source file").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
-    menu.addSeparator(); menu.addItem((entry) => entry.setTitle(`Delete${targetIds.length > 1 ? ` ${targetIds.length} items` : ""}`).setIcon("trash").onClick(() => this.confirmDelete(targetIds)));
+    menu.addSeparator(); menu.addItem((entry) => entry.setTitle(`Delete${targetIds.length > 1 ? ` ${targetIds.length} items` : ""}`).setIcon("trash").onClick(() => {
+      if (targetIds.length === 1 && ((item.childItemIds?.length ?? 0) > 0 || (item.childCollectionIds?.length ?? 0) > 0)) this.confirmItemCollectionDelete(item);
+      else this.confirmDelete(targetIds);
+    }));
     menu.showAtMouseEvent(event);
   }
 
@@ -1119,5 +1130,19 @@ export class SidePaletteView extends ItemView {
       window.addEventListener("pointermove", move, true); window.addEventListener("pointerup", finish, true); window.addEventListener("pointercancel", finish, true);
     });
   }
+  private confirmItemCollectionDelete(item: PaletteItem): void {
+    const workspace = this.plugin.store.workspaceForItem(item.id);
+    const parentItem = item.parentItemId ? this.plugin.store.data.items[item.parentItemId] : null;
+    const parentCollection = workspace ? Object.values(this.plugin.store.data.collections).find((collection) => collection.workspaceId === workspace.id && collection.itemIds.includes(item.id)) : null;
+    const destination = parentItem?.displayTitle ?? parentCollection?.name ?? workspace?.name ?? "the Workspace";
+    new ConfirmDeleteItemCollectionModal(this.app, item.displayTitle, destination, item.childItemIds?.length ?? 0, item.childCollectionIds?.length ?? 0, () => {
+      this.outlineSelection = this.outlineSelection.filter((entry) => entry.kind !== "item" || entry.id !== item.id);
+      this.plugin.store.removeItemCollection(item.id);
+    }, () => {
+      this.outlineSelection = [];
+      this.plugin.store.removeItemCollectionWithContents(item.id);
+    }).open();
+  }
+
   private confirmDelete(ids: string[]): void { if (ids.length > 0) new ConfirmDeleteModal(this.app, ids.length, () => this.plugin.store.removeItems(ids)).open(); }
 }

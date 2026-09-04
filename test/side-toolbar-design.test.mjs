@@ -23,10 +23,11 @@ test("Viewport keeps Memo and view modes while compacting selected-item deletion
   assert.match(styles, /\.cp-viewport-tools\{display:flex;align-items:flex-start/);
 });
 
-test("Outliner rows use compact aligned hierarchy controls without removing actions", () => {
+test("Outliner rows keep hierarchy controls while Collection deletion moves to the context menu", () => {
   assert.match(source, /iconButton\(row, "plus", "Add nested collection"/);
   assert.match(source, /iconButton\(row, "pencil", "Rename collection"/);
-  assert.match(source, /iconButton\(row, "trash-2", "Delete collection"/);
+  assert.doesNotMatch(source, /iconButton\(row, "trash-2", "Delete collection"/);
+  assert.match(source, /setTitle\("Delete"\).*onClick\(deleteCollection\)/);
   assert.match(styles, /\.cp-outliner \.cp-outline-arrow\{flex:0 0 19px;width:19px;height:19px\}/);
   assert.match(styles, /\.cp-outliner \.cp-outline-row>\.cp-icon-button\{flex:0 0 22px;width:22px;height:22px/);
 });
