@@ -1,5 +1,6 @@
 import type { PaletteData, SideLayoutState } from "./types";
 import { ASSET_DENSITY_DEFAULT, legacyDensity } from "../ui/asset-density";
+import { isVideoPath } from "./media";
 
 const captionFontSize = (value: unknown): number => Math.max(8, Math.min(32, typeof value === "number" && Number.isFinite(value) ? Math.round(value) : 11));
 
@@ -11,7 +12,7 @@ export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
 };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 29,
+  schemaVersion: 30,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4, canvasCaptionFontSize: 11 },
   items: {},
   workspaces: {},
@@ -47,9 +48,9 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
     ...structuredClone(DEFAULT_DATA),
     ...raw,
     settings: { ...DEFAULT_DATA.settings, ...migratedSettings, canvasCaptionFontSize: captionFontSize(rawSettings?.canvasCaptionFontSize), labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 29,
+    schemaVersion: 30,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
-      const repairedType = item.type === "markdown" && !item.origin?.filePath ? "card" : item.type;
+      const repairedType = item.type === "markdown" && !item.origin?.filePath ? "card" : item.type === "markdown" && isVideoPath(item.origin?.filePath) ? "video" : item.type;
       const supportsFaces = repairedType !== "group" && repairedType !== "link";
       const group = repairedType === "group" && item.group ? {
         ...item.group,
@@ -58,7 +59,7 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
       } : item.group;
       const rawLink = item.webLink;
       const webLink = repairedType === "link" && rawLink?.url ? { url: rawLink.url, siteName: rawLink.siteName ?? "", description: rawLink.description ?? "", thumbnailUrl: rawLink.thumbnailUrl ?? "", width: rawLink.width ?? 280, height: rawLink.height ?? 180, color: rawLink.color, capturedAt: rawLink.capturedAt ?? item.createdAt ?? migratedAt } : undefined;
-      return [id, { ...item, group, type: repairedType, webLink, sourceDeletedAt: repairedType === "markdown" ? item.sourceDeletedAt : undefined, backContent: supportsFaces ? item.backContent ?? "" : "", facesEnabled: supportsFaces && (item.facesEnabled ?? Boolean(item.backContent)), labelColor: item.labelColor ?? "", captionFontSize: captionFontSize(item.captionFontSize), canvasPlacements: item.canvasPlacements ?? [], parentItemId: item.parentItemId ?? null, childItemIds: item.childItemIds ?? [] }];
+      return [id, { ...item, group, type: repairedType, content: repairedType === "video" ? undefined : item.content, webLink, sourceDeletedAt: repairedType === "markdown" ? item.sourceDeletedAt : undefined, backContent: supportsFaces ? item.backContent ?? "" : "", facesEnabled: supportsFaces && (item.facesEnabled ?? Boolean(item.backContent)), labelColor: item.labelColor ?? "", captionFontSize: captionFontSize(item.captionFontSize), canvasPlacements: item.canvasPlacements ?? [], parentItemId: item.parentItemId ?? null, childItemIds: item.childItemIds ?? [] }];
     })),
     workspaces,
     collections: raw.collections ?? {},

@@ -7,7 +7,7 @@ const styles = await readFile(new URL("../styles.css", import.meta.url), "utf8")
 
 test("Viewport keeps the direct type and status filter buttons", () => {
   assert.match(source, /const filters = parent\.createDiv\(\{ cls: "cp-viewport-filters"/);
-  assert.match(source, /\[\["All", null\], \["Image", "image"\], \["MD", "markdown"\], \["Card", "card"\], \["Link", "link"\], \["Group", "group"\]\]/);
+  assert.match(source, /\[\["All", null\], \["Image", "image"\], \["Video", "video"\], \["MD", "markdown"\], \["Card", "card"\], \["Link", "link"\], \["Group", "group"\]\]/);
   assert.match(source, /text: "Unlinked"/);
   assert.match(source, /text: "Linked spaces"/);
   assert.doesNotMatch(source, /cp-filter-menu-button/);

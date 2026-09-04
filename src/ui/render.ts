@@ -7,6 +7,7 @@ export const TYPE_ICON: Record<PaletteItemType, string> = {
   card: "sticky-note",
   markdown: "file-text",
   image: "image",
+  video: "video",
   link: "link",
   group: "boxes"
 };
@@ -87,7 +88,7 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   const body = card.createDiv({ cls: "cp-item__body" });
   body.dataset.face = face;
   if (face === "back") body.setText(item.backContent || "Write on the back…");
-  else if (item.type === "image" && item.origin.filePath) body.createDiv({ cls: "cp-image-placeholder", text: item.origin.filePath });
+  else if ((item.type === "image" || item.type === "video") && item.origin.filePath) body.createDiv({ cls: item.type === "video" ? "cp-video-placeholder" : "cp-image-placeholder", text: item.origin.filePath });
   else if (item.type === "group") body.createDiv({ text: `${item.group?.nodes.length ?? 0} nodes · ${item.group?.edges.length ?? 0} edges` });
   else body.setText((item.content ?? item.origin.filePath ?? "No preview").slice(0, 240));
   if (canvasPaths.length > 0) {

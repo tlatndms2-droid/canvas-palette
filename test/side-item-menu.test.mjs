@@ -10,7 +10,7 @@ test("Side item menu uses focused metadata, move, and Find link actions", async 
 
   assert.match(source, /setTitle\("Edit tags, label & caption"\)/);
   assert.match(source, /setTitle\("Rename linked item"\)/);
-  assert.match(source, /item\.type === "image" \|\| item\.type === "markdown" \|\| item\.type === "group"/);
+  assert.match(source, /item\.type === "image" \|\| \(item\.type === "video" && Boolean\(item\.origin\.filePath\)\) \|\| item\.type === "markdown" \|\| item\.type === "group"/);
   assert.match(source, /setTitle\("Convert to shared Markdown…"\)/);
   assert.match(source, /new CardToMarkdownModal/);
   assert.match(source, /this\.plugin\.renameLinkedItem\(item\.id, value\)/);

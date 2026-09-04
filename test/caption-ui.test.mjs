@@ -12,7 +12,7 @@ test("Canvas captions use one Canvas-local control while Palette captions keep a
   assert.doesNotMatch(modal, /Caption font size \(Canvas\)/);
   assert.match(modal, /text: "File name"/);
   assert.ok(modal.indexOf('text: "File name"') < modal.indexOf('text: "Tags"'));
-  assert.match(main, /linkedItem && \(linkedItem\.type === "markdown" \|\| linkedItem\.type === "image"\)/);
+  assert.match(main, /linkedItem && \(linkedItem\.type === "markdown" \|\| linkedItem\.type === "image" \|\| linkedItem\.type === "video"\)/);
   assert.match(main, /source instanceof TFile \? \{ name: source\.basename, rename: \(name: string\) => this\.renameCanvasSourceFile/);
   assert.match(main, /renameLinkedItem\(linkedItem\.id, name\)/);
   assert.match(controller, /settings\.canvasCaptionFontSize/);

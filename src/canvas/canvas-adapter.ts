@@ -3,6 +3,7 @@ import { createId } from "../core/ids";
 import { findMarkdownNodeReplacement } from "../core/canvas-node-replacement";
 import { SerialTaskQueue } from "../core/serial-task-queue";
 import type { CanvasEdgeSnapshot, CanvasNodeSnapshot, PaletteItem, PaletteItemType, PaletteMetadata } from "../core/types";
+import { IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "../core/media";
 import { restoreGroup, serializeGroup } from "./group-serializer";
 import { bundleContentCollides } from "./placement-collision";
 
@@ -54,8 +55,6 @@ interface RestoredMaterial {
   warnings: string[];
 }
 
-const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
-
 export class CanvasAdapter {
   private readonly restoreQueue = new SerialTaskQueue();
   private readonly previousNodesByCanvas = new Map<string, Map<string, CanvasNodeSnapshot>>();
@@ -63,10 +62,17 @@ export class CanvasAdapter {
   constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined, private readonly restoreNodeMetadata: (canvasPath: string, records: Array<{ nodeId: string; metadata: PaletteMetadata }>) => void, private readonly linkedNodes: (item: PaletteItem, canvasPath: string) => string[] = () => [], private readonly onReplaced: (itemId: string, canvasPath: string, removedNodeIds: string[], newNodeIds: string[], existingNodeIds: Set<string>) => void = () => {}) {}
 
   activeContext(): CanvasContext | null {
-    const leaf = this.app.workspace.activeLeaf;
-    const view = leaf?.view as unknown as CanvasViewLike | undefined;
-    if (!view || view.getViewType?.() !== "canvas" || !view.file || !view.canvas) return null;
-    return { file: view.file, view, runtime: view.canvas };
+    const activeLeaf = this.app.workspace.activeLeaf;
+    const activeView = activeLeaf?.view as unknown as CanvasViewLike | undefined;
+    if (activeView?.getViewType?.() === "canvas" && activeView.file && activeView.canvas) {
+      return { file: activeView.file, view: activeView, runtime: activeView.canvas };
+    }
+    // Side Palette actions keep their own leaf active. When that happens, use
+    // the open Canvas so its visible selection can still be collected.
+    const canvasLeaf = this.app.workspace.getLeavesOfType("canvas")[0];
+    const canvasView = canvasLeaf?.view as unknown as CanvasViewLike | undefined;
+    if (!canvasView?.file || !canvasView.canvas) return null;
+    return { file: canvasView.file, view: canvasView, runtime: canvasView.canvas };
   }
 
   activeContainer(): HTMLElement | null { return this.activeContext()?.view.containerEl ?? null; }
@@ -414,7 +420,7 @@ export class CanvasAdapter {
   private batchRestorePositions(items: PaletteItem[], point: { x: number; y: number }): Array<{ x: number; y: number }> {
     const sizeFor = (item: PaletteItem): { width: number; height: number } => item.type === "group"
       ? { width: Math.max(280, item.group?.bounds.width ?? 280), height: Math.max(180, item.group?.bounds.height ?? 180) }
-      : item.type === "image" ? { width: 360, height: 240 } : { width: 280, height: 180 };
+      : item.type === "image" || item.type === "video" ? { width: 360, height: 240 } : { width: 280, height: 180 };
     const sizes = items.map(sizeFor);
     // Group snapshots can be much larger than ordinary cards, so a one-column batch guarantees their bounds never overlap.
     const columns = items.some((item) => item.type === "group") ? 1 : Math.max(1, Math.ceil(Math.sqrt(items.length)));
@@ -530,8 +536,8 @@ export class CanvasAdapter {
     const common = { tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", captionFontSize: metadata?.captionFontSize ?? 11, backContent: metadata?.backContent ?? "", facesEnabled: metadata?.facesEnabled ?? false, modifiedAt: metadata?.modifiedAt ?? now };
     if (node.type === "file" && node.file) {
       const file = this.app.vault.getAbstractFileByPath(node.file);
-      const isImage = file instanceof TFile && IMAGE_EXTENSIONS.has(file.extension.toLowerCase());
-      const type: PaletteItemType = isImage ? "image" : "markdown";
+      const extension = file instanceof TFile ? file.extension.toLowerCase() : "";
+      const type: PaletteItemType = IMAGE_EXTENSIONS.has(extension) ? "image" : VIDEO_EXTENSIONS.has(extension) ? "video" : "markdown";
       return { id: createId(type), type, displayTitle: file instanceof TFile ? file.basename : node.file, ...common, createdAt: now, origin: { canvasPath, canvasNodeId: node.id, filePath: node.file }, canvasPlacements: [], content: type === "markdown" && file instanceof TFile ? await this.app.vault.cachedRead(file) : undefined };
     }
     if (node.type === "link") {
@@ -620,9 +626,10 @@ export class CanvasAdapter {
       const text = this.exportCardText(item, headingLevel);
       return { node: { id: nextId(), type: "text", text, x, y, width: size.width, height: size.height }, warning: `${item.displayTitle}: Markdown source was unavailable, so stored content was exported as a Card.` };
     }
-    if (item.type === "image") {
-      const file = item.origin.filePath ? this.app.vault.getAbstractFileByPath(item.origin.filePath) : null;
-      if (!(file instanceof TFile)) return { node: null, warning: `${item.displayTitle}: image source was unavailable and was skipped.` };
+    if (item.type === "image" || item.type === "video") {
+      const path = item.origin.filePath ?? (item.type === "video" ? item.sourceReferencePath : undefined);
+      const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
+      if (!(file instanceof TFile)) return { node: null, warning: `${item.displayTitle}: ${item.type} source was unavailable and was skipped.` };
       return { node: { id: nextId(), type: "file", file: file.path, x, y, width: size.width, height: size.height } };
     }
     if (item.type === "link") {
@@ -731,7 +738,7 @@ export class CanvasAdapter {
   private itemNodeSize(item: PaletteItem, headingLevel?: number): { width: number; height: number } {
     if (item.type === "group") return { width: Math.max(280, item.group?.bounds.width ?? 280), height: Math.max(180, item.group?.bounds.height ?? 180) };
     const scale = headingLevel ? Math.max(0.72, 1 - (headingLevel - 1) * 0.08) : 1;
-    if (item.type === "image") return { width: Math.round(360 * scale), height: Math.round(240 * scale) };
+    if (item.type === "image" || item.type === "video") return { width: Math.round(360 * scale), height: Math.round(240 * scale) };
     return { width: Math.round(280 * scale), height: Math.round(180 * scale) };
   }
 

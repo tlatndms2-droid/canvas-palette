@@ -231,7 +231,7 @@ export default class CanvasPalettePlugin extends Plugin {
     if (!sources.length) return;
     const filePaths = new Set<string>();
     for (const item of sources) {
-      if ((item.type === "markdown" || item.type === "image") && item.origin.filePath) filePaths.add(item.origin.filePath);
+      if ((item.type === "markdown" || item.type === "image" || item.type === "video") && item.origin.filePath) filePaths.add(item.origin.filePath);
       for (const node of item.group?.nodes ?? []) if (node.type === "file" && typeof node.file === "string") filePaths.add(node.file);
     }
     for (const path of filePaths) if (!(this.app.vault.getAbstractFileByPath(path) instanceof TFile)) { new Notice(`Archive copy failed: ${path} is unavailable.`); return; }
@@ -429,7 +429,7 @@ export default class CanvasPalettePlugin extends Plugin {
     const linkedItem = targets.length === 1 ? this.store.linkedItemForNode(first.canvasPath, first.nodeId) : undefined;
     const sourcePath = targets.length === 1 ? (nodes[0] as { getData?: () => { file?: string } }).getData?.().file : undefined;
     const source = sourcePath ? this.app.vault.getAbstractFileByPath(sourcePath) : null;
-    const fileRename = linkedItem && (linkedItem.type === "markdown" || linkedItem.type === "image")
+    const fileRename = linkedItem && (linkedItem.type === "markdown" || linkedItem.type === "image" || linkedItem.type === "video")
       ? { name: linkedItem.displayTitle, rename: (name: string) => this.renameLinkedItem(linkedItem.id, name) }
       : source instanceof TFile ? { name: source.basename, rename: (name: string) => this.renameCanvasSourceFile(source.path, name) } : undefined;
     new MetadataEditorModal(this.app, this, current, (metadata) => {
@@ -593,8 +593,9 @@ export default class CanvasPalettePlugin extends Plugin {
 
   async openOriginal(item: PaletteItem): Promise<void> {
     if (item.origin.canvasPath && item.origin.canvasNodeId && await this.canvas.revealNode(item.origin.canvasPath, item.origin.canvasNodeId)) return;
-    if (item.origin.filePath) {
-      const file = this.app.vault.getAbstractFileByPath(item.origin.filePath);
+    const sourcePath = item.origin.filePath ?? (item.type === "video" ? item.sourceReferencePath : undefined);
+    if (sourcePath) {
+      const file = this.app.vault.getAbstractFileByPath(sourcePath);
       if (file instanceof TFile) { await this.app.workspace.getLeaf("tab").openFile(file); return; }
     }
     new Notice("The original item is unavailable.");
@@ -635,7 +636,7 @@ export default class CanvasPalettePlugin extends Plugin {
     if (!title) return false;
     const locations = this.store.linkedCanvasNodes(item);
     try {
-      if (item.type === "markdown" || item.type === "image") {
+      if (item.type === "markdown" || item.type === "image" || item.type === "video") {
         const source = item.origin.filePath ? this.app.vault.getAbstractFileByPath(item.origin.filePath) : null;
         if (!(source instanceof TFile)) { new Notice("The linked source file is unavailable."); return false; }
         const baseName = title.replace(new RegExp(`\\.${source.extension}$`, "i"), "");

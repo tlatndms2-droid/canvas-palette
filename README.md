@@ -2,12 +2,13 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, web links, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.59**
+Current version: **0.3.66**
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 
 ## Current implementation
 
+- Canvas에서 MP4, WebM, MOV, M4V, OGV 파일을 수집하면 글로 잘못 읽지 않고 전용 Video 카드로 보관합니다. Side Palette와 Mini Palette는 소리 없는 첫 장면 썸네일과 재생 시간을 표시하고, 더블클릭하면 기본 재생 조작을 갖춘 큰 영상 화면을 엽니다. 카드 삭제는 Palette 카드만 지우며 원본 영상 파일과 Canvas 항목은 남습니다. Side Palette가 현재 화면으로 선택된 상태에서도 열려 있는 Canvas의 선택 항목을 수집할 수 있습니다.
 - Workspace Explorer is a movable, resizable, collapsible non-blocking popup. It shows the current Canvas at the top, Canvas folders on the left, and General Workspaces on the right. Dragging a Workspace into a Canvas folder makes it Canvas-owned; dragging it to the General area removes that ownership without changing its Items, Collections, layout, files, or existing Canvas placements. Ctrl/Cmd, Shift, and checkboxes support multiple Workspace selection and batch move/delete actions.
 - Workspace Explorer shows only Canvas folders that currently own a Canvas Workspace; empty Canvases remain available as `Canvas로 이동…` targets. Its Workspace menu opens at the triggering button or pointer location. Side header export buttons have moved into the Item context menu, which offers Mini Palette transfer, individual Canvas export, and current-Workspace Canvas export.
 - Canvas Workspaces may share one Canvas and exactly one can be its representative. Moving a representative Workspace clears that role; no other Workspace is promoted automatically. Changing Canvas no longer changes the selected Workspace. `Current Canvas` opens the Explorer for an explicit representative selection or new Canvas Workspace.
@@ -75,6 +76,7 @@ Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/
 - **Card**: a text snapshot or Side Palette memo.
 - **Markdown**: references an existing Vault Markdown file; it is not copied or renamed.
 - **Image**: references an existing Vault image; it is not copied or renamed.
+- **Video**: references an existing Vault video; it is not copied or renamed.
 - **Link**: preserves a native Canvas external-link address and a one-time display snapshot; it is not copied into the Vault.
 - **Group**: a reusable Canvas subgraph snapshot containing nodes, internal edges, sizes, and relative layout.
 

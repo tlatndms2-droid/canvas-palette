@@ -1,7 +1,6 @@
 import { App, Component, MarkdownRenderer, TFile } from "obsidian";
 import type { CanvasEdgeSnapshot, CanvasNodeSnapshot, CardFace, GroupSnapshot, PaletteItem } from "../core/types";
-
-const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
+import { IMAGE_EXTENSIONS } from "../core/media";
 
 export class PreviewService {
   private readonly groupObservers = new WeakMap<HTMLElement, ResizeObserver>();
@@ -23,6 +22,20 @@ export class PreviewService {
       const file = this.app.vault.getAbstractFileByPath(item.origin.filePath);
       if (file instanceof TFile) parent.createEl("img", { attr: { src: this.app.vault.getResourcePath(file), alt: item.displayTitle, draggable: "false" } });
       else parent.createDiv({ cls: "cp-empty", text: "Original image is unavailable." });
+      return;
+    }
+    if (item.type === "video" && (item.origin.filePath || item.sourceReferencePath)) {
+      const file = this.app.vault.getAbstractFileByPath(item.origin.filePath ?? item.sourceReferencePath!);
+      if (!(file instanceof TFile)) { parent.createDiv({ cls: "cp-empty", text: "Original video is unavailable." }); return; }
+      const video = parent.createEl("video", { cls: compact ? "cp-video-thumbnail" : "cp-video-player", attr: { src: this.app.vault.getResourcePath(file), preload: "metadata", playsinline: "true", "aria-label": item.displayTitle } });
+      video.muted = compact;
+      video.controls = !compact;
+      if (compact) {
+        video.addEventListener("loadedmetadata", () => { if (Number.isFinite(video.duration) && video.duration > 0) video.currentTime = Math.min(.1, video.duration); }, { once: true });
+        video.addEventListener("error", () => { video.replaceWith(parent.createDiv({ cls: "cp-video-unavailable", text: `${file.extension.toUpperCase()} · Video preview unavailable` })); }, { once: true });
+        const badge = parent.createSpan({ cls: "cp-video-duration", text: "VIDEO" });
+        video.addEventListener("loadedmetadata", () => { const seconds = Math.round(video.duration); if (Number.isFinite(seconds)) badge.setText(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`); }, { once: true });
+      }
       return;
     }
     if (item.type === "group" && item.group) {

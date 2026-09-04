@@ -384,7 +384,7 @@ export class SidePaletteView extends ItemView {
       remove.addClass("mod-warning", "cp-selection-delete");
     }
     const filters = parent.createDiv({ cls: "cp-viewport-filters" });
-    const typeFilters = [["All", null], ["Image", "image"], ["MD", "markdown"], ["Card", "card"], ["Link", "link"], ["Group", "group"]] as const;
+    const typeFilters = [["All", null], ["Image", "image"], ["Video", "video"], ["MD", "markdown"], ["Card", "card"], ["Link", "link"], ["Group", "group"]] as const;
     for (const [label, type] of typeFilters) {
       const token = type ? `type:${type}` : null;
       const active = token ? this.plugin.search.hasToken(this.query, token) : !/\btype:/i.test(this.query);
@@ -768,7 +768,7 @@ export class SidePaletteView extends ItemView {
       setIcon(arrow, collapsed ? "chevron-right" : "chevron-down");
       arrow.addEventListener("click", (event) => { event.stopPropagation(); if (!layout) return; layout.collapsedItemIds = collapsed ? layout.collapsedItemIds.filter((id) => id !== item.id) : [...layout.collapsedItemIds, item.id]; this.plugin.store.changed(); });
     } else row.createSpan({ cls: "cp-outline-arrow cp-outline-arrow--empty" });
-    const icon = row.createSpan({ cls: "cp-outline-item__icon" }); setIcon(icon, item.type === "image" ? "image" : item.type === "markdown" ? "file-text" : item.type === "group" ? "group" : "sticky-note");
+    const icon = row.createSpan({ cls: "cp-outline-item__icon" }); setIcon(icon, item.type === "image" ? "image" : item.type === "video" ? "video" : item.type === "markdown" ? "file-text" : item.type === "group" ? "group" : "sticky-note");
     if (showMarker) row.createSpan({ cls: "cp-outline-item__check", text: "✓" }); row.createSpan({ cls: "cp-outline-item__title", text: item.displayTitle });
     const metadata = row.createSpan({ cls: "cp-outline-item__metadata" });
     for (const tag of item.tags) metadata.createSpan({ cls: "cp-outline-item__tag", text: `#${tag}` });
@@ -795,7 +795,7 @@ export class SidePaletteView extends ItemView {
       const arrow = row.createEl("button", { cls: "cp-outline-arrow", attr: { "aria-label": collapsed ? "Expand structure" : "Collapse structure" } }); setIcon(arrow, collapsed ? "chevron-right" : "chevron-down");
       arrow.addEventListener("click", (event) => { event.stopPropagation(); if (!layout) return; layout.collapsedItemIds = collapsed ? layout.collapsedItemIds.filter((id) => id !== itemId) : [...layout.collapsedItemIds, itemId]; this.plugin.store.changed(); });
     } else row.createSpan({ cls: "cp-outline-arrow cp-outline-arrow--empty" });
-    const icon = row.createSpan({ cls: "cp-outline-item__icon" }); setIcon(icon, item.type === "image" ? "image" : item.type === "markdown" ? "file-text" : item.type === "group" ? "group" : "sticky-note");
+    const icon = row.createSpan({ cls: "cp-outline-item__icon" }); setIcon(icon, item.type === "image" ? "image" : item.type === "video" ? "video" : item.type === "markdown" ? "file-text" : item.type === "group" ? "group" : "sticky-note");
     if (showMarker) row.createSpan({ cls: "cp-outline-item__check", text: "✓" });
     row.createSpan({ cls: "cp-outline-item__title", text: item.displayTitle });
     const metadata = row.createSpan({ cls: "cp-outline-item__metadata" });
@@ -897,7 +897,7 @@ export class SidePaletteView extends ItemView {
       }, "Group name").open();
     }));
     menu.addItem((entry) => entry.setTitle("Edit tags, label & caption").setIcon("tags").onClick(() => new TagLabelModal(this.app, this.plugin, targetIds).open()));
-    if (item.type === "image" || item.type === "markdown" || item.type === "group") menu.addItem((entry) => entry
+    if (item.type === "image" || (item.type === "video" && Boolean(item.origin.filePath)) || item.type === "markdown" || item.type === "group") menu.addItem((entry) => entry
       .setTitle("Rename linked item")
       .setIcon("pencil")
       .onClick(() => new TextPromptModal(this.app, "Rename linked item", item.displayTitle, (value) => this.plugin.renameLinkedItem(item.id, value), "Linked item name").open()));

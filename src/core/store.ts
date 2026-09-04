@@ -56,7 +56,7 @@ export class PaletteStore {
     const collection = this.createCollection(workspaceId, input.name);
     const mapped = new Map<string, string>();
     for (const item of input.items) {
-      const sourceReferencePath = item.type === "markdown" ? item.origin.filePath : item.sourceReferencePath;
+      const sourceReferencePath = item.type === "markdown" || item.type === "video" ? item.origin.filePath : item.sourceReferencePath;
       const stored: PaletteItem = {
         ...structuredClone(item),
         id: createId(item.type === "markdown" ? "card" : item.type),

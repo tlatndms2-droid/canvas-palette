@@ -1,4 +1,4 @@
-export type PaletteItemType = "card" | "markdown" | "image" | "link" | "group";
+export type PaletteItemType = "card" | "markdown" | "image" | "video" | "link" | "group";
 export type PaletteTheme = "obsidian" | "light" | "dark";
 export type AccentMode = "obsidian" | "custom";
 export type AssetViewMode = "grid" | "list";

@@ -25,7 +25,7 @@ test("Image Front Back remains opt-in instead of being enabled by item type", as
     }
   });
 
-  assert.equal(data.schemaVersion, 29);
+  assert.equal(data.schemaVersion, 30);
   assert.equal(data.settings.canvasCaptionFontSize, 11);
   assert.equal(data.items.ordinary.captionFontSize, 11);
   assert.equal(data.items.ordinary.facesEnabled, false);
@@ -46,7 +46,7 @@ test("schema 22 does not turn the former automatic Mini browser into explicit re
     pendingItemIds: [],
     uiState: { miniPalette: { hiddenStorageItemIds: [] } }
   });
-  assert.equal(data.schemaVersion, 29);
+  assert.equal(data.schemaVersion, 30);
   assert.deepEqual(data.uiState.miniPalette.storageItemIds, []);
   assert.equal("hiddenStorageItemIds" in data.uiState.miniPalette, false);
   await cleanup();
