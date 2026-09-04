@@ -9,6 +9,7 @@ interface CanvasMenuRuntime {
 interface CanvasNodeToolbarActions {
   editMetadata: (nodes: CanvasRuntimeNodeLike[]) => void;
   collectToMini: () => void;
+  cutToMini: () => void;
   saveToSide: (anchor: HTMLElement) => void;
   exportStructure: (anchor: HTMLElement) => void;
   supportsFaces: (node: CanvasRuntimeNodeLike) => boolean;
@@ -90,7 +91,7 @@ export class CanvasNodeToolbarController {
     const selectionKey = `${nodes.map((node) => this.nodeId(node)).sort().join("|")}:${supportsFaces ? "eligible" : "excluded"}:${facesEnabled ? "faces" : "plain"}:${linked ? "linked" : "local"}`;
     const currentButtons = menuEl.querySelectorAll(":scope > .cp-canvas-toolbar-action");
     const separator = menuEl.querySelector(":scope > .cp-canvas-toolbar-separator");
-    const expectedButtons = 4 + (singleNodeId && supportsFaces ? 1 : 0) + (linked ? 1 : 0);
+    const expectedButtons = 5 + (singleNodeId && supportsFaces ? 1 : 0) + (linked ? 1 : 0);
     if (nodes.length === 0) { this.clear(menuEl); return; }
     if (menuEl.dataset.cpToolbarSelectionKey === selectionKey && currentButtons.length === expectedButtons && separator) return;
     this.clear(menuEl);
@@ -98,6 +99,7 @@ export class CanvasNodeToolbarController {
     menuEl.createSpan({ cls: "cp-canvas-toolbar-separator", attr: { "aria-hidden": "true" } });
     this.button(menuEl, "tags", "Edit Palette Metadata", () => this.actions.editMetadata(nodes));
     this.button(menuEl, "inbox", "Collect to Mini Palette", () => this.actions.collectToMini());
+    this.button(menuEl, "scissors", "잘라내어 Mini Palette에 수집", () => this.actions.cutToMini(), "cp-canvas-toolbar-action--cut");
     this.button(menuEl, "panel-right", "Save directly to Side Palette", (button) => this.actions.saveToSide(button));
     this.button(menuEl, "git-branch", "선택한 구조를 Side Palette로 내보내기", (button) => this.actions.exportStructure(button));
     if (singleNodeId && supportsFaces && !facesEnabled) this.button(menuEl, "refresh-cw", "Enable Front / Back", () => this.actions.enableFaces(context.file.path, singleNodeId));
@@ -117,8 +119,8 @@ export class CanvasNodeToolbarController {
     delete menuEl.dataset.cpToolbarSelectionKey;
   }
 
-  private button(parent: HTMLElement, icon: string, label: string, action: (button: HTMLButtonElement) => void): void {
-    const button = parent.createEl("button", { cls: "clickable-icon cp-canvas-toolbar-action", attr: { "aria-label": label, "data-tooltip-position": "top", type: "button" } });
+  private button(parent: HTMLElement, icon: string, label: string, action: (button: HTMLButtonElement) => void, extraClass = ""): void {
+    const button = parent.createEl("button", { cls: `clickable-icon cp-canvas-toolbar-action ${extraClass}`, attr: { "aria-label": label, title: label, "data-tooltip-position": "top", type: "button" } });
     setIcon(button, icon);
     button.addEventListener("pointerdown", (event) => event.stopPropagation());
     button.addEventListener("click", (event) => {

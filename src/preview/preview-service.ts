@@ -40,6 +40,11 @@ export class PreviewService {
     }
     if (item.type === "group" && item.group) {
       await this.renderCanvasGroup(parent, item.group, item.origin.canvasPath ?? "", compact);
+      if (item.cutFromCanvas) {
+        const details = parent.createDiv({ cls: "cp-cut-collection__details" });
+        details.createSpan({ text: `${item.group.nodes.length}개 항목 · 내부 연결 ${item.group.edges.length}개` });
+        details.createSpan({ cls: "cp-cut-collection__status", text: "Canvas에서 잘라냄" });
+      }
       return;
     }
     if (item.type === "link" && item.webLink) {

@@ -42,6 +42,7 @@ export default class CanvasPalettePlugin extends Plugin {
   canvasToolbar = new CanvasNodeToolbarController(this.canvas, {
     editMetadata: (nodes) => this.editCanvasNodesMetadata(nodes),
     collectToMini: () => void this.collectCanvasSelection(),
+    cutToMini: () => void this.cutCanvasSelection(),
     saveToSide: (anchor) => this.saveCanvasSelectionFromToolbar(anchor),
     exportStructure: () => this.exportCanvasSelectionStructure(),
     supportsFaces: (node) => this.canvas.supportsFrontBack(node),
@@ -83,6 +84,7 @@ export default class CanvasPalettePlugin extends Plugin {
     this.addCommand({ id: "open-side-palette", name: "Open Side Palette", callback: () => void this.activateSidePalette() });
     this.addCommand({ id: "open-mini-palette", name: "Toggle Mini Palette on Canvas", callback: () => this.miniPalette.toggle() });
     this.addCommand({ id: "collect-canvas-selection", name: "Collect selected Canvas items", callback: () => void this.collectCanvasSelection() });
+    this.addCommand({ id: "cut-canvas-selection", name: "Cut selected Canvas items to Mini Palette", callback: () => void this.cutCanvasSelection() });
     this.addCommand({ id: "collect-selected-text", name: "Collect selected text as card", editorCheckCallback: (checking, editor, view) => {
       const selection = editor.getSelection();
       if (!selection) return false;
@@ -401,6 +403,16 @@ export default class CanvasPalettePlugin extends Plugin {
     this.store.data.uiState.miniPalette.tab = "collect";
     this.miniPalette.open();
     new Notice(`${collected.length} Canvas item${collected.length === 1 ? "" : "s"} collected in Mini Palette.`);
+  }
+
+  async cutCanvasSelection(): Promise<void> {
+    const cut = await this.canvas.cutSelection();
+    if (!cut) return;
+    if (this.store.reconcileCanvasLinks(cut.canvasPath, cut.remainingNodeIds)) this.store.changed();
+    this.store.collectCanvasItems([cut.item]);
+    this.store.data.uiState.miniPalette.tab = "collect";
+    this.miniPalette.open();
+    new Notice("Selected Canvas items were cut to Mini Palette.");
   }
 
   sendItemsToMini(itemIds: string[]): void {

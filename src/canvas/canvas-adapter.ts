@@ -34,6 +34,7 @@ interface CanvasViewLike { getViewType?: () => string; file?: TFile; containerEl
 export interface CanvasContext { file: TFile; view: CanvasViewLike; runtime: CanvasRuntimeLike; }
 export interface CanvasExportEntry { id: string; name: string; parentId: string | null; item?: PaletteItem; }
 export interface CanvasOutlineSelection { canvasPath: string; title: string; items: PaletteItem[]; nodeIds: string[]; edges: Array<{ fromNode: string; toNode: string }>; positions: Record<string, { x: number; y: number }>; }
+export interface CanvasCutSelection { item: PaletteItem; canvasPath: string; remainingNodeIds: Set<string>; }
 export interface ExportBundle {
   nodes: CanvasNodeSnapshot[];
   edges: CanvasEdgeSnapshot[];
@@ -169,6 +170,32 @@ export class CanvasAdapter {
     const document = await this.read(context.file);
     const selectedIds = this.runtimeSelectionIds(context.view);
     return this.collectIds(document, context.file.path, selectedIds);
+  }
+
+  async cutSelection(): Promise<CanvasCutSelection | null> {
+    const context = this.activeContext();
+    if (!context) { new Notice("Open a Canvas before cutting Canvas items."); return null; }
+    const current = context.runtime.getData?.();
+    if (!current || typeof current !== "object" || !context.runtime.setData) { new Notice("This Canvas runtime cannot remove selected items."); return null; }
+    const document = this.parse(JSON.stringify(current));
+    const selectedIds = this.runtimeSelectionIds(context.view);
+    if (selectedIds.length === 0) { new Notice("Select one or more Canvas items first."); return null; }
+    const selectedNodes = document.nodes.filter((node) => selectedIds.includes(node.id));
+    if (selectedNodes.length === 0) { new Notice("Unable to identify the selected Canvas items."); return null; }
+    const cutNodeIds = new Set(selectedNodes.map((node) => node.id));
+    for (const group of selectedNodes.filter((node) => node.type === "group")) for (const node of this.expandGroupNodes(document.nodes, [group.id])) cutNodeIds.add(node.id);
+    const cutNodes = document.nodes.filter((node) => cutNodeIds.has(node.id));
+    const item = this.groupItem(cutNodes, document.edges, context.file.path, selectedNodes[0].id, true);
+    if (!item) return null;
+    const next: CanvasDocument = {
+      ...document,
+      nodes: document.nodes.filter((node) => !cutNodeIds.has(node.id)),
+      edges: document.edges.filter((edge) => !cutNodeIds.has(edge.fromNode) && !cutNodeIds.has(edge.toNode))
+    };
+    try { await context.runtime.setData(next); }
+    catch (error) { console.error("Canvas Palette failed to cut selected Canvas items", error); new Notice("Unable to cut the selected Canvas items."); return null; }
+    context.runtime.requestSave?.();
+    return { item, canvasPath: context.file.path, remainingNodeIds: new Set(next.nodes.map((node) => node.id)) };
   }
 
   async collectNode(node: unknown): Promise<PaletteItem[]> {
@@ -615,7 +642,7 @@ export class CanvasAdapter {
     try { const parsed = new URL(url); const host = parsed.hostname.replace(/^www\./, "").toLowerCase(); const value = host === "youtu.be" ? parsed.pathname.slice(1) : host.endsWith("youtube.com") ? parsed.searchParams.get("v") ?? (/^\/(?:embed|shorts|live)\/([^/?#]+)/.exec(parsed.pathname)?.[1] ?? null) : null; return value && /^[A-Za-z0-9_-]{11}$/.test(value) ? value : null; } catch { return null; }
   }
 
-  private groupItem(nodes: CanvasNodeSnapshot[], edges: CanvasEdgeSnapshot[], canvasPath: string, nodeId: string): PaletteItem | null {
+  private groupItem(nodes: CanvasNodeSnapshot[], edges: CanvasEdgeSnapshot[], canvasPath: string, nodeId: string, cutFromCanvas = false): PaletteItem | null {
     if (nodes.length === 0) return null;
     const now = Date.now();
     const metadata = this.getMetadata(canvasPath, nodeId);
@@ -623,7 +650,7 @@ export class CanvasAdapter {
     snapshot.nodeBacks = Object.fromEntries(nodes.map((node) => [node.id, this.getMetadata(canvasPath, node.id)?.backContent ?? ""]).filter(([, back]) => Boolean(back)));
     snapshot.nodeMetadata = Object.fromEntries(nodes.map((node) => [node.id, this.getMetadata(canvasPath, node.id)]).filter((entry): entry is [string, PaletteMetadata] => Boolean(entry[1])).map(([id, value]) => [id, { ...value, tags: [...value.tags] }]));
     const title = nodes.find((node) => node.type === "group")?.label ?? nodes.find((node) => node.text)?.text?.split(/\r?\n/, 1)[0] ?? "Canvas group";
-    return { id: createId("group"), type: "group", displayTitle: title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", captionFontSize: metadata?.captionFontSize ?? 11, backContent: "", facesEnabled: false, createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot };
+    return { id: createId("group"), type: "group", displayTitle: cutFromCanvas ? "잘라낸 묶음" : title.slice(0, 80), tags: metadata?.tags ?? [], label: metadata?.label ?? "", labelColor: metadata?.labelColor ?? "", caption: metadata?.caption ?? "", captionFontSize: metadata?.captionFontSize ?? 11, backContent: "", facesEnabled: false, createdAt: now, modifiedAt: metadata?.modifiedAt ?? now, origin: cutFromCanvas ? {} : { canvasPath, canvasNodeId: nodeId }, canvasPlacements: [], group: snapshot, cutFromCanvas };
   }
 
   private materializeItem(item: PaletteItem, x: number, y: number, usedNodeIds: Set<string>, usedEdgeIds: Set<string>, headingLevel?: number): RestoredMaterial | null {

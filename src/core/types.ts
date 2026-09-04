@@ -83,6 +83,8 @@ export interface PaletteItem {
   backContent: string;
   facesEnabled: boolean;
   group?: GroupSnapshot;
+  /** A Group snapshot created by removing its source Canvas nodes. */
+  cutFromCanvas?: boolean;
   parentItemId?: string | null;
   childItemIds?: string[];
   /** Collections may be nested beneath any Item, just like child Items. */

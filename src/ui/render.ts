@@ -25,6 +25,7 @@ export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: bo
 export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group" && item.type !== "link"; }
 
 export function renderItem(parent: HTMLElement, item: PaletteItem, options: ItemRenderOptions): HTMLElement {
+  const cutFromCanvas = item.type === "group" && item.cutFromCanvas === true;
   const canvasLinks = new Map<string, string[]>();
   const addCanvasLink = (canvasPath: string | undefined, nodeId: string | undefined): void => {
     if (!canvasPath || !nodeId) return;
@@ -36,14 +37,15 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   for (const placement of item.canvasPlacements) for (const nodeId of placement.nodeIds) addCanvasLink(placement.canvasPath, nodeId);
   const canvasPaths = [...canvasLinks.keys()];
   const unlinked = options.unlinked ?? canvasPaths.length === 0;
-  const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${options.selected ? " is-selected" : ""}${options.compact ? " is-compact" : ""}` });
+  const showUnlinked = !cutFromCanvas && unlinked;
+  const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${cutFromCanvas ? " cp-item--cut" : ""}${options.selected ? " is-selected" : ""}${options.compact ? " is-compact" : ""}` });
   card.dataset.itemId = item.id;
   card.tabIndex = 0;
   if (options.selected && options.showSelectionMarker !== false) { const marker = card.createSpan({ cls: "cp-item__selection", attr: { "aria-label": "Selected" } }); setIcon(marker, "check"); }
   const header = card.createDiv({ cls: "cp-item__header" });
   const icon = header.createSpan({ cls: "cp-item__icon" });
-  setIcon(icon, TYPE_ICON[item.type]);
-  icon.addClass("cp-item__type-badge", `cp-item__type-badge--${item.type}`);
+  if (cutFromCanvas) { setIcon(icon, "scissors"); icon.addClass("cp-item__type-badge", "cp-item__type-badge--cut"); }
+  else { setIcon(icon, TYPE_ICON[item.type]); icon.addClass("cp-item__type-badge", `cp-item__type-badge--${item.type}`); }
   if (options.titleEditing) {
     const title = header.createEl("input", { cls: "cp-item__title-input", value: item.displayTitle, attr: { type: "text", "aria-label": "카드 제목" } });
     const stop = (event: Event): void => event.stopPropagation();
@@ -56,7 +58,7 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
     const label = header.createSpan({ cls: "cp-label", text: item.label });
     if (item.labelColor) label.style.setProperty("--cp-label-color", item.labelColor);
   }
-  if (unlinked || options.onToggleFace || options.markdownSourceStatus || options.onEditMenu) {
+  if (showUnlinked || options.onToggleFace || options.markdownSourceStatus || options.onEditMenu) {
     const actions = header.createSpan({ cls: "cp-item__header-actions" });
     if (options.markdownSourceStatus) {
       const source = options.markdownSourceStatus;
@@ -69,7 +71,7 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
       state.addEventListener("pointerdown", (event) => event.stopPropagation());
       state.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); options.onMarkdownSourceStatus?.(event); });
       state.addEventListener("dblclick", (event) => event.stopPropagation());
-    } else if (unlinked) {
+    } else if (showUnlinked) {
       const unlinkedBadge = actions.createSpan({ cls: "cp-item__link-state cp-item__link-state--unlinked", attr: { "aria-label": "Unlinked from Canvas", title: "Unlinked from Canvas" } });
       setIcon(unlinkedBadge, "unlink");
     }
@@ -89,7 +91,9 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   body.dataset.face = face;
   if (face === "back") body.setText(item.backContent || "Write on the back…");
   else if ((item.type === "image" || item.type === "video") && (item.origin.filePath || item.sourceReferencePath)) body.createDiv({ cls: item.type === "video" ? "cp-video-placeholder" : "cp-image-placeholder", text: item.origin.filePath ?? item.sourceReferencePath! });
-  else if (item.type === "group") body.createDiv({ text: `${item.group?.nodes.length ?? 0} nodes · ${item.group?.edges.length ?? 0} edges` });
+  else if (item.type === "group") {
+    body.createDiv({ text: `${item.group?.nodes.length ?? 0} nodes · ${item.group?.edges.length ?? 0} edges` });
+  }
   else body.setText((item.content ?? item.origin.filePath ?? item.sourceReferencePath ?? "No preview").slice(0, 240));
   if (canvasPaths.length > 0) {
     const links = card.createDiv({ cls: "cp-item__canvas-links", attr: { title: canvasPaths.join("\n") } });
