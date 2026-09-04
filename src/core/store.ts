@@ -1155,7 +1155,9 @@ export class PaletteStore {
     this.data.uiState.miniPalette.collectSelectedItemIds = this.data.uiState.miniPalette.collectSelectedItemIds.filter((id) => !completed.has(id));
     if (this.data.uiState.miniPalette.collectSelectionAnchorId && completed.has(this.data.uiState.miniPalette.collectSelectionAnchorId)) this.data.uiState.miniPalette.collectSelectionAnchorId = null;
     if (this.data.uiState.miniPalette.focusedItemId && completed.has(this.data.uiState.miniPalette.focusedItemId)) this.data.uiState.miniPalette.focusedItemId = null;
-    this.changed();
+    const disposable = [...completed].filter((id) => !this.workspaceForItem(id) && !this.miniStorageHas(id));
+    if (disposable.length > 0) this.removeItems(disposable);
+    else this.changed();
   }
 
   private wouldCreateOutlineCycle(id: string, parentId: string | null): boolean {

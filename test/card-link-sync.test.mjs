@@ -344,6 +344,54 @@ test("Outliner moves multiple items and safely reparents collections", async () 
   await cleanup();
 });
 
+test("placing an unsaved Collect item removes its canonical link while keeping Canvas nodes intact", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  store.data = fixture();
+  store.data.uiState.miniPalette.collectSelectedItemIds = [];
+  store.data.uiState.miniPalette.collectSelectionAnchorId = null;
+  store.data.uiState.miniPalette.focusedItemId = null;
+  store.data.uiState.miniPalette.storageItemIds = [];
+  store.data.uiState.miniPalette.storageSelectedItemIds = [];
+  store.data.uiState.sideItemFaces = {};
+  store.data.uiState.miniItemFaces = {};
+  store.data.pendingItemIds = ["card"];
+  store.data.workspaces.workspace.looseItemIds = [];
+  store.recordCanvasPlacement("card", "B.canvas", ["drop"]);
+
+  store.completePendingCanvasPlacement(["card"]);
+
+  assert.deepEqual(store.data.pendingItemIds, []);
+  assert.equal(store.data.items.card, undefined);
+  assert.equal(store.linkedItemForNode("A.canvas", "origin"), undefined);
+  assert.equal(store.linkedItemForNode("B.canvas", "drop"), undefined);
+  assert.ok(store.getCanvasNodeMetadata("B.canvas", "drop"));
+  await cleanup();
+});
+
+test("placing a Collect item saved in Side or Storage preserves its canonical link", async () => {
+  const { PaletteStore, cleanup } = await loadStore();
+  const store = new PaletteStore({ loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} });
+  store.data = fixture();
+  store.data.uiState.miniPalette.collectSelectedItemIds = [];
+  store.data.uiState.miniPalette.collectSelectionAnchorId = null;
+  store.data.uiState.miniPalette.focusedItemId = null;
+  store.data.pendingItemIds = ["card"];
+  store.recordCanvasPlacement("card", "B.canvas", ["side-drop"]);
+  store.completePendingCanvasPlacement(["card"]);
+  assert.equal(store.data.items.card.id, "card");
+  assert.equal(store.linkedItemForNode("B.canvas", "side-drop")?.id, "card");
+
+  store.data.pendingItemIds = ["card"];
+  store.data.workspaces.workspace.looseItemIds = [];
+  store.data.uiState.miniPalette.storageItemIds = ["card"];
+  store.recordCanvasPlacement("card", "C.canvas", ["storage-drop"]);
+  store.completePendingCanvasPlacement(["card"]);
+  assert.equal(store.data.items.card.id, "card");
+  assert.equal(store.linkedItemForNode("C.canvas", "storage-drop")?.id, "card");
+  await cleanup();
+});
+
 test("Outliner permits Collections inside Items while rejecting mixed hierarchy cycles", async () => {
   const { PaletteStore, cleanup } = await loadStore();
   const plugin = { loadData: async () => null, saveData: async () => {}, syncPaletteItemToCanvas: async () => {} };
