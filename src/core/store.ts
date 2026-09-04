@@ -1,7 +1,7 @@
 import type CanvasPalettePlugin from "../main";
 import { DEFAULT_SIDE_LAYOUT, migrateData } from "./defaults";
 import { createId } from "./ids";
-import type { CardFace, Collection, NumberedCanvasLink, PaletteData, PaletteItem, PaletteMetadata, PaletteWorkspace } from "./types";
+import type { CardFace, Collection, GroupDecompositionInput, NumberedCanvasLink, PaletteData, PaletteItem, PaletteMetadata, PaletteWorkspace } from "./types";
 
 type Listener = () => void;
 
@@ -83,6 +83,61 @@ export class PaletteStore {
       parent.childItemIds = childIds;
       for (const childId of childIds) { const child = this.data.items[childId]; if (child) child.parentItemId = parentId; }
     }
+    workspace.modifiedAt = Date.now(); this.changed();
+    return "saved";
+  }
+
+  /** Replaces one saved Canvas Group with ordinary Collections and independent Palette Items. */
+  decomposeGroupItem(workspaceId: string, groupItemId: string, input: GroupDecompositionInput): "saved" | "missing" | "invalid" {
+    const workspace = this.data.workspaces[workspaceId]; const group = this.data.items[groupItemId];
+    if (!workspace || !group) return "missing";
+    if (group.type !== "group" || input.folders.length === 0) return "invalid";
+    const folderNodes = new Set(input.folders.map((folder) => folder.nodeId));
+    if (folderNodes.size !== input.folders.length || input.folders.some((folder) => folder.parentNodeId && !folderNodes.has(folder.parentNodeId))) return "invalid";
+    const sourceByNode = new Map(input.items.map((item) => [item.origin.canvasNodeId, item] as const));
+    if (sourceByNode.size !== input.items.length || input.items.some((item) => !item.origin.canvasNodeId || !input.itemFolderIds[item.origin.canvasNodeId] || !folderNodes.has(input.itemFolderIds[item.origin.canvasNodeId]))) return "invalid";
+    const owningCollection = Object.values(this.data.collections).find((collection) => collection.workspaceId === workspaceId && collection.itemIds.includes(groupItemId));
+    const folderCollectionIds = new Map<string, string>();
+    const pendingFolders = [...input.folders];
+    while (pendingFolders.length > 0) {
+      const ready = pendingFolders.filter((folder) => !folder.parentNodeId || folderCollectionIds.has(folder.parentNodeId));
+      if (ready.length === 0) return "invalid";
+      for (const folder of ready) {
+        const parentId = folder.parentNodeId ? folderCollectionIds.get(folder.parentNodeId)! : owningCollection?.id ?? null;
+        folderCollectionIds.set(folder.nodeId, this.createCollection(workspaceId, folder.name, parentId).id);
+        pendingFolders.splice(pendingFolders.indexOf(folder), 1);
+      }
+    }
+    const members = new Map<string, string[]>();
+    for (const [nodeId, folderId] of Object.entries(input.itemFolderIds)) members.set(folderId, [...(members.get(folderId) ?? []), nodeId]);
+    const clone = (source: PaletteItem, parentItemId: string | null): PaletteItem => {
+      const copy = structuredClone(source); const sourcePath = source.origin.filePath ?? source.sourceReferencePath;
+      copy.id = createId(source.type); copy.createdAt = Date.now(); copy.modifiedAt = copy.createdAt;
+      copy.origin = { workspaceId, ...(source.origin.filePath ? { filePath: source.origin.filePath } : {}) };
+      copy.canvasPlacements = []; copy.parentItemId = parentItemId; copy.childItemIds = [];
+      if (sourcePath) copy.sourceReferencePath = sourcePath;
+      return copy;
+    };
+    for (const [folderNodeId, nodeIds] of members) {
+      const memberIds = new Set(nodeIds);
+      const children: Record<string, string[]> = {}; const parents = new Set<string>();
+      const reaches = (start: string, goal: string, seen = new Set<string>()): boolean => start === goal || (!seen.has(start) && (seen.add(start), (children[start] ?? []).some((child) => reaches(child, goal, seen))));
+      for (const edge of input.edges) {
+        if (!memberIds.has(edge.fromNode) || !memberIds.has(edge.toNode) || edge.fromNode === edge.toNode || reaches(edge.toNode, edge.fromNode)) continue;
+        const row = children[edge.fromNode] ??= []; if (!row.includes(edge.toNode)) { row.push(edge.toNode); parents.add(edge.toNode); }
+      }
+      const collection = this.data.collections[folderCollectionIds.get(folderNodeId)!]; if (!collection) return "invalid";
+      const createBranch = (nodeId: string, parentItemId: string | null, path: Set<string>): void => {
+        if (path.has(nodeId)) return;
+        const source = sourceByNode.get(nodeId); if (!source) return;
+        const copy = clone(source, parentItemId); this.data.items[copy.id] = copy;
+        if (parentItemId) this.data.items[parentItemId]?.childItemIds?.push(copy.id); else collection.itemIds.push(copy.id);
+        const nextPath = new Set(path); nextPath.add(nodeId);
+        for (const childId of children[nodeId] ?? []) createBranch(childId, copy.id, nextPath);
+      };
+      for (const nodeId of nodeIds.filter((nodeId) => !parents.has(nodeId))) createBranch(nodeId, null, new Set());
+    }
+    this.removeItems([groupItemId]);
     workspace.modifiedAt = Date.now(); this.changed();
     return "saved";
   }

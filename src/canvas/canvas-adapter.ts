@@ -2,7 +2,7 @@ import { App, Notice, TFile, requestUrl } from "obsidian";
 import { createId } from "../core/ids";
 import { findMarkdownNodeReplacement } from "../core/canvas-node-replacement";
 import { SerialTaskQueue } from "../core/serial-task-queue";
-import type { CanvasEdgeSnapshot, CanvasNodeSnapshot, PaletteItem, PaletteItemType, PaletteMetadata } from "../core/types";
+import type { CanvasEdgeSnapshot, CanvasNodeSnapshot, GroupDecompositionInput, PaletteItem, PaletteItemType, PaletteMetadata } from "../core/types";
 import { IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "../core/media";
 import { restoreGroup, serializeGroup } from "./group-serializer";
 import { bundleContentCollides } from "./placement-collision";
@@ -462,18 +462,51 @@ export class CanvasAdapter {
     const selected = new Set(nodeIds);
     const selectedNodes = document.nodes.filter((node) => selected.has(node.id));
     const selectedGroups = selectedNodes.filter((node) => node.type === "group");
-    const expanded = new Set(selectedNodes.filter((node) => node.type !== "group").map((node) => node.id));
-    for (const group of selectedGroups) for (const node of this.expandGroupNodes(document.nodes, [group.id])) if (node.type !== "group") expanded.add(node.id);
-    const nodes = document.nodes.filter((node) => expanded.has(node.id));
-    if (nodes.length === 0) { new Notice("The selected Canvas group has no items to collect."); return null; }
+    if (selectedNodes.length === 0) return null;
+    const selectedIds = new Set(selectedNodes.map((node) => node.id));
     return {
       canvasPath: context.file.path,
       title: selectedGroups[0]?.label?.trim() || `${context.file.basename} 구조`,
-      items: await this.collectIds(document, context.file.path, [...expanded]),
-      nodeIds: [...expanded],
-      edges: document.edges.filter((edge) => expanded.has(edge.fromNode) && expanded.has(edge.toNode)).map((edge) => ({ fromNode: edge.fromNode, toNode: edge.toNode })),
-      positions: Object.fromEntries(nodes.map((node) => [node.id, { x: node.x, y: node.y }]))
+      items: await this.collectIds(document, context.file.path, [...selectedIds]),
+      nodeIds: [...selectedIds],
+      edges: document.edges.filter((edge) => selectedIds.has(edge.fromNode) && selectedIds.has(edge.toNode)).map((edge) => ({ fromNode: edge.fromNode, toNode: edge.toNode })),
+      positions: Object.fromEntries(selectedNodes.map((node) => [node.id, { x: node.x, y: node.y }]))
     };
+  }
+
+  async groupDecomposition(item: PaletteItem): Promise<GroupDecompositionInput | null> {
+    if (item.type !== "group" || !item.group?.nodes.length) return null;
+    const snapshot = item.group;
+    const groups = snapshot.nodes.filter((node) => node.type === "group");
+    if (groups.length === 0) return null;
+    const sourcePath = item.origin.canvasPath;
+    const parentForGroup = (group: CanvasNodeSnapshot): string | null => {
+      const explicit = group.parentId && groups.some((candidate) => candidate.id === group.parentId) ? group.parentId : null;
+      if (explicit) return explicit;
+      return groups.filter((candidate) => candidate.id !== group.id && this.isInside(group, candidate))
+        .sort((left, right) => left.width * left.height - right.width * right.height)[0]?.id ?? null;
+    };
+    const folders = groups.map((group) => ({ nodeId: group.id, name: (group.label?.trim() || (group.id === item.origin.canvasNodeId ? item.displayTitle : "Canvas 그룹")).slice(0, 80), parentNodeId: parentForGroup(group) }));
+    const folderForNode = (node: CanvasNodeSnapshot): string | null => {
+      const explicit = node.parentId && groups.some((group) => group.id === node.parentId) ? node.parentId : null;
+      if (explicit) return explicit;
+      return groups.filter((group) => this.isInside(node, group)).sort((left, right) => left.width * left.height - right.width * right.height)[0]?.id ?? null;
+    };
+    const items: PaletteItem[] = [];
+    const itemFolderIds: Record<string, string> = {};
+    for (const node of snapshot.nodes.filter((node) => node.type !== "group")) {
+      const folderId = folderForNode(node); if (!folderId) return null;
+      const material = await this.itemFromNode(node, sourcePath ?? ""); if (!material) return null;
+      const metadata = snapshot.nodeMetadata?.[node.id];
+      if (metadata) Object.assign(material, { tags: [...metadata.tags], label: metadata.label, labelColor: metadata.labelColor, caption: metadata.caption, captionFontSize: metadata.captionFontSize, backContent: metadata.backContent, facesEnabled: material.type !== "link" && metadata.facesEnabled, modifiedAt: metadata.modifiedAt });
+      if (material.type === "markdown") {
+        material.type = "card";
+        material.sourceReferencePath = material.origin.filePath;
+        material.origin = { canvasPath: sourcePath, canvasNodeId: node.id };
+      }
+      items.push(material); itemFolderIds[node.id] = folderId;
+    }
+    return { folders, items, itemFolderIds, edges: snapshot.edges.map((edge) => ({ fromNode: edge.fromNode, toNode: edge.toNode })) };
   }
 
 

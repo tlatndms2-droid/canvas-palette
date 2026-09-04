@@ -17,11 +17,12 @@ test("Canvas selection structure is saved independently from regular Outliner pl
   assert.match(store, /migrateOutlineStructuresToCollections/);
   assert.match(store, /workspace\.outlineStructures = \[\]/);
   assert.match(canvas, /selectedGroups/);
-  assert.match(canvas, /expandGroupNodes\(document\.nodes, \[group\.id\]\)/);
+  assert.doesNotMatch(canvas.match(/async collectOutlineSelection\(\)[\s\S]*?async groupDecomposition/)?.[0] ?? "", /expandGroupNodes/);
   assert.match(store, /id: createId\(item\.type === "markdown" \? "card" : item\.type\)/);
   assert.match(store, /sourceReferencePath/);
   assert.doesNotMatch(store.match(/saveOutlineCollection[\s\S]*?return "saved"/)?.[0] ?? "", /existingCollectedItem/);
   assert.match(await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8"), /renderOutlineStructureItem[\s\S]*?row\.draggable = true/);
   assert.doesNotMatch(store.match(/saveOutlineStructure[\s\S]*?return "saved"/)?.[0] ?? "", /detachWorkspaceLinks/);
-  assert.match(modal, /Outliner 구조를 읽는 기준/);
+  assert.match(modal, /Outliner 구조로 수집/);
+  assert.match(modal, /화살표 방향만 사용합니다/);
 });

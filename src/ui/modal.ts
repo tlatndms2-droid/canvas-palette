@@ -48,17 +48,30 @@ export class TextPromptModal extends Modal {
 }
 
 export class OutlineStructureRuleModal extends Modal {
-  private rule: "edge" | "position" = "edge";
-  constructor(app: App, private readonly onSubmit: (rule: "edge" | "position") => void) { super(app); }
+  constructor(app: App, private readonly onSubmit: () => void) { super(app); }
   onOpen(): void {
     this.contentEl.addClass("canvas-palette", "cp-outline-structure-modal");
-    this.contentEl.createEl("h2", { text: "Outliner 구조를 읽는 기준" });
-    this.contentEl.createEl("p", { text: "선택한 Canvas 노드의 위·아래 관계를 정합니다." });
-    for (const [rule, label, detail] of [["edge", "화살표 방향으로 읽기", "A → B이면 A 아래에 B를 표시"], ["position", "화면 위치로 읽기", "왼쪽·위에 있는 노드를 상위로 표시"]] as const) {
-      const row = this.contentEl.createEl("label", { cls: "cp-outline-structure-modal__choice" }); const radio = row.createEl("input", { attr: { type: "radio", name: "outline-structure-rule" } }); radio.checked = this.rule === rule;
-      row.createSpan({ text: label }); row.createEl("small", { text: detail }); radio.addEventListener("change", () => { this.rule = rule; });
-    }
-    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" }); actions.createEl("button", { text: "취소" }).addEventListener("click", () => this.close()); actions.createEl("button", { text: "구조 추가", cls: "mod-cta" }).addEventListener("click", () => { this.onSubmit(this.rule); this.close(); });
+    this.contentEl.createEl("h2", { text: "Outliner 구조로 수집" });
+    this.contentEl.createEl("p", { text: "Canvas에서 화살표가 향하는 쪽을 아래 항목으로 정리합니다." });
+    const example = this.contentEl.createDiv({ cls: "cp-outline-structure-modal__example", attr: { "aria-label": "Canvas 화살표와 Outliner 구조 예시" } });
+    const canvas = example.createDiv({ cls: "cp-outline-structure-modal__canvas" }); canvas.createSpan({ text: "상위 카드" }); canvas.createSpan({ cls: "cp-outline-structure-modal__arrow", text: "→" }); canvas.createSpan({ text: "하위 카드" });
+    const outliner = example.createDiv({ cls: "cp-outline-structure-modal__outliner" }); outliner.createDiv({ text: "▾ 상위 카드" }); outliner.createDiv({ text: "└─ 하위 카드" });
+    this.contentEl.createEl("small", { text: "화면에서 어느 쪽에 있든 화살표 방향만 사용합니다." });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" }); actions.createEl("button", { text: "취소" }).addEventListener("click", () => this.close()); actions.createEl("button", { text: "구조 수집", cls: "mod-cta" }).addEventListener("click", () => { this.onSubmit(); this.close(); });
+  }
+  onClose(): void { this.contentEl.empty(); }
+}
+
+export class GroupDecompositionModal extends Modal {
+  constructor(app: App, private readonly groupName: string, private readonly folderCount: number, private readonly itemCount: number, private readonly onConfirm: () => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-group-decomposition-modal");
+    this.contentEl.createEl("h2", { text: "그룹 분해" });
+    this.contentEl.createEl("p", { text: `“${this.groupName}” 그룹을 Outliner 폴더와 독립 카드로 바꿉니다.` });
+    const summary = this.contentEl.createDiv({ cls: "cp-group-decomposition-modal__summary" });
+    summary.createDiv({ text: `폴더 ${this.folderCount}개` }); summary.createDiv({ text: `카드 ${this.itemCount}개` });
+    this.contentEl.createEl("small", { text: "원래 Canvas와 파일은 바뀌지 않습니다. 분해 후 원래 그룹 아이템은 제거됩니다." });
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" }); actions.createEl("button", { text: "취소" }).addEventListener("click", () => this.close()); actions.createEl("button", { text: "분해하기", cls: "mod-warning" }).addEventListener("click", () => { this.onConfirm(); this.close(); });
   }
   onClose(): void { this.contentEl.empty(); }
 }

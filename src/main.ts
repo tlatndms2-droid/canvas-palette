@@ -342,17 +342,13 @@ export default class CanvasPalettePlugin extends Plugin {
     if (!workspace) { new Notice("Side Palette에서 Workspace를 먼저 선택하세요."); return; }
     const selection = await this.canvas.collectOutlineSelection();
     if (!selection) return;
-    new OutlineStructureRuleModal(this.app, (rule) => void this.saveCanvasSelectionStructure(workspace.id, selection, rule)).open();
+    new OutlineStructureRuleModal(this.app, () => void this.saveCanvasSelectionStructure(workspace.id, selection)).open();
   }
 
-  private async saveCanvasSelectionStructure(workspaceId: string, selection: Awaited<ReturnType<CanvasAdapter["collectOutlineSelection"]>>, rule: "edge" | "position"): Promise<void> {
+  private async saveCanvasSelectionStructure(workspaceId: string, selection: Awaited<ReturnType<CanvasAdapter["collectOutlineSelection"]>>): Promise<void> {
     if (!selection) return;
     const ids = new Set(selection.items.map((item) => item.origin.canvasNodeId).filter((id): id is string => Boolean(id)));
-    const edges = selection.edges.filter((edge) => ids.has(edge.fromNode) && ids.has(edge.toNode)).map((edge) => {
-      if (rule === "edge") return edge;
-      const from = selection.positions[edge.fromNode]; const to = selection.positions[edge.toNode];
-      return !from || !to || from.y < to.y || (from.y === to.y && from.x <= to.x) ? edge : { fromNode: edge.toNode, toNode: edge.fromNode };
-    });
+    const edges = selection.edges.filter((edge) => ids.has(edge.fromNode) && ids.has(edge.toNode));
     const children: Record<string, string[]> = {}; const parents = new Set<string>();
     const reaches = (start: string, goal: string, seen = new Set<string>()): boolean => {
       if (start === goal) return true; if (seen.has(start)) return false; seen.add(start);

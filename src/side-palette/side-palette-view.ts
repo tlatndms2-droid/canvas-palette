@@ -1,7 +1,7 @@
 import { ItemView, Menu, Notice, setIcon, TFile, WorkspaceLeaf } from "obsidian";
 import type CanvasPalettePlugin from "../main";
 import type { Collection, OutlineSelectionTarget, OutlineStructure, PaletteItem, SideLayoutState } from "../core/types";
-import { CardToMarkdownModal, ConfirmDeleteCollectionModal, ConfirmDeleteModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
+import { CardToMarkdownModal, ConfirmDeleteCollectionModal, ConfirmDeleteModal, GroupDecompositionModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
 import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
 import { LinkedSpacesModal } from "../ui/linked-spaces-modal";
@@ -896,6 +896,7 @@ export class SidePaletteView extends ItemView {
         this.plugin.store.moveItems(workspace.id, targetIds, group.id);
       }, "Group name").open();
     }));
+    if (item.type === "group" && workspace) menu.addItem((entry) => entry.setTitle("그룹 분해…").setIcon("folder-tree").onClick(() => void this.decomposeGroup(item, workspace.id)));
     menu.addItem((entry) => entry.setTitle("Edit tags, label & caption").setIcon("tags").onClick(() => new TagLabelModal(this.app, this.plugin, targetIds).open()));
     if (item.type === "image" || (item.type === "video" && Boolean(item.origin.filePath)) || item.type === "markdown" || item.type === "group") menu.addItem((entry) => entry
       .setTitle("Rename linked item")
@@ -932,6 +933,15 @@ export class SidePaletteView extends ItemView {
     else if (item.origin.filePath) menu.addItem((entry) => entry.setTitle("Open source file").setIcon("external-link").onClick(() => void this.plugin.openOriginal(item)));
     menu.addSeparator(); menu.addItem((entry) => entry.setTitle(`Delete${targetIds.length > 1 ? ` ${targetIds.length} items` : ""}`).setIcon("trash").onClick(() => this.confirmDelete(targetIds)));
     menu.showAtMouseEvent(event);
+  }
+
+  private async decomposeGroup(item: PaletteItem, workspaceId: string): Promise<void> {
+    const decomposition = await this.plugin.canvas.groupDecomposition(item);
+    if (!decomposition) { new Notice("이 그룹의 저장된 항목을 모두 안전하게 복원할 수 없어 분해하지 않았습니다."); return; }
+    new GroupDecompositionModal(this.app, item.displayTitle, decomposition.folders.length, decomposition.items.length, () => {
+      const result = this.plugin.store.decomposeGroupItem(workspaceId, item.id, decomposition);
+      new Notice(result === "saved" ? "그룹을 Outliner 폴더와 독립 카드로 분해했습니다." : "그룹을 안전하게 분해할 수 없어 원래 항목을 유지했습니다.");
+    }).open();
   }
 
   private sideSelectedIds(): string[] { return this.plugin.store.data.uiState.sideSelectedItemIds; }

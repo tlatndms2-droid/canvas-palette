@@ -52,6 +52,14 @@ export interface GroupSnapshot {
   nodeMetadata?: Record<string, PaletteMetadata>;
 }
 
+/** A validated, one-time expansion of a stored Group into ordinary Outliner data. */
+export interface GroupDecompositionInput {
+  folders: Array<{ nodeId: string; name: string; parentNodeId: string | null }>;
+  items: PaletteItem[];
+  itemFolderIds: Record<string, string>;
+  edges: Array<{ fromNode: string; toNode: string }>;
+}
+
 export interface PaletteItem {
   id: string;
   type: PaletteItemType;
