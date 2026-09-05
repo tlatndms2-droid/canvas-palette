@@ -314,6 +314,17 @@ export default class CanvasPalettePlugin extends Plugin {
     view.revealItem(item.id);
   }
 
+  async revealNewSideItem(workspaceId: string, itemId: string): Promise<void> {
+    if (!this.store.data.workspaces[workspaceId] || !this.store.data.items[itemId]) return;
+    if (this.store.data.uiState.activeWorkspaceId !== workspaceId) {
+      this.store.data.uiState.activeWorkspaceId = workspaceId;
+      this.store.changed();
+    }
+    const view = await this.activateSidePalette();
+    if (!view) { new Notice("Unable to open Side Palette."); return; }
+    view.revealItem(itemId);
+  }
+
   async openItemEditor(itemId: string): Promise<void> {
     if (await this.editorManager.openItem(itemId)) return;
     new ItemEditorModal(this.app, this, itemId).open();
@@ -340,8 +351,8 @@ export default class CanvasPalettePlugin extends Plugin {
     const item: PaletteItem = { id: createId("card"), type: "card", displayTitle: "New memo", tags: [], label: "", caption: "", backContent: "", facesEnabled: false, createdAt: now, modifiedAt: now, origin: { canvasPath: workspace?.kind === "canvas" ? workspace.ownerCanvasPath ?? undefined : undefined }, canvasPlacements: [], content: "" };
     this.store.addPending(item);
     if (workspace) this.store.importPending(workspace.id, [item.id]);
-    this.selectItem(item.id);
-    if (workspace) (await this.activateSidePalette())?.revealItem(item.id);
+    if (workspace) await this.revealNewSideItem(workspace.id, item.id);
+    else this.selectItem(item.id);
     return item.id;
   }
 
@@ -510,9 +521,7 @@ export default class CanvasPalettePlugin extends Plugin {
     const item = this.textItem(text, canvasPath, textRange);
     const saved = this.isForeignCanvasWorkspace(workspaceId, canvasPath) ? this.store.addToWorkspaceAsUnlinked(workspaceId, item) : this.store.addToWorkspace(workspaceId, item);
     if (!saved) { new Notice("This Canvas Workspace only accepts items from its own Canvas."); return; }
-    this.store.data.uiState.activeWorkspaceId = workspaceId;
-    this.selectItem(item.id);
-    void this.openSidePalette();
+    void this.revealNewSideItem(workspaceId, item.id);
     new Notice("Selected Canvas text saved to Side Palette.");
   }
 
@@ -525,10 +534,7 @@ export default class CanvasPalettePlugin extends Plugin {
     const alreadySaved = unique.filter((item) => this.store.workspaceForItem(item.id)?.id === workspaceId);
     const accepted = unique.filter((item) => !alreadySaved.includes(item) && save(item));
     if (accepted.length === 0 && alreadySaved.length === 0) { new Notice("This Canvas Workspace only accepts items from its own Canvas."); return; }
-    this.store.data.uiState.activeWorkspaceId = workspaceId;
-    this.store.data.uiState.selectedItemId = (accepted[0] ?? alreadySaved[0]).id;
-    this.store.changed();
-    await this.openSidePalette();
+    if (accepted.length > 0) await this.revealNewSideItem(workspaceId, accepted[0].id);
     if (alreadySaved.length > 0) this.showAlreadySavedToWorkspace(workspaceId, accepted.length, alreadySaved.length);
     else new Notice(`${accepted.length} Canvas item${accepted.length === 1 ? "" : "s"} saved to Side Palette.`);
   }

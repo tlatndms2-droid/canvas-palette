@@ -163,14 +163,17 @@ export class FloatingMiniPalette {
     importButton.addEventListener("click", () => {
       const select = bottom.querySelector("select"); if (!select) return;
       this.plugin.confirmWorkspaceSave(select.value, () => {
+        let firstImportedId: string | null = null;
         this.plugin.store.batch(() => {
         const result = this.plugin.store.importPending(select.value, this.collectSelectedIds(), this.plugin.isForeignCanvasWorkspace(select.value));
+        firstImportedId = result.imported[0] ?? null;
         if (result.rejected.length > 0) new Notice("Some items could not be imported because the selected Workspace is unavailable.");
         if (result.alreadySaved.length > 0) this.plugin.showAlreadySavedToWorkspace(select.value, result.imported.length, result.alreadySaved.length);
         else if (result.imported.length > 0) new Notice(`${result.imported.length} item${result.imported.length === 1 ? "" : "s"} imported.`);
         this.setCollectSelectedIds([...result.rejected, ...result.alreadySaved]); this.plugin.store.data.uiState.miniPalette.focusedItemId = null; this.inspectorItemId = null;
         this.plugin.store.changed();
         });
+        if (firstImportedId) void this.plugin.revealNewSideItem(select.value, firstImportedId);
       });
     });
   }
