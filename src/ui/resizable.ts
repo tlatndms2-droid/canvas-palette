@@ -14,6 +14,7 @@ function makeDivider(divider: HTMLElement, axis: ResizeAxis, onMove: (coordinate
 
     const move = (pointer: PointerEvent): void => {
       pointer.preventDefault();
+      pointer.stopPropagation();
       onMove(axis === "column" ? pointer.clientX : pointer.clientY);
     };
     const end = (): void => {

@@ -902,13 +902,17 @@ export class SidePaletteView extends ItemView {
   }
 
   private applyLayoutVariables(root: HTMLElement, layout: SideLayoutState): void {
-    root.style.setProperty("--cp-side-upper-left", `${layout.viewportRatio}fr`);
-    root.style.setProperty("--cp-side-upper-right", `${1 - layout.viewportRatio}fr`);
-    root.style.setProperty("--cp-side-upper", `${layout.topRatio}fr`);
-    root.style.setProperty("--cp-side-lower", `${1 - layout.topRatio}fr`);
-    root.style.setProperty("--cp-side-lower-left", `${layout.indexRatio}fr`);
-    root.style.setProperty("--cp-side-lower-right", `${1 - layout.indexRatio}fr`);
+    const viewportRatio = this.layoutRatio(layout.viewportRatio, 0.52);
+    const topRatio = this.layoutRatio(layout.topRatio, 0.69);
+    const indexRatio = this.layoutRatio(layout.indexRatio, 0.5);
+    root.style.setProperty("--cp-side-upper-left", `${viewportRatio}fr`);
+    root.style.setProperty("--cp-side-upper-right", `${1 - viewportRatio}fr`);
+    root.style.setProperty("--cp-side-upper", `${topRatio}fr`);
+    root.style.setProperty("--cp-side-lower", `${1 - topRatio}fr`);
+    root.style.setProperty("--cp-side-lower-left", `${indexRatio}fr`);
+    root.style.setProperty("--cp-side-lower-right", `${1 - indexRatio}fr`);
   }
+  private layoutRatio(value: number, fallback: number): number { return Number.isFinite(value) ? this.clamp(value, 0.05, 0.95) : fallback; }
   private horizontalRatio(container: HTMLElement, divider: HTMLElement, clientX: number, leftMinimum: number, rightMinimum: number): number {
     const rect = container.getBoundingClientRect();
     const dividerWidth = divider.getBoundingClientRect().width;
