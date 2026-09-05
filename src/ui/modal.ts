@@ -106,6 +106,39 @@ export class CanvasWorkspaceModal extends Modal {
   onClose(): void { this.contentEl.empty(); }
 }
 
+/** Selects one Side Palette destination for text captured from a Canvas editor. */
+export class TextScrapWorkspaceModal extends Modal {
+  constructor(app: App, private readonly workspaces: PaletteWorkspace[], private readonly currentGeneralWorkspaceId: string | null, private readonly onSave: (workspaceId: string) => void) { super(app); }
+  onOpen(): void {
+    this.contentEl.addClass("canvas-palette", "cp-text-scrap-workspace-modal");
+    this.contentEl.createEl("h2", { text: "저장할 Workspace 선택" });
+    this.contentEl.createEl("label", { text: "Workspace", attr: { for: "canvas-palette-text-scrap-workspace" } });
+    const select = this.contentEl.createEl("select", { attr: { id: "canvas-palette-text-scrap-workspace", "aria-label": "저장할 Workspace" } });
+    const current = this.workspaces.find((workspace) => workspace.id === this.currentGeneralWorkspaceId && workspace.kind === "general");
+    if (!current) {
+      const placeholder = select.createEl("option", { value: "", text: "Workspace를 선택하세요" });
+      placeholder.disabled = true;
+      placeholder.selected = true;
+    }
+    for (const workspace of this.workspaces) {
+      const isCurrent = workspace.id === current?.id;
+      select.createEl("option", { value: workspace.id, text: `${workspace.name}${isCurrent ? " — 현재 사용 중" : ""}` });
+    }
+    if (current) select.value = current.id;
+    const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
+    actions.createEl("button", { text: "취소" }).addEventListener("click", () => this.close());
+    const save = actions.createEl("button", { text: "저장", cls: "mod-cta" });
+    save.disabled = !select.value;
+    select.addEventListener("change", () => { save.disabled = !select.value; });
+    save.addEventListener("click", () => {
+      if (!select.value) return;
+      this.onSave(select.value);
+      this.close();
+    });
+  }
+  onClose(): void { this.contentEl.empty(); }
+}
+
 export class DeletedCanvasWorkspacesModal extends Modal {
   private choices = new Map<string, "general" | "delete">();
   private applied = false;

@@ -2,9 +2,9 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, web links, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.3.79**
+Current version: **0.3.80**
 
-0.3.79 now brings newly saved Canvas text, Canvas selections, and Mini Collect imports directly into view in Side Palette: the first new Item is selected, centered, and briefly highlighted just like a new Memo. Duplicate-only saves keep the current screen unchanged. 0.3.78 keeps Side search text/cursor/focus during Canvas updates and immediately corrects Collect selection after Import. Unchanged Palette cards and visible Canvas decorations are reused; detached Canvas cards are decorated when they reappear, and Canvas-to-Palette synchronization writes back only changed Cards. Opening or closing Mini Palette now leaves unrelated Side and Canvas surfaces in place. See [the performance verification notes](docs/PERFORMANCE_0.3.77.md) for measured scope and limitations.
+0.3.80 replaces the repeated selected-text save entries with one `Save text directly to Side Palette…` action. Its compact Obsidian-style dialog selects the current general Workspace by default and marks it `— 현재 사용 중`; when no general Workspace is active, it requires an explicit destination choice. Existing foreign-Canvas confirmation, duplicate handling, and new-Item reveal behavior are unchanged. 0.3.79 brings newly saved Canvas text, Canvas selections, and Mini Collect imports directly into view in Side Palette: the first new Item is selected, centered, and briefly highlighted just like a new Memo. Duplicate-only saves keep the current screen unchanged. 0.3.78 keeps Side search text/cursor/focus during Canvas updates and immediately corrects Collect selection after Import. Unchanged Palette cards and visible Canvas decorations are reused; detached Canvas cards are decorated when they reappear, and Canvas-to-Palette synchronization writes back only changed Cards. Opening or closing Mini Palette now leaves unrelated Side and Canvas surfaces in place. See [the performance verification notes](docs/PERFORMANCE_0.3.77.md) for measured scope and limitations.
 
 Repository: [tlatndms2-droid/canvas-palette](https://github.com/tlatndms2-droid/canvas-palette)
 

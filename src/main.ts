@@ -17,7 +17,7 @@ import { PreviewService } from "./preview/preview-service";
 import { SearchService } from "./search/search-service";
 import { CanvasPaletteSettingTab } from "./settings/settings-tab";
 import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-view";
-import { AlreadySavedToWorkspaceModal, CanvasTargetModal, CanvasWorkspaceModal, ConfirmDeleteModal, ConfirmExportDuplicateModal, ConfirmForeignCanvasWorkspaceModal, DeletedCanvasWorkspacesModal, ItemEditorModal, MetadataEditorModal, OutlineStructureRuleModal, TextPromptModal } from "./ui/modal";
+import { AlreadySavedToWorkspaceModal, CanvasTargetModal, CanvasWorkspaceModal, ConfirmDeleteModal, ConfirmExportDuplicateModal, ConfirmForeignCanvasWorkspaceModal, DeletedCanvasWorkspacesModal, ItemEditorModal, MetadataEditorModal, OutlineStructureRuleModal, TextPromptModal, TextScrapWorkspaceModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 import { FindLinkModal } from "./ui/find-link-modal";
 import { WorkspaceExplorerModal } from "./ui/workspace-explorer-modal";
@@ -497,12 +497,10 @@ export default class CanvasPalettePlugin extends Plugin {
     menu.addSeparator();
     menu.addItem((item) => item.setTitle("Canvas Palette — collect selected text").setIcon("library-big").setIsLabel(true));
     menu.addItem((item) => item.setTitle("Collect text to Mini Palette").setIcon("inbox").onClick(() => this.collectCanvasTextToMini(text, context.file.path, range)));
-    const currentWorkspace = this.activeWorkspace();
-    if (currentWorkspace) menu.addItem((item) => item.setTitle(`Save text directly to Side Palette — ${currentWorkspace.name}`).setIcon("panel-right").setDisabled(!this.canSaveCanvasToWorkspace(currentWorkspace, context.file.path)).onClick(() => this.confirmWorkspaceSave(currentWorkspace.id, () => this.collectCanvasTextToWorkspace(text, context.file.path, range, currentWorkspace.id))));
-    for (const workspace of Object.values(this.store.data.workspaces)) {
-      if (workspace.id === currentWorkspace?.id) continue;
-      menu.addItem((item) => item.setTitle(`Save text directly to Side Palette — ${workspace.name}`).setIcon("panel-right").setDisabled(!this.canSaveCanvasToWorkspace(workspace, context.file.path)).onClick(() => this.confirmWorkspaceSave(workspace.id, () => this.collectCanvasTextToWorkspace(text, context.file.path, range, workspace.id))));
-    }
+    const workspaces = Object.values(this.store.data.workspaces);
+    const activeWorkspace = this.activeWorkspace();
+    const currentGeneralWorkspaceId = activeWorkspace?.kind === "general" ? activeWorkspace.id : null;
+    menu.addItem((item) => item.setTitle("Save text directly to Side Palette…").setIcon("panel-right").setDisabled(workspaces.length === 0).onClick(() => new TextScrapWorkspaceModal(this.app, workspaces, currentGeneralWorkspaceId, (workspaceId) => this.confirmWorkspaceSave(workspaceId, () => this.collectCanvasTextToWorkspace(text, context.file.path, range, workspaceId))).open()));
   }
 
   private textItem(text: string, canvasPath: string, textRange: { from: { line: number; ch: number }; to: { line: number; ch: number } }): PaletteItem {

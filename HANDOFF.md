@@ -92,6 +92,8 @@ The user distinguishes these modes precisely:
 
 ## Current state
 
+- Version: `0.3.80` (text direct-save Workspace picker). Canvas text selection now shows one `Save text directly to Side Palette…` entry instead of one entry per Workspace. Its compact native Obsidian dialog defaults to the active general Workspace and marks it `— 현재 사용 중`; without an active general Workspace it requires an explicit choice. Existing foreign-Canvas confirmation, duplicate handling, and new-Item reveal remain unchanged. Validation: 128 automated tests, TypeScript no-emit, production build, `git diff --check`, isolated Sandbox menu-handler/modal/save/cancel checks, restart persistence, and restored Sandbox data/workspace fixture hashes.
+
 - Version: `0.3.79` (new Side Item focus). Saving selected Canvas text directly to Side Palette, saving one or more selected Canvas Items, and importing Mini Collect Items now send the first newly saved Item through the same Viewport reveal flow as `+ Memo`: Side Palette opens in Viewport, clears any hiding search, expands its Collection path, selects and centers the Item, then briefly highlights it. A duplicate-only Canvas save or Mini Import leaves the currently visible Side screen unchanged. No schema change.
 - Verification: 126 tests, TypeScript no-emit, production build, generated-bundle syntax/JSON, and `git diff --check` passed. Isolated Obsidian 1.13.7 loaded `0.3.79`; real Canvas-text direct save and the visible Mini Collect card → `Import to workspace` path both displayed the new Item selected and highlighted in Side Palette. After Sandbox restart, both Items and their Workspace persisted. The temporary Canvas and Sandbox data/workspace fixtures were restored to their original hashes.
 
