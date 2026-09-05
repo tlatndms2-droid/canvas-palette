@@ -4,12 +4,15 @@ import { createId } from "./ids";
 import { IMAGE_EXTENSIONS } from "./media";
 import type { CardFace, Collection, GroupDecompositionInput, NumberedCanvasLink, PaletteData, PaletteItem, PaletteMetadata, PaletteWorkspace } from "./types";
 
-type Listener = () => void;
+export type StoreChange = { kind: "selection"; surface: "side" | "mini" } | { kind: "items"; itemIds: string[] } | { kind: "all" };
+type Listener = (change: StoreChange) => void;
 
 export class PaletteStore {
   data: PaletteData = migrateData(null);
   private listeners = new Set<Listener>();
   private saveTimer: number | null = null;
+  private batchDepth = 0;
+  private batchChanged = false;
 
   constructor(private readonly plugin: CanvasPalettePlugin) {}
 
@@ -28,8 +31,15 @@ export class PaletteStore {
     return () => this.listeners.delete(listener);
   }
 
-  changed(): void {
-    for (const listener of this.listeners) listener();
+  batch<T>(action: () => T): T {
+    this.batchDepth++;
+    try { return action(); }
+    finally { if (--this.batchDepth === 0 && this.batchChanged) { this.batchChanged = false; this.changed(); } }
+  }
+
+  changed(change: StoreChange = { kind: "all" }): void {
+    if (this.batchDepth) { this.batchChanged = true; return; }
+    for (const listener of this.listeners) listener(change);
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => void this.flush(), 150);
   }

@@ -327,12 +327,13 @@ export class CanvasAdapter {
     await this.app.vault.modify(file, JSON.stringify(document, null, 2));
   }
 
-  async syncItemsFromCanvas(file: TFile, items: PaletteItem[]): Promise<{ changedItems: number; nodeIds: Set<string> }> {
+  async syncItemsFromCanvas(file: TFile, items: PaletteItem[]): Promise<{ changedItems: number; changedItemIds: string[]; nodeIds: Set<string> }> {
     const document = await this.read(file);
     const previousNodes = this.previousNodesByCanvas.get(file.path) ?? new Map<string, CanvasNodeSnapshot>();
     const currentNodes = new Map(document.nodes.map((node) => [node.id, node]));
     const existingNodeIds = new Set(currentNodes.keys());
     let changed = 0;
+    const changedItemIds: string[] = [];
     for (const item of items) {
       const linkedNodeIds = [
         ...(item.origin.canvasPath === file.path && item.origin.canvasNodeId ? [item.origin.canvasNodeId] : []),
@@ -357,6 +358,7 @@ export class CanvasAdapter {
           }
           item.modifiedAt = Date.now();
           changed++;
+          changedItemIds.push(item.id);
           continue;
         }
       }
@@ -376,6 +378,7 @@ export class CanvasAdapter {
           item.displayTitle = displayTitle;
           item.modifiedAt = Date.now();
           changed++;
+          changedItemIds.push(item.id);
         }
       } else if (item.type === "group" && node.type === "group") {
         const nodes = this.expandGroupNodes(document.nodes, [node.id]);
@@ -384,11 +387,12 @@ export class CanvasAdapter {
           item.group = group;
           item.modifiedAt = Date.now();
           changed++;
+          changedItemIds.push(item.id);
         }
       }
     }
     this.previousNodesByCanvas.set(file.path, currentNodes);
-    return { changedItems: changed, nodeIds: existingNodeIds };
+    return { changedItems: changed, changedItemIds, nodeIds: existingNodeIds };
   }
 
   async revealNode(canvasPath: string, nodeId: string): Promise<boolean> {

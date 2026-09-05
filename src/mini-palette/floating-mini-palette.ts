@@ -3,7 +3,7 @@ import type CanvasPalettePlugin from "../main";
 import type { PaletteItem, PaletteItemType } from "../core/types";
 import { ConfirmDeleteModal, ConfirmMiniStorageRemovalModal, TagLabelModal } from "../ui/modal";
 import { makeHorizontalDivider } from "../ui/resizable";
-import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
+import { iconButton, renderItem, supportsFrontBack, workspaceSelect, withItemReuse, wasItemReused } from "../ui/render";
 import { applyAssetDensity, assetDensityLabel, ASSET_DENSITY_MAX, ASSET_DENSITY_MIN, nextAssetDensity } from "../ui/asset-density";
 import { attachedFlyoutPlacement, miniLayoutMode, type FlyoutSide, type MiniLayoutMode } from "../ui/responsive-layout";
 
@@ -59,7 +59,7 @@ export class FloatingMiniPalette {
     if (this.host?.parentElement === workspace) return;
     this.destroy();
     this.host = workspace.createDiv({ cls: "cp-mini-host" });
-    this.unsubscribe = this.plugin.store.subscribe(() => this.refresh());
+    this.unsubscribe = this.plugin.store.subscribe((change) => { if (change.kind === "selection" && change.surface === "side") return; this.refresh(); });
     const onDragOver = (event: DragEvent) => { if (event.dataTransfer?.types.includes("application/x-canvas-palette-item")) { event.preventDefault(); event.stopPropagation(); if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"; } };
     const onDrop = (event: DragEvent) => { const ids = this.dragIds(event.dataTransfer); if (ids.length === 0) return; event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); const items = ids.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item)); if (items.length > 0) void this.plugin.canvas.restoreItems(items, event.clientX, event.clientY); };
     canvas.addEventListener("dragover", onDragOver, true); canvas.addEventListener("drop", onDrop, true);
@@ -69,6 +69,10 @@ export class FloatingMiniPalette {
   private destroyPanel(): void { this.resizeObserver?.disconnect(); this.resizeObserver = undefined; this.flyoutCleanup?.(); this.flyoutCleanup = undefined; this.panel?.remove(); this.panel = undefined; this.rightPane = undefined; this.inspectorItemId = null; this.hoverItemId = null; this.openFlyout = null; this.responsivePanelLeft = null; }
 
   private render(): void {
+    withItemReuse(this.panel, () => this.renderNow());
+  }
+
+  private renderNow(): void {
     if (!this.host || !this.plugin.store.data.uiState.miniPalette.isOpen) return;
     const viewState = this.captureViewState();
     this.resizeObserver?.disconnect(); this.resizeObserver = undefined;
@@ -135,7 +139,7 @@ export class FloatingMiniPalette {
       summary.createSpan({ text: `Pending ${this.plugin.store.data.pendingItemIds.length} · Selected ${selected.length}` });
       const allVisibleSelected = visible.length > 0 && visible.every((item) => selected.includes(item.id));
       const all = summary.createEl("button", { text: allVisibleSelected ? "Clear selection" : "Select all results" });
-      all.addEventListener("click", () => { this.setCollectSelectedIds(allVisibleSelected ? selected.filter((id) => !visible.some((item) => item.id === id)) : [...new Set([...selected, ...visible.map((item) => item.id)])]); this.plugin.store.changed(); });
+      all.addEventListener("click", () => { this.setCollectSelectedIds(allVisibleSelected ? selected.filter((id) => !visible.some((item) => item.id === id)) : [...new Set([...selected, ...visible.map((item) => item.id)])]); this.plugin.store.changed({ kind: "selection", surface: "mini" }); });
       if (selected.length > 0) {
         const openSettings = summary.createEl("button", { text: "Open selected item settings" });
         openSettings.disabled = selected.length !== 1;
@@ -159,11 +163,14 @@ export class FloatingMiniPalette {
     importButton.addEventListener("click", () => {
       const select = bottom.querySelector("select"); if (!select) return;
       this.plugin.confirmWorkspaceSave(select.value, () => {
+        this.plugin.store.batch(() => {
         const result = this.plugin.store.importPending(select.value, this.collectSelectedIds(), this.plugin.isForeignCanvasWorkspace(select.value));
         if (result.rejected.length > 0) new Notice("Some items could not be imported because the selected Workspace is unavailable.");
         if (result.alreadySaved.length > 0) this.plugin.showAlreadySavedToWorkspace(select.value, result.imported.length, result.alreadySaved.length);
         else if (result.imported.length > 0) new Notice(`${result.imported.length} item${result.imported.length === 1 ? "" : "s"} imported.`);
         this.setCollectSelectedIds([...result.rejected, ...result.alreadySaved]); this.plugin.store.data.uiState.miniPalette.focusedItemId = null; this.inspectorItemId = null;
+        this.plugin.store.changed();
+        });
       });
     });
   }
@@ -247,6 +254,7 @@ export class FloatingMiniPalette {
       const face = facesEnabled ? this.plugin.store.data.uiState.miniItemFaces[item.id] ?? "front" : "front";
       const selected = this.storageSelectedIds();
       const card = renderItem(grid, item, { selected: selected.includes(item.id), showSelectionMarker: selected.length > 1, dragItemIds: selected, currentFace: face, markdownSourceStatus: this.plugin.markdownSourceStatus(item), onMarkdownSourceStatus: (event) => this.plugin.showMarkdownSourceMenu(item, event), onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("mini", item.id, next) : undefined, draggable: true, onSelect: (event) => this.selectStorage(item.id, event, orderedIds), onOpen: () => face === "back" ? void this.plugin.editorManager.openBack(item.id) : void this.plugin.openItemEditor(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), onContextMenu: (event) => this.openMiniItemMenu(event, item, "storage") });
+      if (wasItemReused(card)) continue;
       const body = card.querySelector<HTMLElement>(".cp-item__body"); if (body) void this.plugin.preview.render(body, item, true, 360, face);
       card.addEventListener("mousemove", (event) => { if (event.ctrlKey && this.hoverItemId !== item.id) { this.hoverItemId = item.id; if (this.rightPane) this.renderRightPane(this.rightPane); } });
       card.addEventListener("mouseleave", () => { if (this.hoverItemId === item.id) { this.hoverItemId = null; if (this.rightPane) this.renderRightPane(this.rightPane); } });
@@ -396,13 +404,13 @@ export class FloatingMiniPalette {
     const state = this.plugin.store.data.uiState.miniPalette;
     this.setCollectSelectedIds(this.selectionFromEvent(this.collectSelectedIds(), id, event, orderedIds, state.collectSelectionAnchorId));
     if (!event.shiftKey) state.collectSelectionAnchorId = id;
-    state.focusedItemId = id; this.plugin.store.changed();
+    state.focusedItemId = id; this.inspectorItemId = null; this.plugin.store.changed({ kind: "selection", surface: "mini" });
   }
   private selectStorage(id: string, event: MouseEvent | KeyboardEvent, orderedIds: string[]): void {
     const state = this.plugin.store.data.uiState.miniPalette;
     const next = this.selectionFromEvent(this.storageSelectedIds(), id, event, orderedIds, state.storageSelectionAnchorId);
     this.setStorageSelectedIds(next); if (!event.shiftKey) state.storageSelectionAnchorId = id;
-    this.plugin.store.data.uiState.selectedItemId = next.includes(id) ? id : next.at(-1) ?? null; this.plugin.store.changed();
+    this.plugin.store.data.uiState.selectedItemId = next.includes(id) ? id : next.at(-1) ?? null; this.plugin.store.changed({ kind: "selection", surface: "mini" });
   }
   private collectItems(): PaletteItem[] { return this.filtered(this.plugin.store.data.pendingItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item))); }
   private storageCandidates(): PaletteItem[] { return this.plugin.store.data.uiState.miniPalette.storageItemIds.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item)); }
@@ -450,7 +458,8 @@ export class FloatingMiniPalette {
   }
   private renderPendingCard(parent: HTMLElement, item: PaletteItem, orderedIds: string[]): void {
     const selected = this.collectSelectedIds();
-    const card = renderItem(parent, item, { selected: selected.includes(item.id), showSelectionMarker: selected.length > 1, dragItemIds: selected, miniCollect: true, draggable: true, onSelect: (event) => { this.selectPending(item.id, event, orderedIds); this.inspectorItemId = null; this.render(); }, onOpen: () => void this.plugin.openItemEditor(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), onContextMenu: (event) => this.openMiniItemMenu(event, item, "collect") });
+    const card = renderItem(parent, item, { selected: selected.includes(item.id), showSelectionMarker: selected.length > 1, dragItemIds: selected, miniCollect: true, draggable: true, onSelect: (event) => { this.selectPending(item.id, event, orderedIds); }, onOpen: () => void this.plugin.openItemEditor(item.id), onLocate: () => void this.plugin.locateItemOnCanvas(item), onContextMenu: (event) => this.openMiniItemMenu(event, item, "collect") });
+    if (wasItemReused(card)) return;
     const preview = card.querySelector<HTMLElement>(".cp-item__body"); if (preview) void this.plugin.preview.render(preview, item, true, 360);
   }
   private openCollectInspector(itemId: string): void {

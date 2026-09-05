@@ -24,7 +24,32 @@ export interface ItemRenderOptions { selected: boolean; showSelectionMarker?: bo
 
 export function supportsFrontBack(item: PaletteItem): boolean { return item.type !== "group" && item.type !== "link"; }
 
-export function renderItem(parent: HTMLElement, item: PaletteItem, options: ItemRenderOptions): HTMLElement {
+const itemRenderState = new WeakMap<HTMLElement, { signature: string; options: ItemRenderOptions }>();
+const reusedItems = new WeakSet<HTMLElement>();
+let reusableItems: Map<string, HTMLElement[]> | null = null;
+/** A synchronous render-local pool; no detached cards are retained after rendering. */
+export function withItemReuse(root: HTMLElement | undefined, render: () => void): void {
+  const previous = reusableItems;
+  const pool = new Map<string, HTMLElement[]>();
+  root?.querySelectorAll<HTMLElement>(".cp-item[data-item-id]").forEach((card) => { const id = card.dataset.itemId!; pool.set(id, [...(pool.get(id) ?? []), card]); });
+  reusableItems = pool;
+  try { render(); } finally { reusableItems = previous; }
+}
+export function wasItemReused(card: HTMLElement): boolean { return reusedItems.has(card); }
+
+export function renderItem(parent: HTMLElement, item: PaletteItem, options: ItemRenderOptions & { previewKey?: string }): HTMLElement {
+  const signature = JSON.stringify([item, options.compact, options.draggable, options.miniCollect, options.currentFace, options.unlinked, options.markdownSourceStatus, options.titleEditing, Boolean(options.onToggleFace), Boolean(options.onEditMenu), options.previewKey]);
+  const reusable = reusableItems?.get(item.id)?.shift();
+  const previous = reusable && itemRenderState.get(reusable);
+  if (reusable && previous?.signature === signature && !options.titleEditing) {
+    Object.assign(previous.options, options);
+    reusable.toggleClass("is-selected", options.selected);
+    const marker = reusable.querySelector(":scope > .cp-item__selection");
+    if (options.selected && options.showSelectionMarker !== false) {
+      if (!marker) { const added = reusable.createSpan({ cls: "cp-item__selection", attr: { "aria-label": "Selected" } }); setIcon(added, "check"); reusable.prepend(added); }
+    } else marker?.remove();
+    parent.appendChild(reusable); reusedItems.add(reusable); return reusable;
+  }
   const cutFromCanvas = item.type === "group" && item.cutFromCanvas === true;
   const canvasLinks = new Map<string, string[]>();
   const addCanvasLink = (canvasPath: string | undefined, nodeId: string | undefined): void => {
@@ -40,6 +65,7 @@ export function renderItem(parent: HTMLElement, item: PaletteItem, options: Item
   const showUnlinked = !cutFromCanvas && unlinked;
   const card = parent.createDiv({ cls: `cp-item cp-item--${item.type}${cutFromCanvas ? " cp-item--cut" : ""}${options.selected ? " is-selected" : ""}${options.compact ? " is-compact" : ""}` });
   card.dataset.itemId = item.id;
+  itemRenderState.set(card, { signature, options });
   card.tabIndex = 0;
   if (options.selected && options.showSelectionMarker !== false) { const marker = card.createSpan({ cls: "cp-item__selection", attr: { "aria-label": "Selected" } }); setIcon(marker, "check"); }
   const header = card.createDiv({ cls: "cp-item__header" });

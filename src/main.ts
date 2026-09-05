@@ -9,6 +9,7 @@ import { PaletteDropController } from "./canvas/palette-drop-controller";
 import { TextScrapHighlights } from "./canvas/text-scrap-highlights";
 import { createId } from "./core/ids";
 import { PaletteStore } from "./core/store";
+import { SerialTaskQueue } from "./core/serial-task-queue";
 import type { NumberedCanvasLink, OutlineSelectionTarget, PaletteItem, PaletteWorkspace } from "./core/types";
 import { PaletteEditorManager } from "./editor/editor-manager";
 import { FloatingMiniPalette } from "./mini-palette/floating-mini-palette";
@@ -23,6 +24,7 @@ import { WorkspaceExplorerModal } from "./ui/workspace-explorer-modal";
 
 export default class CanvasPalettePlugin extends Plugin {
   private readonly canvasSyncTimers = new Map<string, number>();
+  private readonly canvasSyncQueue = new SerialTaskQueue();
   private readonly cleanupDialogs = new Set<string>();
   private workspaceExplorer?: WorkspaceExplorerModal;
   private lastCanvasPath: string | null = null;
@@ -77,7 +79,7 @@ export default class CanvasPalettePlugin extends Plugin {
     this.register(this.dropController.mount(this.app.workspace.containerEl.ownerDocument));
     this.register(this.canvasToolbar.mount(this.app.workspace.containerEl.ownerDocument));
     this.registerEditorExtension(this.textScrapHighlights.extension());
-    this.register(this.store.subscribe(() => { this.textScrapHighlights.refreshVisibleEditors(); this.canvasMetadata.refreshSoon(); this.canvasCaptionControl.refresh(); this.canvasToolbar.refreshSoon(); }));
+    this.register(this.store.subscribe((change) => { if (change.kind === "selection") return; this.textScrapHighlights.refreshVisibleEditors(); this.canvasMetadata.refreshSoon(); this.canvasCaptionControl.refresh(); this.canvasToolbar.refreshSoon(); }));
     this.registerView(SIDE_PALETTE_VIEW, (leaf) => new SidePaletteView(leaf, this));
     this.addRibbonIcon("library-big", "Open Canvas Palette", () => void this.activateSidePalette());
     this.addRibbonIcon("panels-top-left", "Toggle Canvas Mini Palette", () => this.miniPalette.toggle());
@@ -739,7 +741,7 @@ export default class CanvasPalettePlugin extends Plugin {
     if (previous !== undefined) window.clearTimeout(previous);
     this.canvasSyncTimers.set(file.path, window.setTimeout(() => {
       this.canvasSyncTimers.delete(file.path);
-      void this.syncCanvasFileToPalette(file);
+      void this.canvasSyncQueue.enqueue(file.path, () => this.syncCanvasFileToPalette(file));
     }, 150));
   }
 
@@ -749,8 +751,8 @@ export default class CanvasPalettePlugin extends Plugin {
       const existingNodeIds = mergeCanvasNodeIds(result.nodeIds, this.canvas.openNodeIds(file.path));
       const linksChanged = this.store.reconcileCanvasLinks(file.path, existingNodeIds);
       if (result.changedItems > 0 || linksChanged) {
-        this.store.changed();
-        for (const item of this.store.allItems()) if (item.type === "card") void this.syncPaletteItemToCanvas(item);
+        this.store.changed(linksChanged ? { kind: "all" } : { kind: "items", itemIds: result.changedItemIds });
+        for (const id of result.changedItemIds) { const item = this.store.data.items[id]; if (item?.type === "card") await this.syncPaletteItemToCanvas(item); }
       }
     } catch (error) { console.error("Canvas Palette failed to synchronize original Canvas items", error); }
   }

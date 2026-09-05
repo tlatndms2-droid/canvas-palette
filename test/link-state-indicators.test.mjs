@@ -7,10 +7,10 @@ const itemRenderer = await readFile(new URL("../src/ui/render.ts", import.meta.u
 const styles = await readFile(new URL("../styles.css", import.meta.url), "utf8");
 
 test("linked Canvas nodes render an isolated clickable top-left link badge", () => {
-  assert.match(canvasController, /numberedCanvasLinkForNode\(canvasPath, nodeId\)/);
+  assert.match(canvasController, /numberedCanvasLinks\(item\)/);
   assert.match(canvasController, /cp-canvas-link-badge/);
   assert.match(canvasController, /cp-canvas-link-badge__number/);
-  assert.match(canvasController, /링크 \$\{numberedLink\?\.link\.number\}/);
+  assert.match(canvasController, /링크 \$\{numberedLink\?\.number\}/);
   assert.match(canvasController, /setIcon\(linkBadge, "link-2"\)/);
   assert.match(canvasController, /revealPaletteItemForCanvasNode\(canvasPath, nodeId\)/);
   assert.match(canvasController, /linkBadge\.addEventListener\("pointerdown", \(event\) => event\.stopPropagation\(\)\)/);

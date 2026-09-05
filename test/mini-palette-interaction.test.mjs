@@ -29,7 +29,8 @@ test("Mini Palette uses command toggling, a full header drag surface, and eight 
 });
 
 test("Mini Collect selection does not auto-open settings, which are opened from its context menu", () => {
-  assert.match(source, /onSelect: \(event\) => \{ this\.selectPending\(item\.id, event, orderedIds\); this\.inspectorItemId = null; this\.render\(\); \}/);
+  assert.match(source, /onSelect: \(event\) => \{ this\.selectPending\(item\.id, event, orderedIds\); \}/);
+  assert.match(source, /state\.focusedItemId = id; this\.inspectorItemId = null; this\.plugin\.store\.changed\(\{ kind: "selection", surface: "mini" \}\)/);
   const menu = source.slice(source.indexOf("private openMiniItemMenu"), source.indexOf("private confirmPendingDelete"));
   assert.match(menu, /tab === "collect" && targetIds\.length === 1/);
   assert.match(menu, /setTitle\("Open selected item settings"\)/);

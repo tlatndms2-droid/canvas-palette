@@ -3,7 +3,7 @@ import type CanvasPalettePlugin from "../main";
 import type { Collection, OutlineSelectionTarget, OutlineStructure, PaletteItem, SideLayoutState } from "../core/types";
 import { CardToMarkdownModal, ConfirmDeleteCollectionModal, ConfirmDeleteItemCollectionModal, ConfirmDeleteModal, GroupDecompositionModal, MoveItemsModal, TagLabelModal, TextPromptModal } from "../ui/modal";
 import { makeHorizontalDivider, makeVerticalDivider } from "../ui/resizable";
-import { iconButton, renderItem, supportsFrontBack, workspaceSelect } from "../ui/render";
+import { iconButton, renderItem, supportsFrontBack, workspaceSelect, withItemReuse, wasItemReused } from "../ui/render";
 import { LinkedSpacesModal } from "../ui/linked-spaces-modal";
 import { NativeMarkdownEditor } from "../editor/native-markdown-editor";
 import { applyAssetDensity, assetDensityLabel, ASSET_DENSITY_DEFAULT, ASSET_DENSITY_MAX, ASSET_DENSITY_MIN, nextAssetDensity } from "../ui/asset-density";
@@ -25,6 +25,8 @@ export class SidePaletteView extends ItemView {
   private viewSettingsOpen = false;
   private outlinerSettingsOpen = false;
   private searchComposing = false;
+  private deferredRender = false;
+  private retainedSearch: HTMLElement | null = null;
   private searchAssistantOpen = false;
   private pendingReveal: "viewport" | "outliner" | null = null;
   private draggedOutlineCollectionId: string | null = null;
@@ -43,7 +45,7 @@ export class SidePaletteView extends ItemView {
   getViewType(): string { return SIDE_PALETTE_VIEW; }
   getDisplayText(): string { return "Canvas Palette"; }
   getIcon(): string { return "library-big"; }
-  async onOpen(): Promise<void> { this.unsubscribe = this.plugin.store.subscribe(() => this.render()); this.render(); }
+  async onOpen(): Promise<void> { this.unsubscribe = this.plugin.store.subscribe((change) => { if (change.kind === "selection" && change.surface === "mini") return; this.render(); }); this.render(); }
   async onClose(): Promise<void> { this.resizeObserver?.disconnect(); this.indexesFlyoutCleanup?.(); this.unsubscribe?.(); await this.activeFrontEditor?.close(true); await this.activeBackEditor?.close(true); }
 
   revealItem(itemId: string): void {
@@ -73,9 +75,18 @@ export class SidePaletteView extends ItemView {
   }
 
   private render(): void {
+    withItemReuse(this.contentEl, () => this.renderNow());
+  }
+
+  private renderNow(): void {
+    if (this.searchComposing) { this.deferredRender = true; return; }
     if (this.activeBackEditor || this.activeFrontEditor || this.searchComposing) return;
     const root = this.contentEl;
     const previousWorkspaceId = root.dataset.cpWorkspaceId;
+    const search = root.querySelector<HTMLInputElement>(".cp-search");
+    const focused = search && root.ownerDocument.activeElement === search;
+    const selection = search ? [search.selectionStart, search.selectionEnd] as const : null;
+    this.retainedSearch = previousWorkspaceId === this.plugin.activeWorkspace()?.id ? root.querySelector<HTMLElement>(".cp-search-wrap") : null;
     this.captureScrollMemory(root);
     this.resizeObserver?.disconnect(); this.resizeObserver = undefined;
     this.indexesFlyoutCleanup?.(); this.indexesFlyoutCleanup = undefined;
@@ -104,6 +115,10 @@ export class SidePaletteView extends ItemView {
         const selector = target === "viewport" ? `.cp-item[data-item-id="${CSS.escape(id)}"]` : `.cp-outline-item[data-item-id="${CSS.escape(id)}"]`;
         this.contentEl.querySelector<HTMLElement>(selector)?.scrollIntoView({ block: "center", inline: "nearest" });
       }));
+    }
+    if (focused && search?.isConnected && root.ownerDocument.activeElement === root.ownerDocument.body) {
+      search.focus({ preventScroll: true });
+      if (selection?.[0] != null && selection[1] != null) search.setSelectionRange(selection[0], selection[1]);
     }
   }
 
@@ -145,11 +160,12 @@ export class SidePaletteView extends ItemView {
   }
 
   private renderSearch(root: HTMLElement, workspaceId: string): HTMLElement {
+    if (this.retainedSearch) { const retained = this.retainedSearch; this.retainedSearch = null; root.appendChild(retained); const input = retained.querySelector<HTMLInputElement>(".cp-search"); if (input) input.value = this.query; this.renderSearchAssistant(retained, workspaceId); return retained; }
     const searchWrap = root.createDiv({ cls: "cp-search-wrap" });
     const search = searchWrap.createEl("input", { cls: "cp-search", attr: { type: "search", placeholder: "Search files, groups, tags, labels…", autocomplete: "off" }, value: this.query });
     const refreshSearch = (): void => this.refreshSearchSurface(searchWrap, workspaceId);
     search.addEventListener("compositionstart", () => { this.searchComposing = true; });
-    search.addEventListener("compositionend", () => { this.searchComposing = false; this.query = search.value.normalize("NFC"); search.value = this.query; queueMicrotask(refreshSearch); });
+    search.addEventListener("compositionend", () => { this.searchComposing = false; this.query = search.value.normalize("NFC"); search.value = this.query; queueMicrotask(() => { if (this.deferredRender) { this.deferredRender = false; this.render(); } else refreshSearch(); }); });
     search.addEventListener("input", (event) => { this.query = search.value; if (this.searchComposing || (event as InputEvent).isComposing) return; refreshSearch(); });
     search.addEventListener("keydown", (event) => { if (event.key === "ArrowDown") { event.preventDefault(); searchWrap.querySelector<HTMLButtonElement>(".cp-search-suggestion")?.focus(); } else if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); this.searchAssistantOpen = false; this.renderSearchAssistant(searchWrap, workspaceId); } });
     search.addEventListener("focus", () => { this.searchAssistantOpen = true; this.renderSearchAssistant(searchWrap, workspaceId); });
@@ -463,7 +479,8 @@ export class SidePaletteView extends ItemView {
     const renderCard = (host: HTMLElement, item: PaletteItem): void => {
       const facesEnabled = supportsFrontBack(item) && item.facesEnabled;
       const face = facesEnabled ? this.plugin.store.data.uiState.sideItemFaces[item.id] ?? "front" : "front";
-      const card = renderItem(host, item, { selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, dragItemIds: selectedIds, currentFace: face, unlinked: !this.plugin.store.itemLinkedToWorkspace(item, workspaceId), markdownSourceStatus: this.plugin.markdownSourceStatus(item), onMarkdownSourceStatus: (event) => this.plugin.showMarkdownSourceMenu(item, event), onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("side", item.id, next) : undefined, titleEditing: this.titleEditingItemId === item.id, onCommitTitle: (title) => this.commitTitleEdit(item.id, title), onCancelTitleEdit: () => this.cancelTitleEdit(), onEditMenu: (event, anchor) => this.openItemEditMenu(item.id, event, anchor), onSelect: (event) => { this.pendingReveal = "outliner"; this.selectSideItem(item.id, event); }, onOpen: () => face === "back" ? void this.openInlineBackEditor(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => this.plugin.findLinkedCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+      const card = renderItem(host, item, { previewKey: `${this.plugin.store.data.settings.fontSize}:${selectedIds.includes(item.id)}`, selected: selectedIds.includes(item.id), showSelectionMarker: selectedIds.length > 1, dragItemIds: selectedIds, currentFace: face, unlinked: !this.plugin.store.itemLinkedToWorkspace(item, workspaceId), markdownSourceStatus: this.plugin.markdownSourceStatus(item), onMarkdownSourceStatus: (event) => this.plugin.showMarkdownSourceMenu(item, event), onToggleFace: facesEnabled ? (next) => this.plugin.store.setPaletteFace("side", item.id, next) : undefined, titleEditing: this.titleEditingItemId === item.id, onCommitTitle: (title) => this.commitTitleEdit(item.id, title), onCancelTitleEdit: () => this.cancelTitleEdit(), onEditMenu: (event, anchor) => this.openItemEditMenu(item.id, event, anchor), onSelect: (event) => { this.pendingReveal = "outliner"; this.selectSideItem(item.id, event); }, onOpen: () => face === "back" ? void this.openInlineBackEditor(item.id) : void this.plugin.openSideItemPreview(item.id), onLocate: () => this.plugin.findLinkedCanvas(item), draggable: true, onContextMenu: (event) => this.itemMenu(event, item) });
+      if (wasItemReused(card)) return;
       const body = card.querySelector<HTMLElement>(".cp-item__body");
       if (body && this.activeFrontEditor?.itemId !== item.id) {
         const compactLimit = Math.round(360 * 14 / this.plugin.store.data.settings.fontSize);
@@ -1035,7 +1052,7 @@ export class SidePaletteView extends ItemView {
     // Viewport selection is item-only, so it deliberately replaces any Outliner Collection rows.
     this.outlineSelection = next.map((itemId) => ({ kind: "item" as const, id: itemId }));
     this.outlineSelectionAnchorKey = this.selectionAnchorId ? `item:${this.selectionAnchorId}` : null;
-    this.plugin.store.changed();
+    this.plugin.store.changed({ kind: "selection", surface: "side" });
   }
   private clearSideSelection(): void {
     if (this.sideSelectedIds().length === 0) return;
@@ -1044,7 +1061,7 @@ export class SidePaletteView extends ItemView {
     this.outlineSelectionAnchorKey = null;
     this.plugin.store.data.uiState.sideSelectedItemIds = [];
     this.plugin.store.data.uiState.selectedItemId = null;
-    this.plugin.store.changed();
+    this.plugin.store.changed({ kind: "selection", surface: "side" });
   }
   private mountViewportReorder(viewport: HTMLElement, listEl: HTMLElement, workspaceId: string): void {
     const overlay = document.createElement("div"); overlay.className = "cp-drop-overlay";

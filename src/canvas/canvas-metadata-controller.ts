@@ -1,11 +1,15 @@
 import { MarkdownRenderer, setIcon } from "obsidian";
 import type CanvasPalettePlugin from "../main";
-import type { PaletteMetadata } from "../core/types";
+import type { NumberedCanvasLink, PaletteMetadata } from "../core/types";
 import { NativeMarkdownEditor } from "../editor/native-markdown-editor";
 import type { CanvasAdapter, CanvasRuntimeNodeLike } from "./canvas-adapter";
 
 export class CanvasMetadataController {
   private timer: number | null = null;
+  private readonly signatures = new WeakMap<HTMLElement, string>();
+  private readonly observedNodes = new Map<HTMLElement, CanvasRuntimeNodeLike>();
+  private attachmentObserver: MutationObserver | null = null;
+  private destroyed = false;
   private readonly nodesByElement = new WeakMap<Element, CanvasRuntimeNodeLike>();
   private readonly activeEditors = new WeakSet<HTMLElement>();
   private activeBackEditor: { nodeEl: HTMLElement; close: (save: boolean) => Promise<void> } | null = null;
@@ -19,21 +23,43 @@ export class CanvasMetadataController {
   constructor(private readonly plugin: CanvasPalettePlugin, private readonly adapter: CanvasAdapter) {}
 
   refreshSoon(): void {
+    if (this.destroyed) return;
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.timer = window.setTimeout(() => { this.timer = null; this.refresh(); }, 60);
   }
 
   refresh(): void {
+    if (this.destroyed) return;
+    if (!this.attachmentObserver) {
+      this.attachmentObserver = new MutationObserver((records) => {
+        if (records.some((record) => [...Array.from(record.addedNodes), ...Array.from(record.removedNodes)].some((node) => node instanceof Element && (node.matches(".canvas-node") || node.querySelector(".canvas-node"))))) this.refreshSoon();
+      });
+      this.attachmentObserver.observe(this.plugin.app.workspace.containerEl, { childList: true, subtree: true });
+    }
+    const links = new Map<string, NumberedCanvasLink>();
+    for (const item of this.plugin.store.allItems()) for (const link of this.plugin.store.numberedCanvasLinks(item)) {
+      const key = JSON.stringify([link.canvasPath, link.nodeId]);
+      if (!links.has(key)) links.set(key, link);
+    }
+    const live = new Set<HTMLElement>();
     for (const context of this.adapter.openContexts()) {
       const nodes = context.runtime.nodes;
       if (!(nodes instanceof Map)) continue;
-      for (const [nodeId, node] of nodes) this.decorate(node, context.file.path, nodeId, this.plugin.store.getCanvasNodeMetadata(context.file.path, nodeId));
+      for (const [nodeId, node] of nodes) {
+        if (!node.nodeEl?.isConnected) continue;
+        live.add(node.nodeEl);
+        this.decorate(node, context.file.path, nodeId, this.plugin.store.getCanvasNodeMetadata(context.file.path, nodeId), links.get(JSON.stringify([context.file.path, nodeId])));
+      }
     }
+    for (const element of this.observedNodes.keys()) if (!live.has(element)) { this.resizeObserver.unobserve(element); this.observedNodes.delete(element); this.signatures.delete(element); this.nodesByElement.delete(element); }
   }
 
   destroy(): void {
+    this.destroyed = true;
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.resizeObserver.disconnect();
+    this.attachmentObserver?.disconnect(); this.attachmentObserver = null;
+    this.observedNodes.clear();
     void this.activeBackEditor?.close(true);
     for (const context of this.adapter.openContexts()) {
       const nodes = context.runtime.nodes;
@@ -42,27 +68,29 @@ export class CanvasMetadataController {
     }
   }
 
-  private decorate(node: CanvasRuntimeNodeLike, canvasPath: string, nodeId: string, metadata: PaletteMetadata | undefined): void {
+  private decorate(node: CanvasRuntimeNodeLike, canvasPath: string, nodeId: string, metadata: PaletteMetadata | undefined, numberedLink?: NumberedCanvasLink): void {
     const nodeEl = node.nodeEl;
     if (!(nodeEl instanceof HTMLElement)) return;
     if (this.activeBackEditor?.nodeEl === nodeEl) return;
     const activeEditor = nodeEl.querySelector<HTMLElement>(":scope > .cp-canvas-metadata .cp-canvas-metadata__editor");
     if (activeEditor && this.activeEditors.has(activeEditor)) return;
-    this.remove(node);
-    const state = metadata ?? { tags: [], label: "", labelColor: "", caption: "", captionFontSize: 11, backContent: "", currentFace: "front" as const, facesEnabled: false, modifiedAt: Date.now() };
+    const state = metadata ?? { tags: [], label: "", labelColor: "", caption: "", captionFontSize: 11, backContent: "", currentFace: "front" as const, facesEnabled: false, modifiedAt: 0 };
     const supportsFaces = this.adapter.supportsFrontBack(node);
-    const numberedLink = this.plugin.store.numberedCanvasLinkForNode(canvasPath, nodeId);
     const linked = Boolean(numberedLink);
     const data = node.getData?.();
     const type = data?.type ?? "unknown";
+    const signature = JSON.stringify([canvasPath, nodeId, state, supportsFaces, numberedLink, type, data?.width, data?.height, this.plugin.store.data.settings.canvasCaptionFontSize]);
+    if (this.signatures.get(nodeEl) === signature && nodeEl.querySelector(":scope > .cp-canvas-metadata")) return;
+    this.remove(node);
+    this.signatures.set(nodeEl, signature);
     nodeEl.addClass("cp-canvas-has-metadata", `cp-canvas-has-metadata--${type}`);
     if (linked) nodeEl.addClass("cp-canvas-linked");
     const layer = nodeEl.createDiv({ cls: `cp-canvas-metadata cp-canvas-metadata--${type}`, attr: { "aria-label": "Canvas Palette metadata" } });
     if (linked) {
-      const linkLabel = `링크 ${numberedLink?.link.number}/${numberedLink?.link.total} · Side Palette에서 보기`;
+      const linkLabel = `링크 ${numberedLink?.number}/${numberedLink?.total} · Side Palette에서 보기`;
       const linkBadge = layer.createEl("button", { cls: "clickable-icon cp-canvas-link-badge", attr: { type: "button", "aria-label": linkLabel, title: linkLabel } });
       setIcon(linkBadge, "link-2");
-      linkBadge.createSpan({ cls: "cp-canvas-link-badge__number", text: String(numberedLink?.link.number ?? "") });
+      linkBadge.createSpan({ cls: "cp-canvas-link-badge__number", text: String(numberedLink?.number ?? "") });
       linkBadge.addEventListener("pointerdown", (event) => event.stopPropagation());
       linkBadge.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); void this.plugin.revealPaletteItemForCanvasNode(canvasPath, nodeId); });
       linkBadge.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); });
@@ -119,6 +147,7 @@ export class CanvasMetadataController {
       });
     }
     this.nodesByElement.set(nodeEl, node);
+    this.observedNodes.set(nodeEl, node);
     this.resizeObserver.observe(nodeEl);
     this.updateScale(node);
   }
@@ -147,6 +176,7 @@ export class CanvasMetadataController {
       host.removeEventListener("keydown", onKeyDown, true);
       const text = editor.getText();
       editor.detach();
+      this.signatures.delete(nodeEl);
       if (this.activeBackEditor?.nodeEl === nodeEl) this.activeBackEditor = null;
       if (save) this.plugin.store.setCanvasNodeBack(canvasPath, nodeId, text);
       else this.refreshSoon();
@@ -190,6 +220,7 @@ export class CanvasMetadataController {
       const finish = (save: boolean): void => {
         if (finished) return;
         finished = true;
+        const nodeEl = editor.closest<HTMLElement>(".canvas-node"); if (nodeEl) this.signatures.delete(nodeEl);
         editor.classList.remove("cp-canvas-metadata__editor");
         editor.disabled = true;
         if (save) onCommit(editor.value.trim());
