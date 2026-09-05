@@ -499,8 +499,8 @@ export default class CanvasPalettePlugin extends Plugin {
     menu.addItem((item) => item.setTitle("Collect text to Mini Palette").setIcon("inbox").onClick(() => this.collectCanvasTextToMini(text, context.file.path, range)));
     const workspaces = Object.values(this.store.data.workspaces);
     const activeWorkspace = this.activeWorkspace();
-    const currentGeneralWorkspaceId = activeWorkspace?.kind === "general" ? activeWorkspace.id : null;
-    menu.addItem((item) => item.setTitle("Save text directly to Side Palette…").setIcon("panel-right").setDisabled(workspaces.length === 0).onClick(() => new TextScrapWorkspaceModal(this.app, workspaces, currentGeneralWorkspaceId, (workspaceId) => this.confirmWorkspaceSave(workspaceId, () => this.collectCanvasTextToWorkspace(text, context.file.path, range, workspaceId))).open()));
+    const currentWorkspaceId = activeWorkspace?.kind !== "archive" ? activeWorkspace?.id ?? null : null;
+    menu.addItem((item) => item.setTitle("Save text directly to Side Palette…").setIcon("panel-right").setDisabled(workspaces.length === 0).onClick(() => new TextScrapWorkspaceModal(this.app, workspaces, currentWorkspaceId, (workspaceId) => this.confirmWorkspaceSave(workspaceId, () => this.collectCanvasTextToWorkspace(text, context.file.path, range, workspaceId))).open()));
   }
 
   private textItem(text: string, canvasPath: string, textRange: { from: { line: number; ch: number }; to: { line: number; ch: number } }): PaletteItem {

@@ -108,13 +108,13 @@ export class CanvasWorkspaceModal extends Modal {
 
 /** Selects one Side Palette destination for text captured from a Canvas editor. */
 export class TextScrapWorkspaceModal extends Modal {
-  constructor(app: App, private readonly workspaces: PaletteWorkspace[], private readonly currentGeneralWorkspaceId: string | null, private readonly onSave: (workspaceId: string) => void) { super(app); }
+  constructor(app: App, private readonly workspaces: PaletteWorkspace[], private readonly currentWorkspaceId: string | null, private readonly onSave: (workspaceId: string) => void) { super(app); }
   onOpen(): void {
     this.contentEl.addClass("canvas-palette", "cp-text-scrap-workspace-modal");
     this.contentEl.createEl("h2", { text: "저장할 Workspace 선택" });
     this.contentEl.createEl("label", { text: "Workspace", attr: { for: "canvas-palette-text-scrap-workspace" } });
     const select = this.contentEl.createEl("select", { attr: { id: "canvas-palette-text-scrap-workspace", "aria-label": "저장할 Workspace" } });
-    const current = this.workspaces.find((workspace) => workspace.id === this.currentGeneralWorkspaceId && workspace.kind === "general");
+    const current = this.workspaces.find((workspace) => workspace.id === this.currentWorkspaceId && workspace.kind !== "archive");
     if (!current) {
       const placeholder = select.createEl("option", { value: "", text: "Workspace를 선택하세요" });
       placeholder.disabled = true;

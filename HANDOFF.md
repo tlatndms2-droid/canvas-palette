@@ -92,6 +92,8 @@ The user distinguishes these modes precisely:
 
 ## Current state
 
+- Version: `0.3.81` (current Canvas Workspace default). The selected-text direct-save picker now treats the active Canvas Workspace exactly like an active general Workspace: it is preselected and labelled `— 현재 사용 중`. Archive still requires an explicit selection. Validation: 128 automated tests, TypeScript no-emit, production build, `git diff --check`, isolated Sandbox Canvas-Workspace modal check, restart persistence, and restored Sandbox data/workspace fixture hashes.
+
 - Version: `0.3.80` (text direct-save Workspace picker). Canvas text selection now shows one `Save text directly to Side Palette…` entry instead of one entry per Workspace. Its compact native Obsidian dialog defaults to the active general Workspace and marks it `— 현재 사용 중`; without an active general Workspace it requires an explicit choice. Existing foreign-Canvas confirmation, duplicate handling, and new-Item reveal remain unchanged. Validation: 128 automated tests, TypeScript no-emit, production build, `git diff --check`, isolated Sandbox menu-handler/modal/save/cancel checks, restart persistence, and restored Sandbox data/workspace fixture hashes.
 
 - Version: `0.3.79` (new Side Item focus). Saving selected Canvas text directly to Side Palette, saving one or more selected Canvas Items, and importing Mini Collect Items now send the first newly saved Item through the same Viewport reveal flow as `+ Memo`: Side Palette opens in Viewport, clears any hiding search, expands its Collection path, selects and centers the Item, then briefly highlights it. A duplicate-only Canvas save or Mini Import leaves the currently visible Side screen unchanged. No schema change.
