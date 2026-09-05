@@ -45,12 +45,12 @@ export class FloatingMiniPalette {
   open(): void {
     const canvas = this.plugin.canvas.activeContainer();
     if (!canvas) { new Notice("Open a Canvas to use Mini Palette."); return; }
-    this.attach(canvas); this.plugin.store.data.uiState.miniPalette.isOpen = true; this.plugin.store.changed(); this.render();
+    this.attach(canvas); this.plugin.store.data.uiState.miniPalette.isOpen = true; this.plugin.store.changed({ kind: "ui", surface: "mini" }); this.render();
   }
 
   toggle(): void { if (this.plugin.store.data.uiState.miniPalette.isOpen) this.close(); else this.open(); }
 
-  close(): void { this.plugin.store.data.uiState.miniPalette.isOpen = false; this.plugin.store.changed(); this.destroyPanel(); }
+  close(): void { this.plugin.store.data.uiState.miniPalette.isOpen = false; this.plugin.store.changed({ kind: "ui", surface: "mini" }); this.destroyPanel(); }
   refresh(): void { if (this.panel) this.render(); }
   destroy(): void { this.destroyPanel(); this.host?.remove(); this.host = undefined; this.unsubscribe?.(); this.unsubscribe = undefined; this.detachDrop?.(); this.detachDrop = undefined; }
 
@@ -59,7 +59,7 @@ export class FloatingMiniPalette {
     if (this.host?.parentElement === workspace) return;
     this.destroy();
     this.host = workspace.createDiv({ cls: "cp-mini-host" });
-    this.unsubscribe = this.plugin.store.subscribe((change) => { if (change.kind === "selection" && change.surface === "side") return; this.refresh(); });
+    this.unsubscribe = this.plugin.store.subscribe((change) => { if ((change.kind === "selection" && change.surface === "side") || change.kind === "ui") return; this.refresh(); });
     const onDragOver = (event: DragEvent) => { if (event.dataTransfer?.types.includes("application/x-canvas-palette-item")) { event.preventDefault(); event.stopPropagation(); if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"; } };
     const onDrop = (event: DragEvent) => { const ids = this.dragIds(event.dataTransfer); if (ids.length === 0) return; event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); const items = ids.map((id) => this.plugin.store.data.items[id]).filter((item): item is PaletteItem => Boolean(item)); if (items.length > 0) void this.plugin.canvas.restoreItems(items, event.clientX, event.clientY); };
     canvas.addEventListener("dragover", onDragOver, true); canvas.addEventListener("drop", onDrop, true);

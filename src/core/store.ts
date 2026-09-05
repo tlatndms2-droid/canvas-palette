@@ -4,7 +4,7 @@ import { createId } from "./ids";
 import { IMAGE_EXTENSIONS } from "./media";
 import type { CardFace, Collection, GroupDecompositionInput, NumberedCanvasLink, PaletteData, PaletteItem, PaletteMetadata, PaletteWorkspace } from "./types";
 
-export type StoreChange = { kind: "selection"; surface: "side" | "mini" } | { kind: "items"; itemIds: string[] } | { kind: "all" };
+export type StoreChange = { kind: "selection"; surface: "side" | "mini" } | { kind: "items"; itemIds: string[] } | { kind: "ui"; surface: "mini" } | { kind: "all" };
 type Listener = (change: StoreChange) => void;
 
 export class PaletteStore {

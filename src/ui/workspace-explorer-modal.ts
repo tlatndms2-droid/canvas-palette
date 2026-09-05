@@ -17,7 +17,7 @@ export class WorkspaceExplorerModal {
     const doc = this.app.workspace.containerEl.ownerDocument;
     this.root = doc.body.createDiv({ cls: "cp-workspace-explorer-overlay" });
     this.panel = this.root.createDiv({ cls: "canvas-palette cp-workspace-explorer-popup" });
-    this.applyGeometry(); this.unsubscribe = this.plugin.store.subscribe(() => this.render()); this.render();
+    this.applyGeometry(); this.unsubscribe = this.plugin.store.subscribe((change) => { if (change.kind !== "ui") this.render(); }); this.render();
   }
   close(): void { this.saveGeometry(); this.unsubscribe?.(); this.root?.remove(); this.root = null; this.panel = null; this.selected.clear(); this.anchor = null; }
   private state() { return this.plugin.store.data.uiState.workspaceExplorer; }

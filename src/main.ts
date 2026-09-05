@@ -79,7 +79,7 @@ export default class CanvasPalettePlugin extends Plugin {
     this.register(this.dropController.mount(this.app.workspace.containerEl.ownerDocument));
     this.register(this.canvasToolbar.mount(this.app.workspace.containerEl.ownerDocument));
     this.registerEditorExtension(this.textScrapHighlights.extension());
-    this.register(this.store.subscribe((change) => { if (change.kind === "selection") return; this.textScrapHighlights.refreshVisibleEditors(); this.canvasMetadata.refreshSoon(); this.canvasCaptionControl.refresh(); this.canvasToolbar.refreshSoon(); }));
+    this.register(this.store.subscribe((change) => { if (change.kind === "selection" || change.kind === "ui") return; this.textScrapHighlights.refreshVisibleEditors(); this.canvasMetadata.refreshSoon(); this.canvasCaptionControl.refresh(); this.canvasToolbar.refreshSoon(); }));
     this.registerView(SIDE_PALETTE_VIEW, (leaf) => new SidePaletteView(leaf, this));
     this.addRibbonIcon("library-big", "Open Canvas Palette", () => void this.activateSidePalette());
     this.addRibbonIcon("panels-top-left", "Toggle Canvas Mini Palette", () => this.miniPalette.toggle());

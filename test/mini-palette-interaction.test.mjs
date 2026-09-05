@@ -28,6 +28,11 @@ test("Mini Palette uses command toggling, a full header drag surface, and eight 
   assert.match(styles, /\.cp-window-resize--se/);
 });
 
+test("Mini window visibility saves without refreshing unrelated Palette surfaces", () => {
+  assert.match(source, /store\.changed\(\{ kind: "ui", surface: "mini" \}\)/);
+  assert.match(source, /change\.kind === "ui"\) return; this\.refresh\(\)/);
+});
+
 test("Mini Collect selection does not auto-open settings, which are opened from its context menu", () => {
   assert.match(source, /onSelect: \(event\) => \{ this\.selectPending\(item\.id, event, orderedIds\); \}/);
   assert.match(source, /state\.focusedItemId = id; this\.inspectorItemId = null; this\.plugin\.store\.changed\(\{ kind: "selection", surface: "mini" \}\)/);

@@ -45,7 +45,7 @@ export class SidePaletteView extends ItemView {
   getViewType(): string { return SIDE_PALETTE_VIEW; }
   getDisplayText(): string { return "Canvas Palette"; }
   getIcon(): string { return "library-big"; }
-  async onOpen(): Promise<void> { this.unsubscribe = this.plugin.store.subscribe((change) => { if (change.kind === "selection" && change.surface === "mini") return; this.render(); }); this.render(); }
+  async onOpen(): Promise<void> { this.unsubscribe = this.plugin.store.subscribe((change) => { if ((change.kind === "selection" && change.surface === "mini") || change.kind === "ui") return; this.render(); }); this.render(); }
   async onClose(): Promise<void> { this.resizeObserver?.disconnect(); this.indexesFlyoutCleanup?.(); this.unsubscribe?.(); await this.activeFrontEditor?.close(true); await this.activeBackEditor?.close(true); }
 
   revealItem(itemId: string): void {

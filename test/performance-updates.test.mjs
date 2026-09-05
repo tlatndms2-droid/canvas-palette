@@ -21,6 +21,7 @@ test('batched Import observers see final selection only and untyped changes stay
     store.batch(()=>{store.changed();store.batch(()=>store.changed());store.data.uiState.miniPalette.collectSelectedItemIds=[];store.changed();});
     assert.deepEqual(states,[{change:{kind:'all'},selected:[]}]);
     store.changed({kind:'selection',surface:'mini'});assert.equal(states.at(-1).change.kind,'selection');
+    store.changed({kind:'ui',surface:'mini'});assert.deepEqual(states.at(-1).change,{kind:'ui',surface:'mini'});
     await store.flush();
   } finally {await loaded.cleanup();}
 });
