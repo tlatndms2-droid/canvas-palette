@@ -8,6 +8,7 @@ import { CanvasNodeToolbarController } from "./canvas/canvas-node-toolbar-contro
 import { PaletteDropController } from "./canvas/palette-drop-controller";
 import { TextScrapHighlights } from "./canvas/text-scrap-highlights";
 import { createId } from "./core/ids";
+import { extractHighlights, type HighlightCanvasLayout, type HighlightExportDestination } from "./core/highlight-export";
 import { PaletteStore } from "./core/store";
 import { SerialTaskQueue } from "./core/serial-task-queue";
 import type { NumberedCanvasLink, OutlineSelectionTarget, PaletteItem, PaletteWorkspace } from "./core/types";
@@ -20,6 +21,7 @@ import { SIDE_PALETTE_VIEW, SidePaletteView } from "./side-palette/side-palette-
 import { AlreadySavedToWorkspaceModal, CanvasTargetModal, CanvasWorkspaceModal, ConfirmDeleteModal, ConfirmExportDuplicateModal, ConfirmForeignCanvasWorkspaceModal, DeletedCanvasWorkspacesModal, ItemEditorModal, MetadataEditorModal, OutlineStructureRuleModal, TextPromptModal, TextScrapWorkspaceModal } from "./ui/modal";
 import { ItemPreviewModal } from "./ui/item-preview-modal";
 import { FindLinkModal } from "./ui/find-link-modal";
+import { HighlightCanvasLayoutModal, HighlightExportModal } from "./ui/highlight-export-modal";
 import { WorkspaceExplorerModal } from "./ui/workspace-explorer-modal";
 
 export default class CanvasPalettePlugin extends Plugin {
@@ -456,6 +458,63 @@ export default class CanvasPalettePlugin extends Plugin {
     const tree = this.exportOutlineSelectionTree(targets);
     if (tree.length === 0) { new Notice("Select one or more Outliner rows first."); return false; }
     return this.beginExport((context) => this.canvas.createTreeBundle(tree, context));
+  }
+
+  exportCardHighlights(itemId: string): void {
+    const source = this.store.data.items[itemId];
+    if (!source || source.type !== "card") return;
+    const highlights = extractHighlights(source.content ?? "");
+    if (highlights.length === 0) { new Notice("이 카드에서 내보낼 하이라이트를 찾을 수 없습니다."); return; }
+    new HighlightExportModal(this.app, highlights.length, (destination) => this.chooseHighlightDestination(source, highlights, destination)).open();
+  }
+
+  private chooseHighlightDestination(source: PaletteItem, highlights: string[], destination: HighlightExportDestination): void {
+    if (destination === "canvas") {
+      new HighlightCanvasLayoutModal(this.app, (layout) => void this.exportHighlightsToCanvas(source, highlights, layout)).open();
+      return;
+    }
+    const items = this.highlightItems(highlights);
+    if (destination === "side") { this.exportHighlightsToSide(items); return; }
+    this.exportHighlightsToMini(items);
+  }
+
+  private highlightItems(highlights: string[]): PaletteItem[] {
+    return highlights.map((content) => {
+      const now = Date.now();
+      return { id: createId("card"), type: "card", displayTitle: content.split(/\r?\n/, 1)[0].slice(0, 60) || "Highlight", tags: [], label: "", caption: "Highlight", backContent: "", facesEnabled: false, createdAt: now, modifiedAt: now, origin: {}, canvasPlacements: [], content };
+    });
+  }
+
+  private async exportHighlightsToCanvas(source: PaletteItem, highlights: string[], layout: HighlightCanvasLayout): Promise<void> {
+    const items = this.highlightItems(highlights);
+    if (layout === "bundle") { await this.beginExport((context) => this.canvas.createItemBundle(items, context)); return; }
+    const root = this.highlightItems([source.displayTitle])[0];
+    const rootId = `highlight-root:${root.id}`;
+    const entries = [
+      { id: rootId, name: root.displayTitle, parentId: null, item: root },
+      ...items.map((item) => ({ id: `highlight-item:${item.id}`, name: item.displayTitle, parentId: rootId, item }))
+    ];
+    await this.beginExport((context) => this.canvas.createTreeBundle(entries, context));
+  }
+
+  private exportHighlightsToSide(items: PaletteItem[]): void {
+    const workspaces = Object.values(this.store.data.workspaces);
+    if (workspaces.length === 0) { new Notice("Workspace를 만든 뒤 Side로 내보낼 수 있습니다."); return; }
+    const active = this.activeWorkspace();
+    const currentWorkspaceId = active?.kind !== "archive" ? active?.id ?? null : null;
+    new TextScrapWorkspaceModal(this.app, workspaces, currentWorkspaceId, (workspaceId) => {
+      const saved = items.filter((item) => this.store.addToWorkspaceAsUnlinked(workspaceId, item));
+      if (saved.length === 0) { new Notice("선택한 Workspace에 하이라이트를 저장할 수 없습니다."); return; }
+      void this.revealNewSideItem(workspaceId, saved[0].id);
+      new Notice(`${saved.length}개 하이라이트를 Side Palette에 저장했습니다.`);
+    }).open();
+  }
+
+  private exportHighlightsToMini(items: PaletteItem[]): void {
+    this.store.collectCanvasItems(items);
+    this.store.data.uiState.miniPalette.tab = "collect";
+    this.miniPalette.open();
+    new Notice(`${items.length}개 하이라이트를 Mini Palette Collect에 추가했습니다.`);
   }
 
   private editCanvasNodesMetadata(nodes: unknown[]): void {

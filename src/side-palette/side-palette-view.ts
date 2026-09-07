@@ -976,6 +976,10 @@ export class SidePaletteView extends ItemView {
         const folder = this.app.workspace.getActiveFile()?.parent?.path ?? "";
         new CardToMarkdownModal(this.app, fileName, folder, (name, targetFolder) => this.plugin.convertCardToMarkdown(item.id, name, targetFolder)).open();
       }));
+    if (item.type === "card" && targetIds.length === 1) menu.addItem((entry) => entry
+      .setTitle("Export Highlight")
+      .setIcon("highlighter")
+      .onClick(() => this.plugin.exportCardHighlights(item.id)));
     if (supportsFrontBack(item)) {
       menu.addItem((entry) => entry
         .setTitle(item.facesEnabled ? "Remove Front / Back" : "Enable Front / Back")
