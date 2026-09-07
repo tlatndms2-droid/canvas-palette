@@ -41,4 +41,7 @@ test("Highlight Export is available from one Canvas text card with the Korean me
   assert.match(modal, /연결 없는 묶음/);
   assert.match(modal, /MindMap 연결/);
   assert.match(readFileSync("styles.css", "utf8"), /height:150px!important/);
+  assert.match(modal, /cp-highlight-export-modal-shell/);
+  assert.match(readFileSync("styles.css", "utf8"), /max-width:540px/);
+  assert.match(readFileSync("styles.css", "utf8"), /@media\(max-width:600px\)/);
 });

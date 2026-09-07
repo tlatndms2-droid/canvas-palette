@@ -6,6 +6,7 @@ export class HighlightExportModal extends Modal {
   constructor(app: App, private readonly count: number, private readonly onChoose: (destination: HighlightExportDestination) => void) { super(app); }
 
   onOpen(): void {
+    this.modalEl.addClass("cp-highlight-export-modal-shell");
     this.contentEl.addClass("canvas-palette", "cp-highlight-export-modal");
     this.contentEl.setAttr("aria-label", `하이라이트 ${this.count}개 내보내기`);
     this.contentEl.createEl("h2", { text: "하이라이트 내보내기" });
