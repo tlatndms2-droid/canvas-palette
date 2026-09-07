@@ -11,12 +11,16 @@ test("highlight extractor keeps both supported syntaxes in source order", () => 
   assert.deepEqual(runExtractor("<mark>바깥 <mark>안쪽</mark></mark>"), []);
 });
 
-test("Export Highlight uses a compact two-step chooser and existing destination paths", () => {
+test("Export Highlight is available from one Canvas text card and uses the compact two-step chooser", () => {
   const main = readFileSync("src/main.ts", "utf8");
   const side = readFileSync("src/side-palette/side-palette-view.ts", "utf8");
   const modal = readFileSync("src/ui/highlight-export-modal.ts", "utf8");
-  assert.match(side, /setTitle\("Export Highlight"\)[\s\S]{0,180}exportCardHighlights/);
-  assert.match(main, /extractHighlights\(source\.content \?\? ""\)/);
+  assert.match(main, /workspaceEvents\.on\("canvas:selection-menu", \(menu, canvas\) => this\.addCanvasHighlightMenu\(menu as Menu, canvas\)\)/);
+  assert.match(main, /exportCanvasHighlights\(node: CanvasRuntimeNodeLike\)/);
+  assert.match(main, /extractHighlights\(source\.text \?\? ""\)/);
+  assert.match(main, /nodes\.length === 1[\s\S]{0,200}node\?\.getData\?\.\(\)\.type !== "text"/);
+  assert.match(main, /setTitle\("Export Highlight"\)[\s\S]{0,180}exportCanvasHighlights\(node\)/);
+  assert.doesNotMatch(side, /setTitle\("Export Highlight"\)/);
   assert.match(main, /new HighlightExportModal/);
   assert.match(main, /new HighlightCanvasLayoutModal/);
   assert.match(main, /createItemBundle\(items, context\)/);

@@ -1,5 +1,5 @@
 import { Editor, EventRef, Menu, Notice, Plugin, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
-import { CanvasAdapter } from "./canvas/canvas-adapter";
+import { CanvasAdapter, type CanvasRuntimeNodeLike } from "./canvas/canvas-adapter";
 import { ExportPlacementController } from "./canvas/export-placement-controller";
 import { mergeCanvasNodeIds } from "./core/canvas-node-presence";
 import { CanvasMetadataController } from "./canvas/canvas-metadata-controller";
@@ -101,6 +101,7 @@ export default class CanvasPalettePlugin extends Plugin {
     }});
     const workspaceEvents = this.app.workspace as unknown as { on: (name: string, callback: (...args: unknown[]) => unknown) => EventRef };
     this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor) => this.addCanvasTextCollectionMenu(menu, editor)));
+    this.registerEvent(workspaceEvents.on("canvas:selection-menu", (menu, canvas) => this.addCanvasHighlightMenu(menu as Menu, canvas)));
     this.registerEvent(this.app.vault.on("modify", (file) => {
       if (!(file instanceof TFile)) return;
       if (file.extension.toLowerCase() === "canvas") this.scheduleCanvasSync(file);
@@ -460,17 +461,18 @@ export default class CanvasPalettePlugin extends Plugin {
     return this.beginExport((context) => this.canvas.createTreeBundle(tree, context));
   }
 
-  exportCardHighlights(itemId: string): void {
-    const source = this.store.data.items[itemId];
-    if (!source || source.type !== "card") return;
-    const highlights = extractHighlights(source.content ?? "");
+  exportCanvasHighlights(node: CanvasRuntimeNodeLike): void {
+    const source = node.getData?.();
+    if (source?.type !== "text") return;
+    const highlights = extractHighlights(source.text ?? "");
     if (highlights.length === 0) { new Notice("이 카드에서 내보낼 하이라이트를 찾을 수 없습니다."); return; }
-    new HighlightExportModal(this.app, highlights.length, (destination) => this.chooseHighlightDestination(source, highlights, destination)).open();
+    const title = source.text?.split(/\r?\n/, 1)[0].slice(0, 60) || "Highlight";
+    new HighlightExportModal(this.app, highlights.length, (destination) => this.chooseHighlightDestination(title, highlights, destination)).open();
   }
 
-  private chooseHighlightDestination(source: PaletteItem, highlights: string[], destination: HighlightExportDestination): void {
+  private chooseHighlightDestination(sourceTitle: string, highlights: string[], destination: HighlightExportDestination): void {
     if (destination === "canvas") {
-      new HighlightCanvasLayoutModal(this.app, (layout) => void this.exportHighlightsToCanvas(source, highlights, layout)).open();
+      new HighlightCanvasLayoutModal(this.app, (layout) => void this.exportHighlightsToCanvas(sourceTitle, highlights, layout)).open();
       return;
     }
     const items = this.highlightItems(highlights);
@@ -485,10 +487,10 @@ export default class CanvasPalettePlugin extends Plugin {
     });
   }
 
-  private async exportHighlightsToCanvas(source: PaletteItem, highlights: string[], layout: HighlightCanvasLayout): Promise<void> {
+  private async exportHighlightsToCanvas(sourceTitle: string, highlights: string[], layout: HighlightCanvasLayout): Promise<void> {
     const items = this.highlightItems(highlights);
     if (layout === "bundle") { await this.beginExport((context) => this.canvas.createItemBundle(items, context)); return; }
-    const root = this.highlightItems([source.displayTitle])[0];
+    const root = this.highlightItems([sourceTitle])[0];
     const rootId = `highlight-root:${root.id}`;
     const entries = [
       { id: rootId, name: root.displayTitle, parentId: null, item: root },
@@ -563,6 +565,18 @@ export default class CanvasPalettePlugin extends Plugin {
     const activeWorkspace = this.activeWorkspace();
     const currentWorkspaceId = activeWorkspace?.kind !== "archive" ? activeWorkspace?.id ?? null : null;
     menu.addItem((item) => item.setTitle("Save text directly to Side Palette…").setIcon("panel-right").setDisabled(workspaces.length === 0).onClick(() => new TextScrapWorkspaceModal(this.app, workspaces, currentWorkspaceId, (workspaceId) => this.confirmWorkspaceSave(workspaceId, () => this.collectCanvasTextToWorkspace(text, context.file.path, range, workspaceId))).open()));
+  }
+
+  private addCanvasHighlightMenu(menu: Menu, canvas: unknown): void {
+    const selection = (canvas as { selection?: Set<CanvasRuntimeNodeLike> }).selection;
+    const nodes = selection instanceof Set ? [...selection] : [];
+    const node = nodes.length === 1 ? nodes[0] : null;
+    if (node?.getData?.().type !== "text") return;
+    menu.addSeparator();
+    menu.addItem((item) => item
+      .setTitle("Export Highlight")
+      .setIcon("highlighter")
+      .onClick(() => this.exportCanvasHighlights(node)));
   }
 
   private textItem(text: string, canvasPath: string, textRange: { from: { line: number; ch: number }; to: { line: number; ch: number } }): PaletteItem {

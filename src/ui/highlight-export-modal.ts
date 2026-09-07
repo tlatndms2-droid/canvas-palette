@@ -1,7 +1,7 @@
 import { App, Modal, setIcon } from "obsidian";
 import type { HighlightCanvasLayout, HighlightExportDestination } from "../core/highlight-export";
 
-/** Compact, one-choice menu used by a Side Card's Export Highlight action. */
+/** Compact, one-choice menu used by a Canvas Card's Export Highlight action. */
 export class HighlightExportModal extends Modal {
   constructor(app: App, private readonly count: number, private readonly onChoose: (destination: HighlightExportDestination) => void) { super(app); }
 
