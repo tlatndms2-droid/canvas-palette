@@ -8,7 +8,7 @@ import { CanvasNodeToolbarController } from "./canvas/canvas-node-toolbar-contro
 import { PaletteDropController } from "./canvas/palette-drop-controller";
 import { TextScrapHighlights } from "./canvas/text-scrap-highlights";
 import { createId } from "./core/ids";
-import { extractHighlights, type HighlightCanvasLayout, type HighlightExportDestination } from "./core/highlight-export";
+import { extractHighlights, type HighlightBlock, type HighlightCanvasLayout, type HighlightExportDestination } from "./core/highlight-export";
 import { PaletteStore } from "./core/store";
 import { SerialTaskQueue } from "./core/serial-task-queue";
 import type { NumberedCanvasLink, OutlineSelectionTarget, PaletteItem, PaletteWorkspace } from "./core/types";
@@ -466,11 +466,11 @@ export default class CanvasPalettePlugin extends Plugin {
     if (source?.type !== "text") return;
     const highlights = extractHighlights(source.text ?? "");
     if (highlights.length === 0) { new Notice("이 카드에서 내보낼 하이라이트를 찾을 수 없습니다."); return; }
-    const title = source.text?.split(/\r?\n/, 1)[0].slice(0, 60) || "Highlight";
+    const title = highlights[0].title;
     new HighlightExportModal(this.app, highlights.length, (destination) => this.chooseHighlightDestination(title, highlights, destination)).open();
   }
 
-  private chooseHighlightDestination(sourceTitle: string, highlights: string[], destination: HighlightExportDestination): void {
+  private chooseHighlightDestination(sourceTitle: string, highlights: HighlightBlock[], destination: HighlightExportDestination): void {
     if (destination === "canvas") {
       new HighlightCanvasLayoutModal(this.app, (layout) => void this.exportHighlightsToCanvas(sourceTitle, highlights, layout)).open();
       return;
@@ -480,17 +480,17 @@ export default class CanvasPalettePlugin extends Plugin {
     this.exportHighlightsToMini(items);
   }
 
-  private highlightItems(highlights: string[]): PaletteItem[] {
-    return highlights.map((content) => {
+  private highlightItems(highlights: HighlightBlock[]): PaletteItem[] {
+    return highlights.map(({ content, title }) => {
       const now = Date.now();
-      return { id: createId("card"), type: "card", displayTitle: content.split(/\r?\n/, 1)[0].slice(0, 60) || "Highlight", tags: [], label: "", caption: "Highlight", backContent: "", facesEnabled: false, createdAt: now, modifiedAt: now, origin: {}, canvasPlacements: [], content };
+      return { id: createId("card"), type: "card", displayTitle: title, tags: [], label: "", caption: "", backContent: "", facesEnabled: false, createdAt: now, modifiedAt: now, origin: {}, canvasPlacements: [], content };
     });
   }
 
-  private async exportHighlightsToCanvas(sourceTitle: string, highlights: string[], layout: HighlightCanvasLayout): Promise<void> {
+  private async exportHighlightsToCanvas(sourceTitle: string, highlights: HighlightBlock[], layout: HighlightCanvasLayout): Promise<void> {
     const items = this.highlightItems(highlights);
     if (layout === "bundle") { await this.beginExport((context) => this.canvas.createItemBundle(items, context)); return; }
-    const root = this.highlightItems([sourceTitle])[0];
+    const root = this.highlightItems([{ content: sourceTitle, title: sourceTitle }])[0];
     const rootId = `highlight-root:${root.id}`;
     const entries = [
       { id: rootId, name: root.displayTitle, parentId: null, item: root },
@@ -571,9 +571,20 @@ export default class CanvasPalettePlugin extends Plugin {
     if (node.getData?.().type !== "text") return;
     menu.addSeparator();
     menu.addItem((item) => item
-      .setTitle("Export Highlight")
+      .setTitle(this.highlightMenuTitle())
       .setIcon("highlighter")
       .onClick(() => this.exportCanvasHighlights(node)));
+  }
+
+  private highlightMenuTitle(): DocumentFragment {
+    const fragment = document.createDocumentFragment();
+    const content = document.createElement("span");
+    content.className = "cp-highlight-menu-title";
+    const title = document.createElement("span"); title.className = "cp-highlight-menu-title__name"; title.textContent = "하이라이트 내보내기";
+    const hint = document.createElement("span"); hint.className = "cp-highlight-menu-title__hint"; hint.textContent = "강조한 문장을 Card로 묶습니다";
+    const brand = document.createElement("span"); brand.className = "cp-highlight-menu-title__brand"; brand.textContent = "Canvas Palette";
+    content.append(title, hint, brand); fragment.append(content);
+    return fragment;
   }
 
   private textItem(text: string, canvasPath: string, textRange: { from: { line: number; ch: number }; to: { line: number; ch: number } }): PaletteItem {

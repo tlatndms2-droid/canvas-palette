@@ -3,8 +3,13 @@ export type HighlightCanvasLayout = "bundle" | "mindmap";
 
 interface HighlightMatch { start: number; end: number; content: string; }
 
-/** Extracts non-empty Obsidian and HTML highlight bodies in source order. */
-export function extractHighlights(source: string): string[] {
+export interface HighlightBlock {
+  content: string;
+  title: string;
+}
+
+/** Extracts logical highlighted Markdown blocks in source order. */
+export function extractHighlights(source: string): HighlightBlock[] {
   const matches = [...markdownHighlights(source), ...htmlHighlights(source)]
     .sort((left, right) => left.start - right.start || left.end - right.end);
   const accepted: HighlightMatch[] = [];
@@ -13,7 +18,47 @@ export function extractHighlights(source: string): string[] {
     if (accepted.some((previous) => match.start < previous.end && previous.start < match.end)) continue;
     accepted.push(match);
   }
-  return accepted.map((match) => match.content.trim());
+  const blocks: HighlightBlock[] = [];
+  let current: { content: string; last: HighlightMatch } | null = null;
+  for (const match of accepted) {
+    if (!current) {
+      current = { content: `${structuralPrefix(source, match.start)}${match.content}`, last: match };
+      continue;
+    }
+    const gap = source.slice(current.last.end, match.start);
+    if (isStructuralGap(gap)) {
+      current.content += `${gap}${match.content}`;
+      current.last = match;
+      continue;
+    }
+    blocks.push(toBlock(current.content));
+    current = { content: `${structuralPrefix(source, match.start)}${match.content}`, last: match };
+  }
+  if (current) blocks.push(toBlock(current.content));
+  return blocks;
+}
+
+function structuralPrefix(source: string, position: number): string {
+  const lineStart = Math.max(source.lastIndexOf("\n", position - 1) + 1, 0);
+  const prefix = source.slice(lineStart, position);
+  return /^[ \t]*(?:#{1,6}[ \t]+|[-*+][ \t]+|\d+[.)][ \t]+)?$/.test(prefix) ? prefix : "";
+}
+
+function isStructuralGap(gap: string): boolean {
+  return gap.split(/\r?\n/).every((line, index) => {
+    if (!line.trim()) return true;
+    return index > 0 && /^[ \t]*(?:#{1,6}[ \t]+|[-*+][ \t]+|\d+[.)][ \t]+)$/.test(line);
+  });
+}
+
+function toBlock(content: string): HighlightBlock {
+  const normalized = content.trim();
+  const first = normalized.split(/\r?\n/).find((line) => line.trim()) ?? "";
+  const title = first
+    .replace(/^\s*(?:#{1,6}[ \t]+|[-*+][ \t]+|\d+[.)][ \t]+)/, "")
+    .trim()
+    .slice(0, 60) || "Highlight";
+  return { content: normalized, title };
 }
 
 function markdownHighlights(source: string): HighlightMatch[] {
