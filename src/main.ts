@@ -115,13 +115,16 @@ export default class CanvasPalettePlugin extends Plugin {
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => void this.handleVaultRename(file, oldPath)));
     this.registerEvent(this.app.vault.on("create", (file) => { if (file instanceof TFile && file.extension.toLowerCase() === "md") void this.reconnectMovedMarkdown(file); }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
-      const context = this.canvas.activeContext();
+      const activeCanvas = this.canvas.activeCanvasContext();
+      const context = activeCanvas ?? this.canvas.activeContext(this.lastCanvasPath);
       if (!this.exportPlacement.isFor(context)) this.exportPlacement.cancel();
       if (context) {
-        this.lastCanvasPath = context.file.path;
-        if (this.store.data.uiState.lastCanvasPath !== context.file.path) {
-          this.store.data.uiState.lastCanvasPath = context.file.path;
-          this.store.changed();
+        if (activeCanvas) {
+          this.lastCanvasPath = activeCanvas.file.path;
+          if (this.store.data.uiState.lastCanvasPath !== activeCanvas.file.path) {
+            this.store.data.uiState.lastCanvasPath = activeCanvas.file.path;
+            this.store.changed();
+          }
         }
         this.miniPalette.mount(); this.canvasCaptionControl.mount();
         this.scheduleCanvasSync(context.file);
@@ -152,7 +155,7 @@ export default class CanvasPalettePlugin extends Plugin {
     return id ? this.store.data.workspaces[id] : undefined;
   }
 
-  currentCanvasPath(): string | null { return this.canvas.activeContext()?.file.path ?? this.lastCanvasPath; }
+  currentCanvasPath(): string | null { return this.canvas.activeContext(this.lastCanvasPath)?.file.path ?? this.lastCanvasPath; }
 
   workspaceDisplayName(workspace: PaletteWorkspace): string {
     const currentPath = this.currentCanvasPath();

@@ -62,18 +62,22 @@ export class CanvasAdapter {
 
   constructor(private readonly app: App, private readonly onRestored: (itemId: string, canvasPath: string, nodeIds: string[]) => void, private readonly getMetadata: (canvasPath: string, nodeId: string) => PaletteMetadata | undefined, private readonly restoreNodeMetadata: (canvasPath: string, records: Array<{ nodeId: string; metadata: PaletteMetadata }>) => void, private readonly linkedNodes: (item: PaletteItem, canvasPath: string) => string[] = () => [], private readonly onReplaced: (itemId: string, canvasPath: string, removedNodeIds: string[], newNodeIds: string[], existingNodeIds: Set<string>) => void = () => {}) {}
 
-  activeContext(): CanvasContext | null {
+  activeCanvasContext(): CanvasContext | null {
     const activeLeaf = this.app.workspace.activeLeaf;
     const activeView = activeLeaf?.view as unknown as CanvasViewLike | undefined;
     if (activeView?.getViewType?.() === "canvas" && activeView.file && activeView.canvas) {
       return { file: activeView.file, view: activeView, runtime: activeView.canvas };
     }
+    return null;
+  }
+
+  activeContext(preferredCanvasPath: string | null = null): CanvasContext | null {
+    const activeContext = this.activeCanvasContext();
+    if (activeContext) return activeContext;
     // Side Palette actions keep their own leaf active. When that happens, use
-    // the open Canvas so its visible selection can still be collected.
-    const canvasLeaf = this.app.workspace.getLeavesOfType("canvas")[0];
-    const canvasView = canvasLeaf?.view as unknown as CanvasViewLike | undefined;
-    if (!canvasView?.file || !canvasView.canvas) return null;
-    return { file: canvasView.file, view: canvasView, runtime: canvasView.canvas };
+    // the last working Canvas before falling back to an arbitrary open pane.
+    const contexts = this.openContexts();
+    return contexts.find((context) => context.file.path === preferredCanvasPath) ?? contexts[0] ?? null;
   }
 
   activeContainer(): HTMLElement | null { return this.activeContext()?.view.containerEl ?? null; }

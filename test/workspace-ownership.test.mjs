@@ -102,9 +102,13 @@ test("Side and Mini Palette expose Workspace ownership controls and restrictions
   assert.doesNotMatch(main, /selectRepresentativeWorkspace/);
   assert.match(main, /representativeWorkspaceForCanvas\(canvasPath\)/);
   assert.doesNotMatch(main, /ensureCanvasWorkspace\(canvasPath/);
-  assert.match(main, /activeContext\(\)\?\.file\.path \?\? this\.lastCanvasPath/);
+  const adapter = await readFile(new URL("../src/canvas/canvas-adapter.ts", import.meta.url), "utf8");
+  assert.match(main, /this\.canvas\.activeContext\(this\.lastCanvasPath\)\?\.file\.path \?\? this\.lastCanvasPath/);
+  assert.match(main, /const activeCanvas = this\.canvas\.activeCanvasContext\(\);/);
+  assert.match(adapter, /activeCanvasContext\(\): CanvasContext \| null/);
+  assert.match(adapter, /contexts\.find\(\(context\) => context\.file\.path === preferredCanvasPath\) \?\? contexts\[0\] \?\? null/);
   assert.match(main, /this\.lastCanvasPath = this\.store\.data\.uiState\.lastCanvasPath/);
-  assert.match(main, /this\.store\.data\.uiState\.lastCanvasPath = context\.file\.path/);
+  assert.match(main, /this\.store\.data\.uiState\.lastCanvasPath = activeCanvas\.file\.path/);
   assert.doesNotMatch(main, /else this\.miniPalette\.destroy\(\);\s*this\.selectRepresentativeWorkspace\(\)/);
   assert.match(side, /Open current Canvas Workspace/);
   assert.match(side, /Open Workspace Explorer/);
