@@ -101,7 +101,7 @@ export default class CanvasPalettePlugin extends Plugin {
     }});
     const workspaceEvents = this.app.workspace as unknown as { on: (name: string, callback: (...args: unknown[]) => unknown) => EventRef };
     this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor) => this.addCanvasTextCollectionMenu(menu, editor)));
-    this.registerEvent(workspaceEvents.on("canvas:selection-menu", (menu, canvas) => this.addCanvasHighlightMenu(menu as Menu, canvas)));
+    this.registerEvent(workspaceEvents.on("canvas:node-menu", (menu, node) => this.addCanvasHighlightMenu(menu as Menu, node as CanvasRuntimeNodeLike)));
     this.registerEvent(this.app.vault.on("modify", (file) => {
       if (!(file instanceof TFile)) return;
       if (file.extension.toLowerCase() === "canvas") this.scheduleCanvasSync(file);
@@ -567,11 +567,8 @@ export default class CanvasPalettePlugin extends Plugin {
     menu.addItem((item) => item.setTitle("Save text directly to Side Palette…").setIcon("panel-right").setDisabled(workspaces.length === 0).onClick(() => new TextScrapWorkspaceModal(this.app, workspaces, currentWorkspaceId, (workspaceId) => this.confirmWorkspaceSave(workspaceId, () => this.collectCanvasTextToWorkspace(text, context.file.path, range, workspaceId))).open()));
   }
 
-  private addCanvasHighlightMenu(menu: Menu, canvas: unknown): void {
-    const selection = (canvas as { selection?: Set<CanvasRuntimeNodeLike> }).selection;
-    const nodes = selection instanceof Set ? [...selection] : [];
-    const node = nodes.length === 1 ? nodes[0] : null;
-    if (node?.getData?.().type !== "text") return;
+  private addCanvasHighlightMenu(menu: Menu, node: CanvasRuntimeNodeLike): void {
+    if (node.getData?.().type !== "text") return;
     menu.addSeparator();
     menu.addItem((item) => item
       .setTitle("Export Highlight")

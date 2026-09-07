@@ -15,10 +15,10 @@ test("Export Highlight is available from one Canvas text card and uses the compa
   const main = readFileSync("src/main.ts", "utf8");
   const side = readFileSync("src/side-palette/side-palette-view.ts", "utf8");
   const modal = readFileSync("src/ui/highlight-export-modal.ts", "utf8");
-  assert.match(main, /workspaceEvents\.on\("canvas:selection-menu", \(menu, canvas\) => this\.addCanvasHighlightMenu\(menu as Menu, canvas\)\)/);
+  assert.match(main, /workspaceEvents\.on\("canvas:node-menu", \(menu, node\) => this\.addCanvasHighlightMenu\(menu as Menu, node as CanvasRuntimeNodeLike\)\)/);
   assert.match(main, /exportCanvasHighlights\(node: CanvasRuntimeNodeLike\)/);
   assert.match(main, /extractHighlights\(source\.text \?\? ""\)/);
-  assert.match(main, /nodes\.length === 1[\s\S]{0,200}node\?\.getData\?\.\(\)\.type !== "text"/);
+  assert.match(main, /addCanvasHighlightMenu\(menu: Menu, node: CanvasRuntimeNodeLike\)[\s\S]{0,150}node\.getData\?\.\(\)\.type !== "text"/);
   assert.match(main, /setTitle\("Export Highlight"\)[\s\S]{0,180}exportCanvasHighlights\(node\)/);
   assert.doesNotMatch(side, /setTitle\("Export Highlight"\)/);
   assert.match(main, /new HighlightExportModal/);
