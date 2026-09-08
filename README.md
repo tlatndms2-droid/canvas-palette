@@ -2,7 +2,9 @@
 
 Canvas Palette is an Obsidian desktop plugin for collecting Canvas-related cards, Markdown files, images, web links, and reusable groups, organizing them by workspace and collection, and placing them back into other canvases.
 
-Current version: **0.4.3**
+Current version: **0.4.4**
+
+0.4.4 synchronizes Card, Markdown, and Link card typography with the shared seven-step density setting in both Side Palette and Mini Palette. Each density now sets readable title sizing and clamping plus preview type size and height; the smallest grid tier hides text previews, while Details/List keeps a full-width readable preview.
 
 0.4.3 keeps the Highlight Export destination picker inside Obsidian's modal width: all three cards remain visible with no horizontal scroll, and narrow windows stack the cards vertically.
 
