@@ -25,14 +25,24 @@ test("Image Front Back remains opt-in instead of being enabled by item type", as
     }
   });
 
-  assert.equal(data.schemaVersion, 31);
+  assert.equal(data.schemaVersion, 32);
   assert.equal(data.settings.canvasCaptionFontSize, 11);
+  assert.equal(data.settings.fontSize, 14);
   assert.equal(data.items.ordinary.captionFontSize, 11);
   assert.equal(data.items.ordinary.facesEnabled, false);
   assert.equal(data.items.chosen.facesEnabled, true);
   assert.equal(data.items.chosen.backContent, "Image notes");
   assert.equal(data.items.group.facesEnabled, false);
   assert.equal(data.items.group.backContent, "");
+  await cleanup();
+});
+
+test("Preview text size migrates legacy unreadable values into the supported range", async () => {
+  const { migrateData, cleanup } = await loadDefaults();
+  assert.equal(migrateData({ settings: { fontSize: 8 } }).settings.fontSize, 11);
+  assert.equal(migrateData({ settings: { fontSize: 10 } }).settings.fontSize, 11);
+  assert.equal(migrateData({ settings: { fontSize: 15 } }).settings.fontSize, 14);
+  assert.equal(migrateData({ settings: { fontSize: Number.NaN } }).settings.fontSize, 14);
   await cleanup();
 });
 
@@ -46,7 +56,7 @@ test("schema 22 does not turn the former automatic Mini browser into explicit re
     pendingItemIds: [],
     uiState: { miniPalette: { hiddenStorageItemIds: [] } }
   });
-  assert.equal(data.schemaVersion, 31);
+  assert.equal(data.schemaVersion, 32);
   assert.deepEqual(data.uiState.miniPalette.storageItemIds, []);
   assert.equal("hiddenStorageItemIds" in data.uiState.miniPalette, false);
   await cleanup();

@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import ts from "typescript";
+
+async function loadDensityModule() {
+  const source = await readFile(new URL("../src/ui/asset-density.ts", import.meta.url), "utf8");
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+}
 
 test("Side and Mini palettes share the Explorer density model", async () => {
   const density = await readFile(new URL("../src/ui/asset-density.ts", import.meta.url), "utf8");
@@ -8,10 +15,35 @@ test("Side and Mini palettes share the Explorer density model", async () => {
   const mini = await readFile(new URL("../src/mini-palette/floating-mini-palette.ts", import.meta.url), "utf8");
   const styles = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   assert.match(density, /ASSET_DENSITY_MAX = 6/);
+  assert.match(density, /PREVIEW_FONT_SIZE_MIN = 11/);
+  assert.match(density, /PREVIEW_FONT_SIZE_MAX = 14/);
   assert.match(density, /clampAssetDensity\(value\) === 0 \? "list" : "grid"/);
-  assert.match(side, /applyAssetDensity\(listEl/);
-  assert.match(mini, /applyAssetDensity\(grid/);
+  assert.match(side, /applyAssetDensity\(listEl[\s\S]*settings\.fontSize/);
+  assert.match(mini, /applyAssetDensity\(grid[\s\S]*settings\.fontSize/);
   assert.match(styles, /repeat\(auto-fill,minmax\(min\(var\(--cp-density-card-width/);
+  assert.match(styles, /@container \(max-width:179px\)/);
+  assert.match(styles, /--cp-density-title-size/);
+  assert.match(styles, /--cp-density-preview-size/);
+  assert.match(styles, /Text previews in List\/Details must use the readable full-width row/);
+  assert.match(styles, /\.cp-grid--list :is\(\.cp-item--card,\.cp-item--markdown,\.cp-item--link\) \.cp-item__body/);
+});
+
+test("Density profiles keep titles readable and previews at or above 11px", async () => {
+  const { applyAssetDensity, clampAssetDensity, clampPreviewFontSize } = await loadDensityModule();
+  assert.equal(clampAssetDensity(-1), 0);
+  assert.equal(clampAssetDensity(99), 6);
+  assert.equal(clampPreviewFontSize(8), 11);
+  assert.equal(clampPreviewFontSize(15), 14);
+  assert.equal(clampPreviewFontSize(undefined), 14);
+
+  const element = { classList: { remove() {}, add() {} }, dataset: {}, style: { values: new Map(), setProperty(key, value) { this.values.set(key, value); } } };
+  for (let density = 0; density <= 6; density += 1) applyAssetDensity(element, density, "cp-grid", 14);
+  assert.equal(element.style.values.get("--cp-density-title-size"), "16px");
+  assert.equal(element.style.values.get("--cp-density-preview-size"), "14px");
+  applyAssetDensity(element, 2, "cp-grid", 11);
+  assert.equal(element.style.values.get("--cp-density-title-size"), "13px");
+  assert.equal(element.style.values.get("--cp-density-preview-size"), "11px");
+  assert.equal(element.style.values.get("--cp-density-preview-lines"), "2");
 });
 
 test("Mini Palette keeps Collect and Storage selections independent", async () => {

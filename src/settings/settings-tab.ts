@@ -20,8 +20,8 @@ export class CanvasPaletteSettingTab extends PluginSettingTab {
       .setValue(this.plugin.store.data.settings.accentColor)
       .onChange((value) => { this.plugin.store.data.settings.accentColor = value; this.plugin.store.changed(); }));
     new Setting(containerEl).setName("Asset size").setDesc("Side Palette and Mini Palette each keep their own Explorer-style item-size level. Change it from the palette's View settings or Control panel.");
-    new Setting(containerEl).setName("Font size").setDesc("Reduce preview text from the default size.").addSlider((slider) => slider
-      .setLimits(8, 14, 1).setDynamicTooltip().setValue(this.plugin.store.data.settings.fontSize)
+    new Setting(containerEl).setName("Preview text size").setDesc("Set the preferred Side and Mini preview text size. Compact item sizes adjust it automatically but never below 11px.").addSlider((slider) => slider
+      .setLimits(11, 14, 1).setDynamicTooltip().setValue(this.plugin.store.data.settings.fontSize)
       .onChange((value) => { this.plugin.store.data.settings.fontSize = value; this.plugin.store.changed(); }));
   }
 }

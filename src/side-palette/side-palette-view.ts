@@ -428,11 +428,9 @@ export class SidePaletteView extends ItemView {
     const listEl = parent.createDiv({ cls: "cp-grid" });
     const applyViewSettings = (): void => {
       if (workspaceLayout) {
-        workspaceLayout.densityLevel = applyAssetDensity(listEl, workspaceLayout.densityLevel, "cp-grid");
+        workspaceLayout.densityLevel = applyAssetDensity(listEl, workspaceLayout.densityLevel, "cp-grid", this.plugin.store.data.settings.fontSize);
         workspaceLayout.viewMode = workspaceLayout.densityLevel === 0 ? "list" : "grid";
       }
-      listEl.style.setProperty("--cp-font-size", `${this.plugin.store.data.settings.fontSize}px`);
-      listEl.style.setProperty("--font-text-size", `${this.plugin.store.data.settings.fontSize}px`);
     };
     const rangeControl = (label: string, key: "cardHeight" | "fontSize", minimum: number, maximum: number, defaultValue: number): void => {
       const row = controls.createDiv({ cls: "cp-view-option" });
@@ -466,7 +464,7 @@ export class SidePaletteView extends ItemView {
       input.addEventListener("change", () => this.plugin.store.changed());
       reset.addEventListener("click", () => { input.value = String(ASSET_DENSITY_DEFAULT); updateDensity(); this.plugin.store.changed(); });
     }
-    rangeControl("Preview font size", "fontSize", 8, 14, 14);
+    rangeControl("Preview text size", "fontSize", 11, 14, 14);
     applyViewSettings();
     listEl.addEventListener("wheel", (event) => { if ((!event.ctrlKey && !event.metaKey) || !workspaceLayout) return; event.preventDefault(); event.stopPropagation(); workspaceLayout.densityLevel = nextAssetDensity(workspaceLayout.densityLevel, event.deltaY); applyViewSettings(); this.plugin.store.changed(); }, { passive: false });
     this.mountViewportReorder(parent, listEl, workspaceId);

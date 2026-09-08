@@ -1,5 +1,5 @@
 import type { PaletteData, SideLayoutState } from "./types";
-import { ASSET_DENSITY_DEFAULT, legacyDensity } from "../ui/asset-density";
+import { ASSET_DENSITY_DEFAULT, clampPreviewFontSize, legacyDensity } from "../ui/asset-density";
 import { isVideoPath } from "./media";
 
 const captionFontSize = (value: unknown): number => Math.max(8, Math.min(32, typeof value === "number" && Number.isFinite(value) ? Math.round(value) : 11));
@@ -12,7 +12,7 @@ export const DEFAULT_SIDE_LAYOUT: SideLayoutState = {
 };
 
 export const DEFAULT_DATA: PaletteData = {
-  schemaVersion: 31,
+  schemaVersion: 32,
   settings: { theme: "obsidian", accentMode: "obsidian", accentColor: "#7c3aed", labelColorPresets: [], cardHeight: 220, fontSize: 14, columns: 4, canvasCaptionFontSize: 11 },
   items: {},
   workspaces: {},
@@ -48,8 +48,8 @@ export function migrateData(raw: Partial<PaletteData> | null | undefined): Palet
   return {
     ...structuredClone(DEFAULT_DATA),
     ...raw,
-    settings: { ...DEFAULT_DATA.settings, ...migratedSettings, canvasCaptionFontSize: captionFontSize(rawSettings?.canvasCaptionFontSize), labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
-    schemaVersion: 31,
+    settings: { ...DEFAULT_DATA.settings, ...migratedSettings, fontSize: clampPreviewFontSize(rawSettings?.fontSize), canvasCaptionFontSize: captionFontSize(rawSettings?.canvasCaptionFontSize), labelColorPresets: [...new Set(rawSettings?.labelColorPresets ?? [])] },
+    schemaVersion: 32,
     items: Object.fromEntries(Object.entries(raw.items ?? {}).map(([id, item]) => {
       const repairedType = item.type === "markdown" && !item.origin?.filePath ? "card" : item.type === "markdown" && isVideoPath(item.origin?.filePath) ? "video" : item.type;
       const supportsFaces = repairedType !== "group" && repairedType !== "link";

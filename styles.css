@@ -221,3 +221,20 @@
 
 /* Text capture destination uses the same compact native form as Workspace creation. */
 .cp-text-scrap-workspace-modal{display:grid;gap:9px;width:min(420px,calc(100vw - 48px))}.cp-text-scrap-workspace-modal h2{margin:0 0 2px}.cp-text-scrap-workspace-modal label{color:var(--cp-muted);font-size:var(--font-ui-smaller)}.cp-text-scrap-workspace-modal select{width:100%;box-sizing:border-box}
+
+/* Density-linked card typography keeps titles and previews readable together. */
+.cp-grid .cp-item,.cp-asset-grid .cp-item{container-type:inline-size;overflow:hidden}
+.cp-grid .cp-item__title,.cp-asset-grid .cp-item__title{display:-webkit-box;flex:1;min-width:0;overflow:hidden;font-size:var(--cp-density-title-size,inherit);font-weight:700;line-height:1.25;white-space:normal;overflow-wrap:break-word;text-overflow:ellipsis;-webkit-box-orient:vertical;-webkit-line-clamp:var(--cp-density-title-lines,2)}
+.cp-grid .cp-item__title-input,.cp-asset-grid .cp-item__title-input{min-width:0;font-size:var(--cp-density-title-size,inherit)}
+.cp-grid :is(.cp-item--card,.cp-item--markdown,.cp-item--link) .cp-item__body,.cp-asset-grid :is(.cp-item--card,.cp-item--markdown,.cp-item--link) .cp-item__body{min-height:0;max-height:var(--cp-density-preview-max-height,220px);overflow:hidden;font-size:var(--cp-density-preview-size,inherit)}
+.cp-grid[data-density="1"] :is(.cp-item--card,.cp-item--markdown,.cp-item--link) .cp-item__body,.cp-asset-grid[data-density="1"] :is(.cp-item--card,.cp-item--markdown,.cp-item--link) .cp-item__body{display:none}
+.cp-grid .cp-item.is-selected:is(.cp-item--card,.cp-item--markdown) .cp-item__body,.cp-asset-grid .cp-item.is-selected:is(.cp-item--card,.cp-item--markdown) .cp-item__body{overflow-y:auto;overscroll-behavior:contain}
+/* Text previews in List/Details must use the readable full-width row, not the legacy metadata column. */
+.cp-grid--list .cp-item:is(.cp-item--card,.cp-item--markdown,.cp-item--link),.cp-asset-grid--list .cp-item:is(.cp-item--card,.cp-item--markdown,.cp-item--link){display:flex;flex-direction:column;align-items:stretch;gap:0;max-height:none}
+.cp-grid--list :is(.cp-item--card,.cp-item--markdown,.cp-item--link) .cp-item__body,.cp-asset-grid--list :is(.cp-item--card,.cp-item--markdown,.cp-item--link) .cp-item__body{grid-column:auto;grid-row:auto;width:100%;flex:0 1 auto}
+.cp-grid--list :is(.cp-item--card,.cp-item--markdown,.cp-item--link) .cp-item__canvas-links,.cp-grid--list :is(.cp-item--card,.cp-item--markdown,.cp-item--link) .cp-item__footer,.cp-asset-grid--list :is(.cp-item--card,.cp-item--markdown,.cp-item--link) .cp-item__canvas-links,.cp-asset-grid--list :is(.cp-item--card,.cp-item--markdown,.cp-item--link) .cp-item__footer{grid-column:auto;grid-row:auto}
+@container (max-width:179px){
+  .cp-item__header{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start}
+  .cp-item__header-actions{grid-column:1/-1;justify-self:end;margin-top:4px}
+  .cp-item__title,.cp-item__title-input{grid-column:2;min-width:0}
+}

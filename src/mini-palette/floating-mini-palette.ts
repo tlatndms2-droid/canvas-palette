@@ -132,7 +132,7 @@ export class FloatingMiniPalette {
     const update = () => {
       list.empty(); summary.empty();
       const state = this.plugin.store.data.uiState.miniPalette;
-      state.densityLevel = applyAssetDensity(list, state.densityLevel, "cp-asset-grid");
+      state.densityLevel = applyAssetDensity(list, state.densityLevel, "cp-asset-grid", this.plugin.store.data.settings.fontSize);
       state.viewMode = state.densityLevel === 0 ? "list" : "grid";
       const visible = this.collectItems();
       const selected = this.collectSelectedIds();
@@ -240,16 +240,16 @@ export class FloatingMiniPalette {
 
   private configureStorageGrid(parent: HTMLElement, grid: HTMLElement): void {
     const state = this.plugin.store.data.uiState.miniPalette;
-    state.densityLevel = applyAssetDensity(grid, state.densityLevel, "cp-asset-grid");
+    state.densityLevel = applyAssetDensity(grid, state.densityLevel, "cp-asset-grid", this.plugin.store.data.settings.fontSize);
     state.viewMode = state.densityLevel === 0 ? "list" : "grid";
-    grid.addEventListener("wheel", (event) => { if (!event.ctrlKey && !event.metaKey) return; event.preventDefault(); event.stopPropagation(); state.densityLevel = nextAssetDensity(state.densityLevel, event.deltaY); state.viewMode = state.densityLevel === 0 ? "list" : "grid"; applyAssetDensity(grid, state.densityLevel, "cp-asset-grid"); this.plugin.store.changed(); }, { passive: false });
+    grid.addEventListener("wheel", (event) => { if (!event.ctrlKey && !event.metaKey) return; event.preventDefault(); event.stopPropagation(); state.densityLevel = nextAssetDensity(state.densityLevel, event.deltaY); state.viewMode = state.densityLevel === 0 ? "list" : "grid"; applyAssetDensity(grid, state.densityLevel, "cp-asset-grid", this.plugin.store.data.settings.fontSize); this.plugin.store.changed(); }, { passive: false });
     this.populateStorageGrid(grid);
     this.mountStorageSelection(parent, grid);
   }
 
   private populateStorageGrid(grid: HTMLElement): void {
     const state = this.plugin.store.data.uiState.miniPalette;
-    applyAssetDensity(grid, state.densityLevel, "cp-asset-grid");
+    applyAssetDensity(grid, state.densityLevel, "cp-asset-grid", this.plugin.store.data.settings.fontSize);
     const storageItems = this.storageItems();
     const orderedIds = storageItems.map((item) => item.id);
     for (const item of storageItems) {
@@ -429,7 +429,7 @@ export class FloatingMiniPalette {
     const heading = control.createDiv({ cls: "cp-density-control__heading" }); const name = heading.createEl("label", { text: label }); const value = heading.createSpan({ text: assetDensityLabel(state.densityLevel) });
     const input = control.createEl("input", { attr: { type: "range", min: String(ASSET_DENSITY_MIN), max: String(ASSET_DENSITY_MAX), step: "1", value: String(state.densityLevel), "aria-label": label } });
     name.htmlFor = input.id = `cp-mini-density-${compact ? "quick" : "panel"}`;
-    const update = (): void => { state.densityLevel = Number(input.value); state.viewMode = state.densityLevel === 0 ? "list" : "grid"; value.setText(assetDensityLabel(state.densityLevel)); const grid = this.panel?.querySelector<HTMLElement>(".cp-asset-grid"); if (grid) applyAssetDensity(grid, state.densityLevel, "cp-asset-grid"); };
+    const update = (): void => { state.densityLevel = Number(input.value); state.viewMode = state.densityLevel === 0 ? "list" : "grid"; value.setText(assetDensityLabel(state.densityLevel)); const grid = this.panel?.querySelector<HTMLElement>(".cp-asset-grid"); if (grid) applyAssetDensity(grid, state.densityLevel, "cp-asset-grid", this.plugin.store.data.settings.fontSize); };
     input.addEventListener("input", update); input.addEventListener("change", () => this.plugin.store.changed());
   }
   private openMiniItemMenu(event: MouseEvent, item: PaletteItem, tab: "collect" | "storage"): void {
