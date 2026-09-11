@@ -49,6 +49,11 @@ test("Collection and Item Collection deletion share the context-menu choice", as
   assert.match(store, /for \(const collectionId of collectionIds\) delete this\.data\.collections\[collectionId\]/);
 });
 
+test("top-level Collection creation returns to the Workspace root so the new row is visible", async () => {
+  const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
+  assert.match(source, /if \(!parentId\) \{[\s\S]*focusedCollectionId = null;[\s\S]*selectedCollectionId = null;[\s\S]*createCollection\(workspaceId, value, parentId\)/);
+});
+
 test("Item Collection arrows never open the preview and Item previews use the short click interval", async () => {
   const source = await readFile(new URL("../src/side-palette/side-palette-view.ts", import.meta.url), "utf8");
   assert.match(source, /arrow\.addEventListener\("dblclick", \(event\) => event\.stopPropagation\(\)\)/);

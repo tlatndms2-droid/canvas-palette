@@ -57,6 +57,7 @@ export class SidePaletteView extends ItemView {
     if (workspace) {
       workspace.sideLayout.responsiveTab = "viewport";
       const collection = Object.values(this.plugin.store.data.collections).find((entry) => entry.workspaceId === workspace.id && entry.itemIds.includes(itemId));
+      workspace.sideLayout.focusedCollectionId = collection?.id ?? null;
       workspace.sideLayout.selectedCollectionId = collection?.id ?? null;
       const expanded: string[] = []; let cursor = collection;
       while (cursor) { expanded.push(cursor.id); cursor = cursor.parentId ? this.plugin.store.data.collections[cursor.parentId] : undefined; }
@@ -948,7 +949,7 @@ export class SidePaletteView extends ItemView {
   }
   private clamp(value: number, minimum: number, maximum: number): number { return Math.max(minimum, Math.min(maximum, value)); }
   private setSideView(viewMode: "grid" | "list"): void { const workspace = this.plugin.activeWorkspace(); if (!workspace) return; workspace.sideLayout.viewMode = viewMode; workspace.sideLayout.densityLevel = viewMode === "list" ? 0 : Math.max(1, workspace.sideLayout.densityLevel || ASSET_DENSITY_DEFAULT); this.plugin.store.changed(); }
-  private promptCollection(workspaceId: string, parentId: string | null): void { new TextPromptModal(this.app, "New collection", "", (value) => this.plugin.store.createCollection(workspaceId, value, parentId), "Collection name").open(); }
+  private promptCollection(workspaceId: string, parentId: string | null): void { new TextPromptModal(this.app, "New collection", "", (value) => { if (!parentId) { const workspace = this.plugin.store.data.workspaces[workspaceId]; if (workspace) { workspace.sideLayout.focusedCollectionId = null; workspace.sideLayout.selectedCollectionId = null; } } this.plugin.store.createCollection(workspaceId, value, parentId); }, "Collection name").open(); }
   private itemMenu(event: MouseEvent, item: PaletteItem, fromOutliner = false): void {
     event.preventDefault(); const menu = new Menu(); const workspace = this.plugin.activeWorkspace();
     const selected = this.sideSelectedIds(); const targetIds = selected.includes(item.id) ? selected : [item.id];
