@@ -30,6 +30,9 @@ test("Collection and Item Collection deletion share the context-menu choice", as
   const removeCollection = store.match(/removeCollection\(id: string\): void \{[\s\S]*?\r?\n  \}\r?\n\r?\n  moveCollection/)?.[0] ?? "";
   assert.doesNotMatch(source, /iconButton\(row, "trash-2", "Delete collection"/);
   assert.match(source, /new ConfirmDeleteCollectionModal/);
+  assert.match(source, /const selectedIds = this\.outlineSelection\.filter\(\(entry\) => entry\.kind === "collection"\)/);
+  assert.match(source, /for \(const target of targets\) this\.plugin\.store\.removeCollection\(target\.id\)/);
+  assert.match(source, /for \(const target of targets\) this\.plugin\.store\.removeCollectionWithContents\(target\.id\)/);
   assert.match(source, /setTitle\("Delete"\).*onClick\(deleteCollection\)/);
   assert.match(source, /confirmItemCollectionDelete\(item\)/);
   assert.match(store, /removeCollection\(id: string\)/);
@@ -39,9 +42,10 @@ test("Collection and Item Collection deletion share the context-menu choice", as
   assert.match(removeCollection, /siblingIds\.splice\(index, 1, \.\.\.promotedChildren\)/);
   assert.match(removeCollection, /itemTarget\.push\(\.\.\.collection\.itemIds\.filter/);
   assert.match(removeCollection, /delete this\.data\.collections\[id\]/);
-  assert.match(source, /removeCollectionWithContents\(collection\.id\)/);
+  assert.match(source, /removeCollectionWithContents\(target\.id\)/);
   assert.match(modal, /Collection만 삭제/);
   assert.match(modal, /Collection과 내부 항목 모두 삭제/);
+  assert.match(modal, /선택한 Collection \$\{this\.batchCount\}개를 어떻게 삭제할까요/);
   assert.match(modal, /아이템 Collection만 삭제/);
   assert.match(modal, /아이템 Collection과 내부 항목 모두 삭제/);
   assert.match(modal, /원본 Vault 파일과 Canvas 노드는 삭제하지 않습니다/);

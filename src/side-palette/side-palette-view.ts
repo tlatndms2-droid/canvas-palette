@@ -753,16 +753,25 @@ export class SidePaletteView extends ItemView {
     iconButton(row, "plus", "Add nested collection", () => this.promptCollection(collection.workspaceId, collection.id));
     iconButton(row, "pencil", "Rename collection", () => new TextPromptModal(this.app, "Rename collection", collection.name, (value) => this.plugin.store.renameCollection(collection.id, value)).open());
     const deleteCollection = (): void => {
+      const selectedIds = this.outlineSelection.filter((entry) => entry.kind === "collection").map((entry) => entry.id);
+      const selected = (selectedIds.length ? selectedIds : [collection.id]).map((id) => this.plugin.store.data.collections[id]).filter((entry): entry is Collection => Boolean(entry));
+      const contains = (ancestorId: string, descendantId: string): boolean => {
+        let cursor = this.plugin.store.data.collections[descendantId];
+        while (cursor?.parentId) { if (cursor.parentId === ancestorId) return true; cursor = this.plugin.store.data.collections[cursor.parentId]; }
+        return false;
+      };
+      const targets = selected.filter((entry) => !selected.some((candidate) => candidate.id !== entry.id && contains(candidate.id, entry.id)));
+      const batchCount = targets.length;
       const parentCollection = collection.parentId ? this.plugin.store.data.collections[collection.parentId] : null;
       const parentItem = collection.parentItemId ? this.plugin.store.data.items[collection.parentItemId] : null;
-      const destination = parentItem?.displayTitle ?? parentCollection?.name ?? this.plugin.store.data.workspaces[collection.workspaceId]?.name ?? "the Workspace";
-      new ConfirmDeleteCollectionModal(this.app, collection.name, destination, collection.itemIds.length, collection.childCollectionIds.length, () => {
-        this.outlineSelection = this.outlineSelection.filter((entry) => entry.kind !== "collection" || entry.id !== collection.id);
-        this.plugin.store.removeCollection(collection.id);
+      const destination = batchCount > 1 ? "각 상위 위치" : parentItem?.displayTitle ?? parentCollection?.name ?? this.plugin.store.data.workspaces[collection.workspaceId]?.name ?? "the Workspace";
+      new ConfirmDeleteCollectionModal(this.app, collection.name, destination, targets.reduce((count, entry) => count + entry.itemIds.length, 0), targets.reduce((count, entry) => count + entry.childCollectionIds.length, 0), () => {
+        this.outlineSelection = [];
+        for (const target of targets) this.plugin.store.removeCollection(target.id);
       }, () => {
         this.outlineSelection = [];
-        this.plugin.store.removeCollectionWithContents(collection.id);
-      }).open();
+        for (const target of targets) this.plugin.store.removeCollectionWithContents(target.id);
+      }, batchCount).open();
     };
     row.addEventListener("contextmenu", (event) => {
       event.preventDefault(); if (!this.outlineTargetSelected(target)) this.selectOutlineTarget(target);

@@ -232,11 +232,11 @@ export class AlreadySavedToWorkspaceModal extends Modal {
 }
 
 export class ConfirmDeleteCollectionModal extends Modal {
-  constructor(app: App, private readonly name: string, private readonly destination: string, private readonly itemCount: number, private readonly childCount: number, private readonly onRemoveCollectionOnly: () => void, private readonly onRemoveEverything: () => void) { super(app); }
+  constructor(app: App, private readonly name: string, private readonly destination: string, private readonly itemCount: number, private readonly childCount: number, private readonly onRemoveCollectionOnly: () => void, private readonly onRemoveEverything: () => void, private readonly batchCount = 1) { super(app); }
   onOpen(): void {
     this.contentEl.addClass("canvas-palette", "cp-confirm-modal");
     this.contentEl.createEl("h2", { text: "Collection 삭제" });
-    this.contentEl.createEl("p", { text: `“${this.name}”을 어떻게 삭제할까요?` });
+    this.contentEl.createEl("p", { text: this.batchCount > 1 ? `선택한 Collection ${this.batchCount}개를 어떻게 삭제할까요?` : `“${this.name}”을 어떻게 삭제할까요?` });
     this.contentEl.createEl("p", { text: `안에 Item ${this.itemCount}개와 하위 Collection ${this.childCount}개가 있습니다.` });
     this.contentEl.createEl("p", { text: "두 선택 모두 원본 Vault 파일과 Canvas 노드는 삭제하지 않습니다." });
     const actions = this.contentEl.createDiv({ cls: "cp-modal-actions" });
