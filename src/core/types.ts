@@ -64,6 +64,8 @@ export interface PaletteItem {
   id: string;
   type: PaletteItemType;
   displayTitle: string;
+  /** Keep a title explicitly edited in the Palette when Canvas content refreshes. */
+  customDisplayTitle?: boolean;
   tags: string[];
   label: string;
   labelColor?: string;

@@ -441,6 +441,7 @@ export class PaletteStore {
   updateItem(id: string, changes: Pick<PaletteItem, "displayTitle" | "tags" | "label" | "caption"> & Partial<Pick<PaletteItem, "content" | "backContent" | "labelColor" | "captionFontSize">>): void {
     const item = this.data.items[id];
     if (!item) return;
+    if (changes.displayTitle !== item.displayTitle) item.customDisplayTitle = true;
     Object.assign(item, changes, { modifiedAt: Date.now() });
     this.applyItemMetadataToLinkedNodes(item);
     this.changed();

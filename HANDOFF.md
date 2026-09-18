@@ -1,5 +1,10 @@
 # Canvas Palette Handoff
 
+## 0.4.7 — Preserve edited Palette titles (2026-09-18)
+
+- Explicit Palette title edits now persist through linked Canvas refreshes and native Markdown conversion. Items whose titles have not been edited retain automatic Canvas title updates; body synchronization remains active.
+- Validation: 134 tests, TypeScript no-emit, production build, bundle syntax, and diff checks passed. In an isolated Obsidian 1.13.7 Sandbox, the visible Edit → Title edit → Enter flow preserved the new title during a Canvas body change and after a full Sandbox restart.
+
 ## Development workflow
 
 Current development proceeds through **Plan mode → Goal/Implementation mode → Verification → Release**.

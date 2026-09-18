@@ -357,7 +357,7 @@ export class CanvasAdapter {
           item.origin.filePath = convertedNode.file;
           delete item.origin.textRange;
           if (source instanceof TFile) {
-            item.displayTitle = source.basename;
+            if (!item.customDisplayTitle) item.displayTitle = source.basename;
             item.content = await this.app.vault.cachedRead(source);
           }
           item.modifiedAt = Date.now();
@@ -376,7 +376,8 @@ export class CanvasAdapter {
         const heading = this.readHeading(rawContent);
         const normalizeHeading = Boolean(heading && this.plainTitle(item.displayTitle) === this.plainTitle(heading.title));
         const content = normalizeHeading && heading ? heading.body : rawContent;
-        const displayTitle = normalizeHeading && heading ? this.plainTitle(heading.title) : rawContent.split(/\r?\n/, 1)[0].slice(0, 80) || "Canvas card";
+        const displayTitle = item.customDisplayTitle ? item.displayTitle
+          : normalizeHeading && heading ? this.plainTitle(heading.title) : rawContent.split(/\r?\n/, 1)[0].slice(0, 80) || "Canvas card";
         if (item.content !== content || item.displayTitle !== displayTitle) {
           item.content = content;
           item.displayTitle = displayTitle;
